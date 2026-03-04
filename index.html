@@ -285,13 +285,6 @@
         </select>
         <select id="all-orders-filter-status" onchange="Orders.applyFilters('all')" style="background:rgba(255,255,255,0.6);border:1px solid rgba(26,92,229,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:12px;cursor:pointer;outline:none">
           <option value="">All Statuses</option>
-          <option value="Pending">Pending</option>
-          <option value="Active">Active</option>
-          <option value="Cancelled">Cancelled</option>
-          <option value="Complete">Complete</option>
-        </select>
-        <select id="all-orders-filter-device-status" onchange="Orders.applyFilters('all')" style="background:rgba(255,255,255,0.6);border:1px solid rgba(26,92,229,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:12px;cursor:pointer;outline:none">
-          <option value="">All Device Statuses</option>
           <option value="Posted">Posted</option>
           <option value="Delivered">Delivered</option>
           <option value="Confirmed">Confirmed</option>
@@ -300,6 +293,7 @@
           <option value="Open">Open</option>
           <option value="Pending">Pending</option>
           <option value="Port Approved">Port Approved</option>
+          <option value="Porting Issue">Porting Issue</option>
           <option value="BYOD">BYOD</option>
           <option value="Backordered">Backordered</option>
           <option value="Disconnected">Disconnected</option>
@@ -342,10 +336,19 @@
         <input id="my-orders-search" type="text" placeholder="Search by DSI..." oninput="Orders.applyFilters('my')" style="flex:1;min-width:160px;background:rgba(255,255,255,0.6);border:1px solid rgba(26,92,229,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:13px;outline:none">
         <select id="my-orders-filter-status" onchange="Orders.applyFilters('my')" style="background:rgba(255,255,255,0.6);border:1px solid rgba(26,92,229,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:12px;cursor:pointer;outline:none">
           <option value="">All Statuses</option>
+          <option value="Posted">Posted</option>
+          <option value="Delivered">Delivered</option>
+          <option value="Confirmed">Confirmed</option>
+          <option value="Shipped">Shipped</option>
+          <option value="Scheduled">Scheduled</option>
+          <option value="Open">Open</option>
           <option value="Pending">Pending</option>
-          <option value="Active">Active</option>
-          <option value="Cancelled">Cancelled</option>
-          <option value="Complete">Complete</option>
+          <option value="Port Approved">Port Approved</option>
+          <option value="Porting Issue">Porting Issue</option>
+          <option value="BYOD">BYOD</option>
+          <option value="Backordered">Backordered</option>
+          <option value="Disconnected">Disconnected</option>
+          <option value="Canceled">Canceled</option>
         </select>
       </div>
       <div id="my-orders-count" style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px"></div>

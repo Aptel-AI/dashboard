@@ -64,7 +64,7 @@ const Orders = {
       'Posted': 'var(--green)', 'Delivered': 'var(--green)', 'Confirmed': 'var(--green)',
       'Shipped': 'var(--sc-cyan)', 'Scheduled': 'var(--sc-cyan)',
       'Open': 'var(--yellow)', 'Pending': 'var(--yellow)',
-      'Port Approved': 'var(--blue-core)', 'BYOD': 'var(--blue-core)', 'Backordered': 'var(--orange)',
+      'Port Approved': 'var(--blue-core)', 'Porting Issue': '#cc6600', 'BYOD': 'var(--blue-core)', 'Backordered': 'var(--orange)',
       'Disconnected': 'var(--red)', 'Canceled': 'var(--red)'
     };
     return map[status] || 'var(--silver-dim)';
@@ -74,7 +74,7 @@ const Orders = {
   _renderStatusBadges(badges, total) {
     const parts = [];
     // Sort: active first, then pending, then bad
-    const order = ['Posted', 'Delivered', 'Confirmed', 'Shipped', 'Scheduled', 'Open', 'Pending', 'Port Approved', 'BYOD', 'Backordered', 'Disconnected', 'Canceled'];
+    const order = ['Posted', 'Delivered', 'Confirmed', 'Shipped', 'Scheduled', 'Open', 'Pending', 'Port Approved', 'Porting Issue', 'BYOD', 'Backordered', 'Disconnected', 'Canceled'];
     const sorted = Object.entries(badges).sort((a, b) => {
       const ai = order.indexOf(a[0]), bi = order.indexOf(b[0]);
       return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
@@ -85,6 +85,7 @@ const Orders = {
       // Abbreviate long status names
       const short = status === 'Disconnected' ? 'Disco'
         : status === 'Port Approved' ? 'Port'
+        : status === 'Porting Issue' ? 'Port Issue'
         : status === 'Backordered' ? 'B/O'
         : status;
       parts.push(`<span style="font-size:10px;font-weight:700;letter-spacing:0.5px;color:${color};background:${color}18;border:1px solid ${color}44;border-radius:4px;padding:2px 6px;white-space:nowrap">${count} ${short}</span>`);
@@ -130,20 +131,24 @@ const Orders = {
     const repFilter = document.getElementById(prefix + '-filter-rep')?.value || '';
     const dateFilter = document.getElementById(prefix + '-filter-date')?.value || '';
     const productFilter = document.getElementById(prefix + '-filter-product')?.value || '';
-    const deviceStatusFilter = document.getElementById(prefix + '-filter-device-status')?.value || '';
 
     let filtered = this._orders.filter(o => {
       if (search) {
         const haystack = (o.repName + ' ' + o.dsi).toLowerCase();
         if (!haystack.includes(search)) return false;
       }
-      if (statusFilter && o.status !== statusFilter) return false;
+      // Status filter — matches Tableau DTR statuses or col AM override
+      if (statusFilter) {
+        if (o.tableau && o.tableau.statusCounts && o.tableau.statusCounts[statusFilter]) {
+          // Has this DTR status in Tableau data — passes
+        } else if (o.status === statusFilter) {
+          // Matches col AM override — passes
+        } else {
+          return false;
+        }
+      }
       if (repFilter && o.repName !== repFilter) return false;
       if (productFilter && !(o[productFilter] > 0)) return false;
-      // Device status filter — filter by Tableau DTR status
-      if (deviceStatusFilter) {
-        if (!o.tableau || !o.tableau.statusCounts || !o.tableau.statusCounts[deviceStatusFilter]) return false;
-      }
       if (dateFilter) {
         const orderDate = new Date(o.dateOfSale);
         const now = new Date();
