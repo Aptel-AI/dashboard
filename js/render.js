@@ -382,6 +382,19 @@ const Render = {
         <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(this.pct(m.projDisco, total)) > 5 ? '#f97316' : '#22c55e'}">${this.pct(m.projDisco, total)}%</div><div class="breakdown-lbl">Proj. Disco</div></div>
       </div>
 
+      ${m.totalDevices > 0 ? `
+      <div class="profile-section-title">Activation Summary</div>
+      <div class="breakdown-grid">
+        <div class="breakdown-stat"><div class="breakdown-val">${m.totalDevices}</div><div class="breakdown-lbl">Total Devices</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:${m.activationRate >= 75 ? '#22c55e' : m.activationRate >= 50 ? '#f0b429' : '#e53535'}">${m.activationRate}%</div><div class="breakdown-lbl">Activation Rate</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:var(--green)">${m.active}</div><div class="breakdown-lbl">Active</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:var(--yellow)">${m.pending}</div><div class="breakdown-lbl">Pending</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:var(--red)">${m.cancel + m.projDisco}</div><div class="breakdown-lbl">Disco + Cancel</div></div>
+        ${Object.entries(m.productBreakdown || {}).map(([pt, count]) =>
+          `<div class="breakdown-stat"><div class="breakdown-val">${count}</div><div class="breakdown-lbl">${pt}</div></div>`
+        ).join('')}
+      </div>` : ''}
+
       <div class="profile-section-title">Churn Buckets</div>
       <div class="churn-grid">${churnHTML}</div>
 
@@ -518,6 +531,19 @@ const Render = {
         <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(this.pct(m.cancel, total)) > 10 ? '#e53535' : 'var(--silver)'}">${this.pct(m.cancel, total)}%</div><div class="breakdown-lbl">Cancel</div></div>
         <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(this.pct(m.projDisco, total)) > 5 ? '#f97316' : '#22c55e'}">${this.pct(m.projDisco, total)}%</div><div class="breakdown-lbl">Proj. Disco</div></div>
       </div>
+
+      ${m.totalDevices > 0 ? `
+      <div class="profile-section-title">Activation Summary</div>
+      <div class="breakdown-grid">
+        <div class="breakdown-stat"><div class="breakdown-val">${m.totalDevices}</div><div class="breakdown-lbl">Total Devices</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:${m.activationRate >= 75 ? '#22c55e' : m.activationRate >= 50 ? '#f0b429' : '#e53535'}">${m.activationRate}%</div><div class="breakdown-lbl">Activation Rate</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:var(--green)">${m.active}</div><div class="breakdown-lbl">Active</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:var(--yellow)">${m.pending}</div><div class="breakdown-lbl">Pending</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:var(--red)">${m.cancel + m.projDisco}</div><div class="breakdown-lbl">Disco + Cancel</div></div>
+        ${Object.entries(m.productBreakdown || {}).map(([pt, count]) =>
+          `<div class="breakdown-stat"><div class="breakdown-val">${count}</div><div class="breakdown-lbl">${pt}</div></div>`
+        ).join('')}
+      </div>` : ''}
 
       <div class="profile-section-title">Churn Buckets</div>
       <div class="churn-grid">${churnHTML}</div>

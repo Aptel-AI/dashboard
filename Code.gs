@@ -55,6 +55,20 @@ const OL = {
 };
 
 
+// _TableauOrderLog column indices (0-based)
+const TABLEAU_TAB = '_TableauOrderLog';
+const TOL = {
+  OWNER_OFFICE: 0, REP: 1, LEAD_REP_ID: 2, REP_NUMBER: 3,
+  ORDER_DATE: 4, ORDER_TIME: 5, DSI: 6, SPE: 7, BAN: 8,
+  PRODUCT_TYPE: 9, CRU_IRU: 10, DTR_STATUS: 11, DISCO_REASON: 12,
+  PORT_CARRIER: 13, NOTES: 14, DTR_STATUS_DATE: 15, ORDER_STATUS: 16,
+  POSTED_DATE: 17, MAX_POSTED: 18, FIRST_STREAMING: 19,
+  VOICE_LINE_COUNT: 20, TN_TYPE: 21, PHONE: 22, INSTALL_DATE: 23,
+  BONUS_TIERS: 24, PAYOUT_REASON: 25,
+  UNIT_COUNT: 26, TOTAL_VOLUME: 27, TOTAL_ACTS: 28
+};
+
+
 // === UTILITIES ===
 
 function getApiKey() {
@@ -159,9 +173,21 @@ function doGet(e) {
       return jsonResponse({ orders: orders });
     }
 
-    // Default: return full dashboard data
+    // Tableau summary (on-demand refresh)
+    if (action === 'readTableauSummary') {
+      return jsonResponse(getTableauSummaryWithCache(ss));
+    }
+
+    // Tableau device detail for a single DSI
+    if (action === 'readTableauDetail') {
+      const dsi = (e.parameter && e.parameter.dsi) || '';
+      return jsonResponse({ devices: readTableauDetail(ss, dsi) });
+    }
+
+    // Default: return full dashboard data (includes Tableau summary)
     const roster = readRoster(ss);
     const peopleResult = readPeople(ss, roster);
+    const tableauSummary = getTableauSummaryWithCache(ss);
     const data = {
       people: peopleResult.people || peopleResult,
       roster: roster,
@@ -171,6 +197,7 @@ function doGet(e) {
       teamCustomizations: readTeamCustomizations(ss),
       unlockRequests: readUnlockRequests(ss),
       settings: readSettings(ss),
+      tableauSummary: tableauSummary,
       _debug: peopleResult._debug || null
     };
     return jsonResponse(data);
@@ -547,6 +574,17 @@ function readPayrollOrders(ss) {
     });
   }
 
+  // Enrich payroll orders with Tableau SPE data
+  var tableauSummary = getTableauSummaryWithCache(ss);
+  var dsiSummary = tableauSummary.dsiSummary || {};
+  orders.forEach(function(order) {
+    var ts = dsiSummary[order.dsi];
+    if (ts) {
+      order.speList = ts.speList || [];
+      order.tableauStatusCounts = ts.statusCounts || {};
+    }
+  });
+
   orders.sort((a, b) => b.dateOfSale.localeCompare(a.dateOfSale));
   return orders;
 }
@@ -656,6 +694,172 @@ function readTeams(ss) {
     };
   }
   return result;
+}
+
+
+// === TABLEAU ORDER LOG ===
+
+// Build DSI → email map from Order Log (for joining Tableau DSIs to roster emails)
+function buildDsiEmailMap(ss) {
+  var olSheet = ss.getSheetByName(ORDER_LOG_TAB);
+  if (!olSheet) return {};
+  var olData = olSheet.getDataRange().getValues();
+  var map = {};
+  for (var i = 1; i < olData.length; i++) {
+    var dsi = String(olData[i][OL.DSI] || '').trim();
+    var email = String(olData[i][OL.EMAIL] || '').trim().toLowerCase();
+    if (dsi && email && !map[dsi]) {
+      map[dsi] = email;
+    }
+  }
+  return map;
+}
+
+// Read and aggregate _TableauOrderLog by DSI and by rep email
+function readTableauSummary(ss) {
+  var sheet = ss.getSheetByName(TABLEAU_TAB);
+  if (!sheet) return { dsiSummary: {}, repSummary: {} };
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { dsiSummary: {}, repSummary: {} };
+
+  // Build DSI → email map for rep aggregation
+  var dsiEmailMap = buildDsiEmailMap(ss);
+
+  var dsiSummary = {};
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var dsi = String(row[TOL.DSI] || '').trim();
+    if (!dsi) continue;
+
+    // Skip the "Total" grand total row
+    var ownerOffice = String(row[TOL.OWNER_OFFICE] || '').trim();
+    if (ownerOffice.toLowerCase() === 'total' || dsi.toLowerCase() === 'total') continue;
+
+    var spe = String(row[TOL.SPE] || '').trim();
+    var productType = String(row[TOL.PRODUCT_TYPE] || '').trim();
+    var dtrStatus = String(row[TOL.DTR_STATUS] || '').trim();
+    var discoReason = String(row[TOL.DISCO_REASON] || '').trim();
+    var totalVolume = Number(row[TOL.TOTAL_VOLUME]) || 0;
+    var totalActs = Number(row[TOL.TOTAL_ACTS]) || 0;
+    var tableauRep = String(row[TOL.REP] || '').trim();
+
+    if (!dsiSummary[dsi]) {
+      dsiSummary[dsi] = {
+        tableauRep: tableauRep,
+        totalDevices: 0,
+        totalActivations: 0,
+        totalVolume: 0,
+        statusCounts: {},
+        productCounts: {},
+        disconnectReasons: {},
+        speList: []
+      };
+    }
+
+    var s = dsiSummary[dsi];
+    s.totalDevices++;
+    s.totalActivations += totalActs;
+    s.totalVolume += totalVolume;
+
+    if (dtrStatus) {
+      s.statusCounts[dtrStatus] = (s.statusCounts[dtrStatus] || 0) + 1;
+    }
+    if (productType) {
+      s.productCounts[productType] = (s.productCounts[productType] || 0) + 1;
+    }
+    if (discoReason) {
+      s.disconnectReasons[discoReason] = (s.disconnectReasons[discoReason] || 0) + 1;
+    }
+    if (spe) {
+      s.speList.push(spe);
+    }
+  }
+
+  // Aggregate per-rep using DSI → email join
+  var repSummary = {};
+  Object.keys(dsiSummary).forEach(function(dsi) {
+    var email = dsiEmailMap[dsi];
+    if (!email) return;
+
+    var ds = dsiSummary[dsi];
+    if (!repSummary[email]) {
+      repSummary[email] = {
+        totalDevices: 0,
+        totalActivations: 0,
+        totalVolume: 0,
+        statusCounts: {},
+        productCounts: {},
+        tableauName: ds.tableauRep
+      };
+    }
+
+    var rs = repSummary[email];
+    rs.totalDevices += ds.totalDevices;
+    rs.totalActivations += ds.totalActivations;
+    rs.totalVolume += ds.totalVolume;
+
+    Object.keys(ds.statusCounts).forEach(function(st) {
+      rs.statusCounts[st] = (rs.statusCounts[st] || 0) + ds.statusCounts[st];
+    });
+    Object.keys(ds.productCounts).forEach(function(pt) {
+      rs.productCounts[pt] = (rs.productCounts[pt] || 0) + ds.productCounts[pt];
+    });
+  });
+
+  return { dsiSummary: dsiSummary, repSummary: repSummary };
+}
+
+// Lazy-load per-device detail rows for a single DSI
+function readTableauDetail(ss, dsi) {
+  var sheet = ss.getSheetByName(TABLEAU_TAB);
+  if (!sheet) return [];
+
+  var data = sheet.getDataRange().getValues();
+  var targetDsi = String(dsi || '').trim();
+  if (!targetDsi) return [];
+
+  var devices = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var rowDsi = String(row[TOL.DSI] || '').trim();
+    if (rowDsi !== targetDsi) continue;
+
+    devices.push({
+      spe: String(row[TOL.SPE] || '').trim(),
+      productType: String(row[TOL.PRODUCT_TYPE] || '').trim(),
+      cruIru: String(row[TOL.CRU_IRU] || '').trim(),
+      dtrStatus: String(row[TOL.DTR_STATUS] || '').trim(),
+      discoReason: String(row[TOL.DISCO_REASON] || '').trim(),
+      phone: String(row[TOL.PHONE] || '').trim(),
+      tnType: String(row[TOL.TN_TYPE] || '').trim(),
+      orderStatus: String(row[TOL.ORDER_STATUS] || '').trim(),
+      postedDate: String(row[TOL.POSTED_DATE] || '').trim(),
+      installDate: String(row[TOL.INSTALL_DATE] || '').trim()
+    });
+  }
+  return devices;
+}
+
+// Cached wrapper for readTableauSummary (6-hour TTL)
+function getTableauSummaryWithCache(ss) {
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'tableauSummary_v1';
+  var cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (e) { /* fall through */ }
+  }
+
+  var summary = readTableauSummary(ss);
+  try {
+    var json = JSON.stringify(summary);
+    // CacheService limit is 100KB per value
+    if (json.length < 100000) {
+      cache.put(cacheKey, json, 21600); // 6 hours
+    }
+  } catch (e) { /* caching failed, that's ok */ }
+  return summary;
 }
 
 

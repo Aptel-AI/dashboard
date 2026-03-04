@@ -796,5 +796,87 @@ const DataPipeline = {
       timeSlots: config.timeSlots,
       recentTime, fw4Time, prodLabels, recentProds, fw4Prods
     };
+  },
+
+  // ──────────────────────────────────────────────
+  // TABLEAU ENRICHMENT — DTR status classification
+  // ──────────────────────────────────────────────
+  _ACTIVE_STATUSES: ['Posted', 'Delivered', 'Confirmed'],
+  _PENDING_STATUSES: ['Open', 'Pending', 'Scheduled', 'Shipped', 'Port Approved', 'BYOD', 'Backordered'],
+  _CANCEL_STATUSES: ['Canceled'],
+  _DISCO_STATUSES: ['Disconnected'],
+
+  _classifyStatusCounts(statusCounts) {
+    let active = 0, pending = 0, cancel = 0, disco = 0, total = 0;
+    Object.entries(statusCounts || {}).forEach(([status, count]) => {
+      total += count;
+      if (this._ACTIVE_STATUSES.includes(status)) active += count;
+      else if (this._PENDING_STATUSES.includes(status)) pending += count;
+      else if (this._CANCEL_STATUSES.includes(status)) cancel += count;
+      else if (this._DISCO_STATUSES.includes(status)) disco += count;
+      else pending += count; // unknown statuses default to pending
+    });
+    return { active, pending, cancel, disco, total };
+  },
+
+  // Enrich person metrics with Tableau rep-level data
+  enrichWithTableau(people, tableauByRep) {
+    if (!tableauByRep || Object.keys(tableauByRep).length === 0) return;
+
+    people.forEach(p => {
+      const email = p.email;
+      if (!email) return;
+      const rep = tableauByRep[email];
+      if (!rep) return;
+
+      const classified = this._classifyStatusCounts(rep.statusCounts);
+      const m = p.metrics;
+      m.active = classified.active;
+      m.pending = classified.pending;
+      m.cancel = classified.cancel;
+      m.projDisco = classified.disco;
+      m.totalDevices = classified.total;
+      m.activationRate = classified.total > 0
+        ? parseFloat((classified.active / classified.total * 100).toFixed(1))
+        : 0;
+      m.productBreakdown = rep.productCounts || {};
+      m.tableauName = rep.tableauName || '';
+    });
+  },
+
+  // Enrich team metrics by aggregating member Tableau data
+  enrichTeamsWithTableau(teams) {
+    if (!teams) return;
+
+    teams.forEach(team => {
+      if (!team.metrics || !team.members || team.members.length === 0) return;
+
+      let active = 0, pending = 0, cancel = 0, disco = 0, totalDevices = 0;
+      const productBreakdown = {};
+
+      team.members.forEach(p => {
+        const m = p.metrics;
+        if (m.totalDevices > 0) {
+          active += m.active;
+          pending += m.pending;
+          cancel += m.cancel;
+          disco += m.projDisco;
+          totalDevices += m.totalDevices;
+          Object.entries(m.productBreakdown || {}).forEach(([pt, count]) => {
+            productBreakdown[pt] = (productBreakdown[pt] || 0) + count;
+          });
+        }
+      });
+
+      if (totalDevices > 0) {
+        team.metrics.active = active;
+        team.metrics.pending = pending;
+        team.metrics.cancel = cancel;
+        team.metrics.projDisco = disco;
+        team.metrics.totalDevices = totalDevices;
+        team.metrics.activationRate = parseFloat((active / totalDevices * 100).toFixed(1));
+        team.metrics.productBreakdown = productBreakdown;
+      }
+    });
   }
 };

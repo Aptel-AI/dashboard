@@ -63,6 +63,26 @@ const SheetsAPI = {
     return data.orders || [];
   },
 
+  // ── Fetch Tableau summary (on-demand refresh) ──
+  async fetchTableauSummary(config) {
+    const url = `${config.appsScriptUrl}?key=${encodeURIComponent(config.apiKey)}&action=readTableauSummary`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Apps Script HTTP ${resp.status}`);
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  },
+
+  // ── Fetch Tableau device detail for a single DSI ──
+  async fetchTableauDetail(config, dsi) {
+    const url = `${config.appsScriptUrl}?key=${encodeURIComponent(config.apiKey)}&action=readTableauDetail&dsi=${encodeURIComponent(dsi)}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Apps Script HTTP ${resp.status}`);
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    return data.devices || [];
+  },
+
   // ── Check if Apps Script URL is configured ──
   isConfigured(config) {
     return config.appsScriptUrl &&

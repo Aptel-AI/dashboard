@@ -9,22 +9,88 @@ const Orders = {
   _orders: [],
   _mode: 'all',
   _loading: false,
+  _expandedDsi: null,       // currently expanded DSI for drill-down
+  _detailCache: {},          // dsi → device detail array (client-side cache)
+  _loadingDetail: false,
 
   // ── Fetch orders from server ──
   async fetchOrders(config, mode) {
     this._mode = mode;
     this._loading = true;
+    this._expandedDsi = null;
     try {
       const email = (mode === 'my')
         ? (Roster.getEmail(App.state.currentPersona) || App.state.currentEmail)
         : null;
       this._orders = await SheetsAPI.fetchOrders(config, email);
+      // Attach Tableau data to each order
+      this._orders.forEach(o => {
+        o.tableau = App.state.tableauDsi[o.dsi] || null;
+      });
     } catch (err) {
       console.error('Failed to fetch orders:', err);
       this._orders = [];
     } finally {
       this._loading = false;
     }
+  },
+
+  // ── Status override logic ──
+  // Returns { label, color, source, badges }
+  _getEffectiveStatus(order) {
+    // If Order Log col AM has a non-Pending value → manual override
+    if (order.status && order.status !== 'Pending') {
+      const color = order.status === 'Active' ? 'var(--green)'
+        : order.status === 'Cancelled' ? 'var(--red)'
+        : order.status === 'Complete' ? 'var(--sc-cyan)'
+        : 'var(--yellow)';
+      return { label: order.status, color, source: 'override', badges: null };
+    }
+
+    // If Tableau data exists → derive from device statuses
+    if (order.tableau && order.tableau.statusCounts) {
+      const counts = order.tableau.statusCounts;
+      const total = order.tableau.totalDevices || 0;
+      return { label: null, color: null, source: 'tableau', badges: counts, total };
+    }
+
+    // Default fallback
+    return { label: 'Pending', color: 'var(--yellow)', source: 'default', badges: null };
+  },
+
+  // ── Status color map for Tableau DTR statuses ──
+  _dtrStatusColor(status) {
+    const map = {
+      'Posted': 'var(--green)', 'Delivered': 'var(--green)', 'Confirmed': 'var(--green)',
+      'Shipped': 'var(--sc-cyan)', 'Scheduled': 'var(--sc-cyan)',
+      'Open': 'var(--yellow)', 'Pending': 'var(--yellow)',
+      'Port Approved': 'var(--blue-core)', 'BYOD': 'var(--blue-core)', 'Backordered': 'var(--orange)',
+      'Disconnected': 'var(--red)', 'Canceled': 'var(--red)'
+    };
+    return map[status] || 'var(--silver-dim)';
+  },
+
+  // ── Render mini status badges for Tableau source ──
+  _renderStatusBadges(badges, total) {
+    const parts = [];
+    // Sort: active first, then pending, then bad
+    const order = ['Posted', 'Delivered', 'Confirmed', 'Shipped', 'Scheduled', 'Open', 'Pending', 'Port Approved', 'BYOD', 'Backordered', 'Disconnected', 'Canceled'];
+    const sorted = Object.entries(badges).sort((a, b) => {
+      const ai = order.indexOf(a[0]), bi = order.indexOf(b[0]);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+
+    sorted.forEach(([status, count]) => {
+      const color = this._dtrStatusColor(status);
+      // Abbreviate long status names
+      const short = status === 'Disconnected' ? 'Disco'
+        : status === 'Port Approved' ? 'Port'
+        : status === 'Backordered' ? 'B/O'
+        : status;
+      parts.push(`<span style="font-size:10px;font-weight:700;letter-spacing:0.5px;color:${color};background:${color}18;border:1px solid ${color}44;border-radius:4px;padding:2px 6px;white-space:nowrap">${count} ${short}</span>`);
+    });
+
+    return `<div style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center">${parts.join('')}</div>`;
   },
 
   // ── Render the orders page ──
@@ -64,6 +130,7 @@ const Orders = {
     const repFilter = document.getElementById(prefix + '-filter-rep')?.value || '';
     const dateFilter = document.getElementById(prefix + '-filter-date')?.value || '';
     const productFilter = document.getElementById(prefix + '-filter-product')?.value || '';
+    const deviceStatusFilter = document.getElementById(prefix + '-filter-device-status')?.value || '';
 
     let filtered = this._orders.filter(o => {
       if (search) {
@@ -73,6 +140,10 @@ const Orders = {
       if (statusFilter && o.status !== statusFilter) return false;
       if (repFilter && o.repName !== repFilter) return false;
       if (productFilter && !(o[productFilter] > 0)) return false;
+      // Device status filter — filter by Tableau DTR status
+      if (deviceStatusFilter) {
+        if (!o.tableau || !o.tableau.statusCounts || !o.tableau.statusCounts[deviceStatusFilter]) return false;
+      }
       if (dateFilter) {
         const orderDate = new Date(o.dateOfSale);
         const now = new Date();
@@ -131,10 +202,16 @@ const Orders = {
       });
       const soldStr = soldParts.length > 0 ? soldParts.join(', ') : '\u2014';
 
-      const statusColor = o.status === 'Active' ? 'var(--green)'
-        : o.status === 'Cancelled' ? 'var(--red)'
-        : o.status === 'Complete' ? 'var(--sc-cyan)'
-        : 'var(--yellow)';
+      // Use effective status (with Tableau override logic)
+      const effective = this._getEffectiveStatus(o);
+      let statusHtml;
+      if (effective.source === 'tableau') {
+        statusHtml = this._renderStatusBadges(effective.badges, effective.total);
+      } else {
+        const overrideTag = effective.source === 'override'
+          ? ' <span style="font-size:9px;color:var(--silver-dim);font-weight:400">(Override)</span>' : '';
+        statusHtml = `<span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${effective.color};background:${effective.color}18;border:1px solid ${effective.color}44;border-radius:6px;padding:3px 10px">${this._escapeHtml(effective.label)}</span>${overrideTag}`;
+      }
 
       const noteLines = o.notes ? o.notes.split('\n') : [];
       const notePreview = noteLines.length > 0
@@ -143,16 +220,21 @@ const Orders = {
       const noteCount = noteLines.length;
 
       const escapedDsi = (o.dsi || '').replace(/'/g, "\\'");
+      const hasDrillDown = !!o.tableau;
+      const isExpanded = this._expandedDsi === o.dsi;
+      const dsiClickable = hasDrillDown
+        ? `<span class="name-link" style="cursor:pointer;color:var(--blue-core)" onclick="Orders.toggleDrillDown('${escapedDsi}','${prefix}')">${this._escapeHtml(o.dsi) || '\u2014'} <span style="font-size:9px">${isExpanded ? '\u25B2' : '\u25BC'}</span></span>`
+        : `<span style="color:var(--silver)">${this._escapeHtml(o.dsi) || '\u2014'}</span>`;
 
       const tr = document.createElement('tr');
+      tr.className = 'orders-row';
+      tr.setAttribute('data-dsi', o.dsi || '');
       tr.innerHTML = `
         ${mode === 'all' ? `<td style="padding:10px 12px;font-weight:700;color:var(--white)">${this._escapeHtml(o.repName)}</td>` : ''}
-        <td style="padding:10px 12px;color:var(--silver)">${this._escapeHtml(o.dsi) || '\u2014'}</td>
+        <td style="padding:10px 12px">${dsiClickable}</td>
         <td style="padding:10px 12px;color:var(--silver)">${o.dateOfSale}</td>
         <td style="padding:10px 12px;color:var(--white)">${soldStr}</td>
-        <td style="padding:10px 12px;text-align:center">
-          <span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${statusColor};background:${statusColor}18;border:1px solid ${statusColor}44;border-radius:6px;padding:3px 10px">${this._escapeHtml(o.status)}</span>
-        </td>
+        <td style="padding:10px 12px;text-align:center">${statusHtml}</td>
         <td style="padding:10px 12px;font-size:11px;color:var(--silver-dim);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._escapeHtml(notePreview)}${noteCount > 1 ? ` <span style="color:var(--blue-core)">(${noteCount})</span>` : ''}</td>
         <td style="padding:10px 8px;text-align:right;white-space:nowrap">
           ${canEdit ? `<button onclick="Orders.openEditModal(${o.rowIndex})" style="background:none;border:1px solid rgba(26,92,229,0.3);border-radius:6px;padding:4px 10px;color:var(--blue-core);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-right:4px">Edit</button>` : ''}
@@ -160,7 +242,78 @@ const Orders = {
             style="background:none;border:1px solid rgba(26,92,229,0.3);border-radius:6px;padding:4px 10px;color:var(--blue-core);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer">Notes${noteCount > 0 ? ' (' + noteCount + ')' : ''}</button>
         </td>`;
       tbody.appendChild(tr);
+
+      // If this DSI is expanded, render drill-down row
+      if (isExpanded) {
+        this._renderDrillDownRow(tbody, o.dsi, colSpan);
+      }
     });
+  },
+
+  // ── Toggle drill-down for a DSI ──
+  async toggleDrillDown(dsi, prefix) {
+    if (this._expandedDsi === dsi) {
+      this._expandedDsi = null;
+    } else {
+      this._expandedDsi = dsi;
+      // Lazy-load detail if not cached
+      if (!this._detailCache[dsi]) {
+        this._loadingDetail = true;
+        try {
+          this._detailCache[dsi] = await SheetsAPI.fetchTableauDetail(OFFICE_CONFIG, dsi);
+        } catch (err) {
+          console.error('Failed to load device detail:', err);
+          this._detailCache[dsi] = [];
+        }
+        this._loadingDetail = false;
+      }
+    }
+    this.applyFilters(this._mode);
+  },
+
+  // ── Render the inline drill-down detail row ──
+  _renderDrillDownRow(tbody, dsi, colSpan) {
+    const tr = document.createElement('tr');
+    tr.className = 'drill-down-row';
+    tr.style.background = 'rgba(0,200,255,0.04)';
+
+    const devices = this._detailCache[dsi];
+    if (!devices || devices.length === 0) {
+      tr.innerHTML = `<td colspan="${colSpan}" style="padding:12px 24px;font-size:12px;color:var(--silver-dim)">Loading device detail...</td>`;
+      tbody.appendChild(tr);
+      return;
+    }
+
+    let html = `<td colspan="${colSpan}" style="padding:8px 16px">
+      <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:'Barlow Condensed',sans-serif">
+        <thead>
+          <tr style="color:var(--silver-dim);text-transform:uppercase;letter-spacing:1px;font-size:10px;font-weight:700">
+            <th style="padding:4px 8px;text-align:left">SPE</th>
+            <th style="padding:4px 8px;text-align:left">Product</th>
+            <th style="padding:4px 8px;text-align:center">CRU/IRU</th>
+            <th style="padding:4px 8px;text-align:center">Status</th>
+            <th style="padding:4px 8px;text-align:left">Device</th>
+            <th style="padding:4px 8px;text-align:left">Disco Reason</th>
+          </tr>
+        </thead><tbody>`;
+
+    devices.forEach(d => {
+      const statusColor = this._dtrStatusColor(d.dtrStatus);
+      html += `<tr style="border-top:1px solid rgba(26,92,229,0.1)">
+        <td style="padding:4px 8px;color:var(--silver)">${this._escapeHtml(d.spe)}</td>
+        <td style="padding:4px 8px;color:var(--white)">${this._escapeHtml(d.productType)}</td>
+        <td style="padding:4px 8px;text-align:center;color:var(--silver)">${this._escapeHtml(d.cruIru)}</td>
+        <td style="padding:4px 8px;text-align:center">
+          <span style="font-size:10px;font-weight:700;color:${statusColor};background:${statusColor}18;border:1px solid ${statusColor}44;border-radius:4px;padding:2px 6px">${this._escapeHtml(d.dtrStatus)}</span>
+        </td>
+        <td style="padding:4px 8px;color:var(--silver);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._escapeHtml(d.phone) || '\u2014'}</td>
+        <td style="padding:4px 8px;color:${d.discoReason ? 'var(--red)' : 'var(--silver-dim)'}">${this._escapeHtml(d.discoReason) || '\u2014'}</td>
+      </tr>`;
+    });
+
+    html += '</tbody></table></td>';
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
   },
 
   // ── Note Modal ──

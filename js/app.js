@@ -17,7 +17,9 @@ const App = {
     currentEmail: '',
     currentNav: 'leaderboard',
     lastUpdated: null,
-    refreshTimer: null
+    refreshTimer: null,
+    tableauDsi: {},      // DSI-keyed Tableau summary
+    tableauByRep: {}     // email-keyed Tableau rep summary
   },
 
   // Cached API data (used between fetch and login)
@@ -208,6 +210,17 @@ const App = {
 
     this.state.teamsData = apiData.teams || {};
     this.state.settings = apiData.settings || {};
+
+    // Extract Tableau summary (included in default doGet response)
+    if (apiData.tableauSummary) {
+      this.state.tableauDsi = apiData.tableauSummary.dsiSummary || {};
+      this.state.tableauByRep = apiData.tableauSummary.repSummary || {};
+    }
+
+    // Enrich person and team metrics with Tableau data
+    DataPipeline.enrichWithTableau(this.state.people, this.state.tableauByRep);
+    DataPipeline.enrichTeamsWithTableau(this.state.teams, this.state.tableauByRep);
+
     Roster.init(this.state.roster);
     Roster.initFromApi(apiData);
     TeamsManager.init(this.state.teamsData);
@@ -572,7 +585,86 @@ const App = {
 
   // Build paid-out checkbox HTML for a single order
   _buildPaidOutHtml(order) {
-    // Determine which products have units
+    const speList = order.speList;
+
+    // If SPE data available → use SPE-keyed UI
+    if (speList && speList.length > 0) {
+      return this._buildPaidOutHtmlSpe(order, speList);
+    }
+    // Fallback: legacy product-keyed UI
+    return this._buildPaidOutHtmlLegacy(order);
+  },
+
+  // ── SPE-keyed paid-out UI ──
+  _buildPaidOutHtmlSpe(order, speList) {
+    // Migrate from legacy format if needed
+    const saved = order.paidOut || {};
+    if (!saved._v || saved._v < 2) {
+      this._migratePaidOutToSpe(order, speList);
+    }
+
+    const rowId = order.rowIndex;
+    const paidOut = order.paidOut || {};
+    const totalSpe = speList.length;
+    let paidCount = 0;
+    speList.forEach(spe => { if (paidOut[spe] === true) paidCount++; });
+    const allPaid = totalSpe > 0 && paidCount === totalSpe;
+
+    let html = '';
+
+    // ALL checkbox
+    html += `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;margin-bottom:4px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${allPaid ? 'var(--green)' : 'var(--silver-dim)'}">
+      <input type="checkbox" ${allPaid ? 'checked' : ''} onchange="App._togglePaidOutAllSpe(${rowId},this.checked)"
+        style="accent-color:#22c55e;cursor:pointer;width:14px;height:14px"> ALL
+    </label>`;
+
+    // Per-SPE checkboxes
+    speList.forEach(spe => {
+      const checked = paidOut[spe] === true ? 'checked' : '';
+      const shortSpe = spe.length > 16 ? '...' + spe.slice(-10) : spe;
+      html += `<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px">
+        <input type="checkbox" ${checked} onchange="App._togglePaidOutSpe(${rowId},'${spe.replace(/'/g, "\\'")}',this.checked)"
+          style="accent-color:#22c55e;cursor:pointer;width:13px;height:13px">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:9px;color:var(--silver-dim)" title="${spe}">${shortSpe}</span>
+      </div>`;
+    });
+
+    // Count summary
+    if (paidCount > 0 && paidCount < totalSpe) {
+      html += `<div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;color:var(--sc-cyan);margin-top:2px">${paidCount}/${totalSpe} paid</div>`;
+    } else if (allPaid) {
+      html += `<div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;color:var(--green);margin-top:2px">\u2713 All paid</div>`;
+    }
+
+    return html;
+  },
+
+  // Migrate legacy product-keyed paidOut → SPE-keyed format
+  _migratePaidOutToSpe(order, speList) {
+    const old = order.paidOut || {};
+    if (old._v === 2) return; // already migrated
+
+    const newState = { _v: 2 };
+    // Flatten old boolean arrays into a sequential list
+    const flatBools = [];
+    OFFICE_CONFIG.columns.products.forEach(prod => {
+      if (Array.isArray(old[prod.key])) {
+        old[prod.key].forEach(v => flatBools.push(v === true));
+      }
+    });
+
+    // Map sequentially to SPE list (best-effort)
+    speList.forEach((spe, i) => {
+      newState[spe] = i < flatBools.length ? flatBools[i] : false;
+    });
+
+    order.paidOut = newState;
+    // Persist the migrated format
+    this._persistPaidOut(order);
+  },
+
+  // ── Legacy product-keyed paid-out UI (fallback) ──
+  _buildPaidOutHtmlLegacy(order) {
     const products = [];
     OFFICE_CONFIG.columns.products.forEach(prod => {
       const qty = order[prod.key] || 0;
@@ -581,9 +673,8 @@ const App = {
       }
     });
 
-    if (products.length === 0) return '<span style="font-size:11px;color:var(--silver-dim)">—</span>';
+    if (products.length === 0) return '<span style="font-size:11px;color:var(--silver-dim)">\u2014</span>';
 
-    // Build/merge paid-out state from saved data
     const saved = order.paidOut || {};
     const state = {};
     products.forEach(p => {
@@ -591,7 +682,6 @@ const App = {
       state[p.key] = Array.from({ length: p.qty }, (_, i) => savedArr[i] === true);
     });
 
-    // Check if all are paid
     const totalUnits = products.reduce((sum, p) => sum + p.qty, 0);
     const paidCount = products.reduce((sum, p) => sum + state[p.key].filter(v => v).length, 0);
     const allPaid = totalUnits > 0 && paidCount === totalUnits;
@@ -599,13 +689,11 @@ const App = {
 
     let html = '';
 
-    // ALL checkbox
     html += `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;margin-bottom:4px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${allPaid ? 'var(--green)' : 'var(--silver-dim)'}">
       <input type="checkbox" ${allPaid ? 'checked' : ''} onchange="App._togglePaidOutAll(${rowId},this.checked)"
         style="accent-color:#22c55e;cursor:pointer;width:14px;height:14px"> ALL
     </label>`;
 
-    // Per-product checkboxes
     products.forEach(p => {
       html += `<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px">
         <span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:600;letter-spacing:0.5px;color:var(--silver-dim);min-width:32px">${p.label}</span>`;
@@ -617,22 +705,20 @@ const App = {
       html += `</div>`;
     });
 
-    // Paid count summary
     if (paidCount > 0 && paidCount < totalUnits) {
       html += `<div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;color:var(--sc-cyan);margin-top:2px">${paidCount}/${totalUnits} paid</div>`;
     } else if (allPaid) {
-      html += `<div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;color:var(--green);margin-top:2px">✓ All paid</div>`;
+      html += `<div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;color:var(--green);margin-top:2px">\u2713 All paid</div>`;
     }
 
     return html;
   },
 
-  // Toggle ALL paid-out checkboxes for an order
+  // Toggle ALL paid-out checkboxes for an order (legacy product-keyed)
   _togglePaidOutAll(rowIndex, checked) {
     const order = this._payrollOrders.find(o => o.rowIndex === rowIndex);
     if (!order) return;
 
-    // Build state — set all to checked/unchecked
     const state = {};
     OFFICE_CONFIG.columns.products.forEach(prod => {
       const qty = order[prod.key] || 0;
@@ -643,28 +729,51 @@ const App = {
 
     order.paidOut = state;
     this._persistPaidOut(order);
-    this._filterPayrollOrders(); // re-render to update all checkbox visuals
+    this._filterPayrollOrders();
   },
 
-  // Toggle a single unit's paid-out checkbox
+  // Toggle a single unit's paid-out checkbox (legacy product-keyed)
   _togglePaidOutUnit(rowIndex, prodKey, unitIdx, checked) {
     const order = this._payrollOrders.find(o => o.rowIndex === rowIndex);
     if (!order) return;
 
-    // Initialize paidOut state if needed
     if (!order.paidOut || typeof order.paidOut !== 'object') order.paidOut = {};
 
-    // Ensure array exists for this product with correct length
     const qty = order[prodKey] || 0;
     if (!Array.isArray(order.paidOut[prodKey])) {
       order.paidOut[prodKey] = Array.from({ length: qty }, () => false);
     }
 
-    // Update the specific unit
     order.paidOut[prodKey][unitIdx] = checked;
 
     this._persistPaidOut(order);
-    this._filterPayrollOrders(); // re-render to update ALL checkbox state
+    this._filterPayrollOrders();
+  },
+
+  // Toggle ALL SPE paid-out checkboxes
+  _togglePaidOutAllSpe(rowIndex, checked) {
+    const order = this._payrollOrders.find(o => o.rowIndex === rowIndex);
+    if (!order || !order.speList) return;
+
+    const state = { _v: 2 };
+    order.speList.forEach(spe => { state[spe] = checked; });
+
+    order.paidOut = state;
+    this._persistPaidOut(order);
+    this._filterPayrollOrders();
+  },
+
+  // Toggle a single SPE paid-out checkbox
+  _togglePaidOutSpe(rowIndex, spe, checked) {
+    const order = this._payrollOrders.find(o => o.rowIndex === rowIndex);
+    if (!order) return;
+
+    if (!order.paidOut || typeof order.paidOut !== 'object') order.paidOut = { _v: 2 };
+    order.paidOut._v = 2;
+    order.paidOut[spe] = checked;
+
+    this._persistPaidOut(order);
+    this._filterPayrollOrders();
   },
 
   // Debounced save of paid-out state to server
