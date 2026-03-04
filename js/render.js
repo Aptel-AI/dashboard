@@ -291,26 +291,31 @@ const Render = {
         <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:var(--white);letter-spacing:0.5px">${info.name}</div>
         <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;color:var(--silver-dim);letter-spacing:0.5px">${info.sub}</div>
       </div>` : '';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:rgba(255,255,255,0.35);border-bottom:1px solid rgba(26,92,229,0.12)">
-      <div style="display:flex;align-items:center;gap:12px">
-        <img src="references/logos/elevate-logo-full-standard-blue.png" alt="Elevate" style="height:36px;width:auto">
-        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px">
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim)">Dashboard</span>
+    return `
+    <div class="header-top">
+      <div class="logo-area">
+        <img src="references/logos/elevate-logo-full-standard-blue.png" alt="Elevate" style="height:44px;width:auto;">
+        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;">
+          <span class="week-label">Weekly Leaderboard</span>
           <div class="live-badge"><span class="live-dot"></span>Live</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:var(--silver-dim)">${updated}</span>
-        <button onclick="App.manualRefresh()" title="Refresh data" style="background:rgba(0,200,255,0.1);border:1px solid rgba(0,200,255,0.3);border-radius:6px;padding:5px 8px;cursor:pointer;color:var(--sc-cyan);display:flex;align-items:center">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      <div class="header-right">
+        <span class="last-updated">${updated}</span>
+        <button class="refresh-btn" onclick="App.manualRefresh()" title="Refresh data">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 4v6h-6"/>
+            <path d="M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+          </svg>
         </button>
         ${infoHtml}
         <button onclick="App.logout()" title="Sign out" style="background:none;border:1px solid rgba(229,53,53,0.3);border-radius:6px;padding:5px 10px;color:#e53535;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer">Logout</button>
       </div>
     </div>
-    <nav style="display:flex;gap:2px;padding:8px 24px;background:rgba(255,255,255,0.2);border-bottom:1px solid rgba(26,92,229,0.1);overflow-x:auto">
-      <button class="nav-tab" onclick="App.navTo('leaderboard')" style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:6px 14px;border-radius:6px;border:none;cursor:pointer;background:none;color:var(--silver-dim)">Leaderboard</button>
-      <button class="nav-tab active" style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:6px 14px;border-radius:6px;border:none;cursor:pointer;background:rgba(0,200,255,0.15);color:var(--sc-cyan)">My Profile</button>
+    <nav id="profile-nav" style="display:flex;align-items:center;gap:4px;padding:0 0 10px">
+      <button class="nav-tab" onclick="App.navTo('leaderboard')">Leaderboard</button>
+      <button class="nav-tab active">My Profile</button>
     </nav>`;
   },
 
