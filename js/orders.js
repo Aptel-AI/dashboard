@@ -251,21 +251,15 @@ const Orders = {
   },
 
   // ── Toggle drill-down for a DSI ──
-  async toggleDrillDown(dsi, prefix) {
+  toggleDrillDown(dsi, prefix) {
     if (this._expandedDsi === dsi) {
       this._expandedDsi = null;
     } else {
       this._expandedDsi = dsi;
-      // Lazy-load detail if not cached
+      // Use embedded devices from summary (already loaded with dashboard)
       if (!this._detailCache[dsi]) {
-        this._loadingDetail = true;
-        try {
-          this._detailCache[dsi] = await SheetsAPI.fetchTableauDetail(OFFICE_CONFIG, dsi);
-        } catch (err) {
-          console.error('Failed to load device detail:', err);
-          this._detailCache[dsi] = [];
-        }
-        this._loadingDetail = false;
+        const tableau = App.state.tableauDsi[dsi];
+        this._detailCache[dsi] = (tableau && tableau.devices) ? tableau.devices : [];
       }
     }
     this.applyFilters(this._mode);

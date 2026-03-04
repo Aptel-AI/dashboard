@@ -754,7 +754,8 @@ function readTableauSummary(ss) {
         statusCounts: {},
         productCounts: {},
         disconnectReasons: {},
-        speList: []
+        speList: [],
+        devices: []
       };
     }
 
@@ -775,6 +776,18 @@ function readTableauSummary(ss) {
     if (spe) {
       s.speList.push(spe);
     }
+    s.devices.push({
+      spe: spe,
+      productType: productType,
+      cruIru: String(row[TOL.CRU_IRU] || '').trim(),
+      dtrStatus: dtrStatus,
+      discoReason: discoReason,
+      phone: String(row[TOL.PHONE] || '').trim(),
+      tnType: String(row[TOL.TN_TYPE] || '').trim(),
+      orderStatus: String(row[TOL.ORDER_STATUS] || '').trim(),
+      postedDate: String(row[TOL.POSTED_DATE] || '').trim(),
+      installDate: String(row[TOL.INSTALL_DATE] || '').trim()
+    });
   }
 
   // Aggregate per-rep using DSI → email join
