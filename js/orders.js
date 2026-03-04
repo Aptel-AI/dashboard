@@ -111,7 +111,7 @@ const Orders = {
   // ── Status color map for Tableau DTR statuses ──
   _dtrStatusColor(status) {
     const map = {
-      'Active': 'var(--green)', 'Posted': 'var(--green)', 'Delivered': 'var(--green)', 'Confirmed': 'var(--green)',
+      'Active': 'var(--green)', 'Posted': 'var(--green)', 'Delivered': 'var(--yellow)', 'Confirmed': 'var(--green)',
       'Shipped': 'var(--sc-cyan)', 'Scheduled': 'var(--sc-cyan)',
       'Open': 'var(--yellow)', 'Pending': 'var(--yellow)',
       'Port Approved': 'var(--blue-core)', 'Porting Issue': '#cc6600', 'Pending Install': 'var(--sc-teal)', 'BYOD': 'var(--blue-core)', 'Backordered': 'var(--orange)',
