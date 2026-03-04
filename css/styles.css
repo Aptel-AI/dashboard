@@ -130,14 +130,14 @@ header {
   display: flex;
   align-items: center;
   gap: 7px;
-  background: rgba(34,197,94,0.12);
-  border: 1px solid rgba(34,197,94,0.3);
+  background: #22c55e;
+  border: none;
   border-radius: 20px;
-  padding: 4px 12px;
+  padding: 5px 14px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 2px;
-  color: var(--sc-green);
+  color: #fff;
   text-transform: uppercase;
 }
 
@@ -145,7 +145,7 @@ header {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--sc-green);
+  background: #fff;
   animation: pulse 2s infinite;
 }
 
