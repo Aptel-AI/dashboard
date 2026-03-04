@@ -15,7 +15,7 @@ const App = {
     viewAsActive: false,   // whether superadmin View-As switcher is expanded
     currentPersona: '',
     currentEmail: '',
-    currentNav: 'leaderboard',
+    currentNav: 'profile',
     lastUpdated: null,
     refreshTimer: null,
     tableauDsi: {},      // DSI-keyed Tableau summary
@@ -231,6 +231,10 @@ const App = {
     TeamsManager.init(this.state.teamsData);
     this.updateNav();
     Render.renderAll(this.state.people, this.state.teams);
+    // Land on My Profile by default
+    if (this.state.currentNav === 'profile') {
+      this.openPersonProfile(this.state.currentPersona);
+    }
     // Re-render roster page if it's currently visible
     if (this.state.currentNav === 'roster') {
       Roster.renderRoster(this.state.people, this.state.currentRole, OFFICE_CONFIG);
@@ -841,7 +845,7 @@ const App = {
 
   setRole(role) {
     this.state.currentRole = role;
-    this.state.currentNav = 'leaderboard';
+    this.state.currentNav = 'profile';
     document.querySelectorAll('.role-pill').forEach(b => b.classList.toggle('active', b.dataset.role === role));
     this.populatePersonaSelect(role);
     this.updateRoleIndicator();
@@ -852,7 +856,7 @@ const App = {
 
   setPersona(name) {
     this.state.currentPersona = name;
-    this.state.currentNav = 'leaderboard';
+    this.state.currentNav = 'profile';
     this.updateRoleIndicator();
     this.updateNav();
     Render.closeProfile();
