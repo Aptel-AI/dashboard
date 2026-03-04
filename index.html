@@ -269,6 +269,23 @@
       </div>
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px">
         <input id="all-orders-search" type="text" placeholder="Search by name or DSI..." oninput="Orders.applyFilters('all')" style="flex:1;min-width:160px;background:rgba(255,255,255,0.6);border:1px solid rgba(26,92,229,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:13px;outline:none">
+        <select id="all-orders-filter-rep" onchange="Orders.applyFilters('all')" style="background:rgba(255,255,255,0.6);border:1px solid rgba(26,92,229,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:12px;cursor:pointer;outline:none">
+          <option value="">All Reps</option>
+        </select>
+        <select id="all-orders-filter-date" onchange="Orders.applyFilters('all')" style="background:rgba(255,255,255,0.6);border:1px solid rgba(26,92,229,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:12px;cursor:pointer;outline:none">
+          <option value="">All Dates</option>
+          <option value="today">Today</option>
+          <option value="7">Past 7 Days</option>
+          <option value="14">Past 14 Days</option>
+          <option value="30">Past 30 Days</option>
+        </select>
+        <select id="all-orders-filter-product" onchange="Orders.applyFilters('all')" style="background:rgba(255,255,255,0.6);border:1px solid rgba(26,92,229,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:12px;cursor:pointer;outline:none">
+          <option value="">All Products</option>
+          <option value="air">Air</option>
+          <option value="cell">Cell</option>
+          <option value="fiber">Fiber</option>
+          <option value="voip">VoIP</option>
+        </select>
         <select id="all-orders-filter-status" onchange="Orders.applyFilters('all')" style="background:rgba(255,255,255,0.6);border:1px solid rgba(26,92,229,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:12px;cursor:pointer;outline:none">
           <option value="">All Statuses</option>
           <option value="Pending">Pending</option>

@@ -41,6 +41,18 @@ const Orders = {
         : `${this._orders.length} orders \u00b7 Past 30 days`;
     }
 
+    // Populate rep filter dropdown (All Orders only)
+    if (mode === 'all') {
+      const repSel = document.getElementById('all-orders-filter-rep');
+      if (repSel) {
+        const reps = [...new Set(this._orders.map(o => o.repName).filter(Boolean))].sort();
+        const current = repSel.value;
+        repSel.innerHTML = '<option value="">All Reps</option>'
+          + reps.map(r => `<option value="${r}">${r}</option>`).join('');
+        if (current) repSel.value = current;
+      }
+    }
+
     this.applyFilters(mode);
   },
 
@@ -49,6 +61,9 @@ const Orders = {
     const prefix = (mode === 'all') ? 'all-orders' : 'my-orders';
     const search = (document.getElementById(prefix + '-search')?.value || '').toLowerCase().trim();
     const statusFilter = document.getElementById(prefix + '-filter-status')?.value || '';
+    const repFilter = document.getElementById(prefix + '-filter-rep')?.value || '';
+    const dateFilter = document.getElementById(prefix + '-filter-date')?.value || '';
+    const productFilter = document.getElementById(prefix + '-filter-product')?.value || '';
 
     let filtered = this._orders.filter(o => {
       if (search) {
@@ -56,6 +71,21 @@ const Orders = {
         if (!haystack.includes(search)) return false;
       }
       if (statusFilter && o.status !== statusFilter) return false;
+      if (repFilter && o.repName !== repFilter) return false;
+      if (productFilter && !(o[productFilter] > 0)) return false;
+      if (dateFilter) {
+        const orderDate = new Date(o.dateOfSale);
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        if (dateFilter === 'today') {
+          const todayStr = now.toISOString().split('T')[0];
+          if (o.dateOfSale !== todayStr) return false;
+        } else {
+          const days = parseInt(dateFilter);
+          const cutoff = new Date(now.getTime() - days * 86400000);
+          if (orderDate < cutoff) return false;
+        }
+      }
       return true;
     });
 
