@@ -786,7 +786,8 @@ function readTableauSummary(ss) {
       tnType: String(row[TOL.TN_TYPE] || '').trim(),
       orderStatus: String(row[TOL.ORDER_STATUS] || '').trim(),
       postedDate: String(row[TOL.POSTED_DATE] || '').trim(),
-      installDate: String(row[TOL.INSTALL_DATE] || '').trim()
+      installDate: String(row[TOL.INSTALL_DATE] || '').trim(),
+      firstStreaming: String(row[TOL.FIRST_STREAMING] || '').trim()
     });
   }
 
@@ -858,7 +859,7 @@ function readTableauDetail(ss, dsi) {
 // Cached wrapper for readTableauSummary (6-hour TTL)
 function getTableauSummaryWithCache(ss) {
   var cache = CacheService.getScriptCache();
-  var cacheKey = 'tableauSummary_v1';
+  var cacheKey = 'tableauSummary_v3';
   var cached = cache.get(cacheKey);
   if (cached) {
     try { return JSON.parse(cached); } catch (e) { /* fall through */ }

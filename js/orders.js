@@ -57,8 +57,8 @@ const Orders = {
 
     // If Tableau data exists → derive from device statuses
     if (order.tableau && order.tableau.statusCounts) {
-      // Remap fiber pending statuses to "Pending Install" in the badge counts
-      const counts = this._remapFiberStatuses(order.tableau);
+      // Remap device statuses (fiber→Pending Install, air→Active, posted+approved→Active)
+      const counts = this._remapDeviceStatuses(order.tableau);
       const total = order.tableau.totalDevices || 0;
       return { label: null, color: null, source: 'tableau', badges: counts, total };
     }
@@ -67,20 +67,34 @@ const Orders = {
     return { label: 'Pending', color: 'var(--yellow)', source: 'default', badges: null };
   },
 
-  // ── Remap fiber device statuses to "Pending Install" ──
-  _remapFiberStatuses(tableau) {
+  // ── Remap device statuses based on product type ──
+  _remapDeviceStatuses(tableau) {
     if (!tableau.devices || tableau.devices.length === 0) {
       return { ...tableau.statusCounts };
     }
-    const ACTIVE = ['Posted', 'Delivered', 'Confirmed'];
-    const KEEP = ['Canceled', 'Disconnected'];
+    const ACTIVE_STATUSES = ['Posted', 'Delivered', 'Confirmed'];
+    const KEEP_AS_IS = ['Canceled', 'Disconnected'];
     const remapped = {};
     tableau.devices.forEach(d => {
-      const isFiber = (d.productType || '').toUpperCase().includes('INTERNET');
+      const pt = (d.productType || '').toUpperCase();
+      const isFiber = pt.includes('INTERNET');
+      const isAir = pt.includes('AIR') || pt.includes('AWB');
       let status = d.dtrStatus || '';
-      if (isFiber && status && !ACTIVE.includes(status) && !KEEP.includes(status)) {
+      const orderStatus = (d.orderStatus || '').toLowerCase();
+
+      // AIR/AWB: if firstStreaming exists → Active
+      if (isAir && d.firstStreaming) {
+        status = 'Active';
+      }
+      // "Posted" + "Approved" orderStatus → Active (no "Posted" label)
+      else if (status === 'Posted' && orderStatus === 'approved') {
+        status = 'Active';
+      }
+      // Fiber: pending-type → Pending Install
+      else if (isFiber && status && !ACTIVE_STATUSES.includes(status) && !KEEP_AS_IS.includes(status)) {
         status = 'Pending Install';
       }
+
       remapped[status] = (remapped[status] || 0) + 1;
     });
     return remapped;
@@ -89,11 +103,11 @@ const Orders = {
   // ── Status color map for Tableau DTR statuses ──
   _dtrStatusColor(status) {
     const map = {
-      'Posted': 'var(--green)', 'Delivered': 'var(--green)', 'Confirmed': 'var(--green)',
+      'Active': 'var(--green)', 'Posted': 'var(--green)', 'Delivered': 'var(--green)', 'Confirmed': 'var(--green)',
       'Shipped': 'var(--sc-cyan)', 'Scheduled': 'var(--sc-cyan)',
       'Open': 'var(--yellow)', 'Pending': 'var(--yellow)',
       'Port Approved': 'var(--blue-core)', 'Porting Issue': '#cc6600', 'Pending Install': 'var(--sc-teal)', 'BYOD': 'var(--blue-core)', 'Backordered': 'var(--orange)',
-      'Disconnected': 'var(--red)', 'Canceled': 'var(--red)'
+      'Canceled': 'var(--red)', 'Disconnected': '#8b0000'
     };
     return map[status] || 'var(--silver-dim)';
   },
@@ -102,7 +116,7 @@ const Orders = {
   _renderStatusBadges(badges, total) {
     const parts = [];
     // Sort: active first, then pending, then bad
-    const order = ['Posted', 'Delivered', 'Confirmed', 'Shipped', 'Scheduled', 'Open', 'Pending', 'Port Approved', 'Porting Issue', 'Pending Install', 'BYOD', 'Backordered', 'Disconnected', 'Canceled'];
+    const order = ['Active', 'Posted', 'Delivered', 'Confirmed', 'Shipped', 'Scheduled', 'Open', 'Pending', 'Port Approved', 'Porting Issue', 'Pending Install', 'BYOD', 'Backordered', 'Canceled', 'Disconnected'];
     const sorted = Object.entries(badges).sort((a, b) => {
       const ai = order.indexOf(a[0]), bi = order.indexOf(b[0]);
       return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
@@ -329,14 +343,26 @@ const Orders = {
           </tr>
         </thead><tbody>`;
 
-    const ACTIVE = ['Posted', 'Delivered', 'Confirmed'];
+    const ACTIVE_STATUSES = ['Posted', 'Delivered', 'Confirmed'];
     const KEEP_AS_IS = ['Canceled', 'Disconnected'];
 
     devices.forEach(d => {
-      const isFiber = (d.productType || '').toUpperCase().includes('INTERNET');
-      // Fiber: show "Pending Install" unless active, canceled, or disconnected
+      const pt = (d.productType || '').toUpperCase();
+      const isFiber = pt.includes('INTERNET');
+      const isAir = pt.includes('AIR') || pt.includes('AWB');
+      const orderStatus = (d.orderStatus || '').toLowerCase();
       let displayStatus = d.dtrStatus;
-      if (isFiber && displayStatus && !ACTIVE.includes(displayStatus) && !KEEP_AS_IS.includes(displayStatus)) {
+
+      // AIR/AWB: if firstStreaming exists → Active
+      if (isAir && d.firstStreaming) {
+        displayStatus = 'Active';
+      }
+      // Posted + Approved → Active
+      else if (displayStatus === 'Posted' && orderStatus === 'approved') {
+        displayStatus = 'Active';
+      }
+      // Fiber: pending-type → Pending Install
+      else if (isFiber && displayStatus && !ACTIVE_STATUSES.includes(displayStatus) && !KEEP_AS_IS.includes(displayStatus)) {
         displayStatus = 'Pending Install';
       }
       const statusColor = this._dtrStatusColor(displayStatus);
