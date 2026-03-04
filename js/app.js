@@ -519,7 +519,7 @@ const App = {
     tbody.innerHTML = '';
 
     if (orders.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--silver-dim);padding:32px;font-family:\'Barlow Condensed\',sans-serif;font-size:14px">No trainee orders found</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--silver-dim);padding:32px;font-family:\'Barlow Condensed\',sans-serif;font-size:14px">No trainee orders found</td></tr>';
       return;
     }
 
@@ -551,6 +551,7 @@ const App = {
       tr.style.cssText = 'border-bottom:1px solid rgba(0,0,0,0.06)';
       tr.innerHTML = `
         <td style="padding:10px 16px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;color:var(--white)">${o.repName}</td>
+        <td style="padding:10px 16px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;color:var(--sc-cyan)">${o.traineeName || '—'}</td>
         <td style="padding:10px 16px;font-family:'Barlow Condensed',sans-serif;font-size:13px;color:var(--silver)">${o.dsi}</td>
         <td style="padding:10px 16px;font-family:'Barlow Condensed',sans-serif;font-size:13px;color:var(--silver)">${o.dateOfSale}</td>
         <td style="padding:10px 16px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:var(--silver-dim)">${soldStr}</td>
