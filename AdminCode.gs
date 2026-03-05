@@ -8,6 +8,7 @@
 // === CONFIG ===
 const ADMIN_ROSTER_TAB = '_AdminRoster';
 const OFFICES_TAB = '_Offices';
+const OWNERS_TAB = '_Owners';
 
 // === UTILITIES ===
 
@@ -42,6 +43,9 @@ function getOrCreateSheet(name) {
           'apiKey', 'status', 'ownerEmail', 'ownerName', 'ownerLevel',
           'logoUrl', 'logoIconUrl', 'brandColors', 'createdDate'
         ]);
+        break;
+      case OWNERS_TAB:
+        sheet.appendRow(['email', 'name', 'level', 'uplineEmail', 'phone', 'notes', 'dateAdded', 'deactivated']);
         break;
     }
   }
@@ -95,7 +99,8 @@ function doGet(e) {
       case 'readAll':
         return jsonResponse({
           adminRoster: readAdminRoster(),
-          offices: readOffices()
+          offices: readOffices(),
+          owners: readOwners()
         });
 
       case 'readOffices':
@@ -103,6 +108,9 @@ function doGet(e) {
 
       case 'readAdminRoster':
         return jsonResponse({ adminRoster: readAdminRoster() });
+
+      case 'readOwners':
+        return jsonResponse({ owners: readOwners() });
 
       default:
         return jsonResponse({ error: 'Unknown action: ' + action });
@@ -256,6 +264,50 @@ function doPost(e) {
         return jsonResponse({ success: true });
       }
 
+      // ── OWNER CRUD ──
+      case 'addOwner': {
+        const sheet = getOrCreateSheet(OWNERS_TAB);
+        const email = (body.email || '').trim().toLowerCase();
+        if (!email) return jsonResponse({ success: false, error: 'Email required' });
+        const existing = findRowCI(sheet, 0, email);
+        if (existing) return jsonResponse({ success: false, error: 'Owner already exists' });
+        sheet.appendRow([
+          email,
+          body.name || '',
+          body.level || 'lvl1',
+          (body.uplineEmail || '').trim().toLowerCase(),
+          body.phone || '',
+          body.notes || '',
+          new Date().toISOString(),
+          'FALSE'
+        ]);
+        return jsonResponse({ success: true });
+      }
+
+      case 'updateOwner': {
+        const sheet = getOrCreateSheet(OWNERS_TAB);
+        const email = (body.email || '').trim().toLowerCase();
+        const found = findRowCI(sheet, 0, email);
+        if (!found) return jsonResponse({ success: false, error: 'Owner not found' });
+        const row = found.rowIndex;
+        if (body.name !== undefined)        sheet.getRange(row, 2).setValue(body.name);
+        if (body.level !== undefined)       sheet.getRange(row, 3).setValue(body.level);
+        if (body.uplineEmail !== undefined) sheet.getRange(row, 4).setValue((body.uplineEmail || '').trim().toLowerCase());
+        if (body.phone !== undefined)       sheet.getRange(row, 5).setValue(body.phone);
+        if (body.notes !== undefined)       sheet.getRange(row, 6).setValue(body.notes);
+        if (body.deactivated !== undefined) sheet.getRange(row, 8).setValue(body.deactivated);
+        return jsonResponse({ success: true });
+      }
+
+      case 'deleteOwner': {
+        const sheet = getOrCreateSheet(OWNERS_TAB);
+        const email = (body.email || '').trim().toLowerCase();
+        const found = findRowCI(sheet, 0, email);
+        if (!found) return jsonResponse({ success: false, error: 'Owner not found' });
+        sheet.deleteRow(found.rowIndex);
+        return jsonResponse({ success: true });
+      }
+
       default:
         return jsonResponse({ error: 'Unknown action: ' + action });
     }
@@ -287,6 +339,28 @@ function readAdminRoster() {
     };
   }
   return roster;
+}
+
+function readOwners() {
+  const sheet = getOrCreateSheet(OWNERS_TAB);
+  const data = sheet.getDataRange().getValues();
+  const owners = {};
+
+  for (let i = 1; i < data.length; i++) {
+    const email = (data[i][0] || '').toString().trim().toLowerCase();
+    if (!email) continue;
+    owners[email] = {
+      email: email,
+      name: (data[i][1] || '').toString().trim(),
+      level: (data[i][2] || 'lvl1').toString().trim(),
+      uplineEmail: (data[i][3] || '').toString().trim().toLowerCase(),
+      phone: (data[i][4] || '').toString().trim(),
+      notes: (data[i][5] || '').toString().trim(),
+      dateAdded: (data[i][6] || '').toString(),
+      deactivated: (data[i][7] || '').toString().toUpperCase() === 'TRUE'
+    };
+  }
+  return owners;
 }
 
 function readOffices() {

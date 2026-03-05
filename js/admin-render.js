@@ -243,8 +243,152 @@ const AdminRender = {
 
 
   // ═══════════════════════════════════════════════════════
+  // OWNERS PAGE
+  // ═══════════════════════════════════════════════════════
+
+  renderOwners(rootNodes, totalCount) {
+    const wrap = document.getElementById('owners-tree-wrap');
+    const countEl = document.getElementById('owners-count');
+    if (!wrap) return;
+
+    if (countEl) countEl.textContent = totalCount + ' owner' + (totalCount !== 1 ? 's' : '');
+
+    if (totalCount === 0) {
+      wrap.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">👑</div>
+          <h3>No Owners Yet</h3>
+          <p>Add your first owner to start building the promotion hierarchy.</p>
+        </div>
+      `;
+      return;
+    }
+
+    let rows = '';
+    const renderNode = (node, depth) => {
+      const indent = depth * 28;
+      const connector = depth > 0 ? '<span style="color:var(--gray-400);margin-right:6px">└</span>' : '';
+      const levelLabel = this._ownerLevelLabel(node.level);
+      const statusClass = node.deactivated ? 'inactive' : 'active';
+      const statusLabel = node.deactivated ? 'Deactivated' : 'Active';
+      const officesBadge = node.officeCount > 0
+        ? `<span style="background:var(--teal);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">${node.officeCount}</span>`
+        : '<span style="color:var(--gray-400)">0</span>';
+      const downlineCount = this._countDescendants(node);
+      const downlineBadge = downlineCount > 0
+        ? `<span style="background:var(--blue-core);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">${downlineCount}</span>`
+        : '<span style="color:var(--gray-400)">0</span>';
+
+      rows += `
+        <tr>
+          <td style="padding-left:${indent + 12}px">
+            ${connector}<strong>${this._esc(node.name || '—')}</strong>
+          </td>
+          <td>${this._esc(node.email)}</td>
+          <td>${this._esc(levelLabel)}</td>
+          <td style="text-align:center">${officesBadge}</td>
+          <td style="text-align:center">${downlineBadge}</td>
+          <td>
+            <span class="status-badge ${statusClass}">
+              <span class="dot"></span> ${statusLabel}
+            </span>
+          </td>
+          <td>
+            <button class="btn btn-secondary btn-sm" onclick="AdminApp.showEditOwnerModal('${this._esc(node.email)}')">Edit</button>
+            <button class="btn btn-sm ${node.deactivated ? 'btn-primary' : 'btn-danger'}"
+                    onclick="AdminApp.toggleOwnerDeactivated('${this._esc(node.email)}')">
+              ${node.deactivated ? 'Reactivate' : 'Deactivate'}
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="AdminApp.deleteOwner('${this._esc(node.email)}')">Delete</button>
+          </td>
+        </tr>
+      `;
+
+      node.children.forEach(child => renderNode(child, depth + 1));
+    };
+
+    rootNodes.forEach(root => renderNode(root, 0));
+
+    wrap.innerHTML = `
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Level</th>
+            <th style="text-align:center">Offices</th>
+            <th style="text-align:center">Downline</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  },
+
+
+  // ═══════════════════════════════════════════════════════
+  // OWNER MODAL
+  // ═══════════════════════════════════════════════════════
+
+  populateOwnerModal(owner, availableUplines) {
+    const title = document.getElementById('owner-modal-title');
+    const emailInput = document.getElementById('owner-email');
+    const nameInput = document.getElementById('owner-name');
+    const levelSelect = document.getElementById('owner-level');
+    const uplineSelect = document.getElementById('owner-upline');
+    const phoneInput = document.getElementById('owner-phone');
+    const notesInput = document.getElementById('owner-notes');
+    const error = document.getElementById('owner-modal-error');
+
+    if (title) title.textContent = owner ? 'Edit Owner' : 'Add Owner';
+    if (error) error.textContent = '';
+
+    if (emailInput) {
+      emailInput.value = owner ? owner.email : '';
+      emailInput.disabled = !!owner; // email is primary key
+    }
+    if (nameInput) nameInput.value = owner ? owner.name : '';
+
+    // Populate level dropdown
+    if (levelSelect) {
+      levelSelect.innerHTML = '';
+      Object.entries(ADMIN_CONFIG.ownerLevels).forEach(([key, lvl]) => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = lvl.label;
+        if (owner && owner.level === key) opt.selected = true;
+        levelSelect.appendChild(opt);
+      });
+    }
+
+    // Populate upline dropdown (cycle-safe)
+    if (uplineSelect) {
+      uplineSelect.innerHTML = '<option value="">(None — top of hierarchy)</option>';
+      (availableUplines || []).forEach(up => {
+        const opt = document.createElement('option');
+        opt.value = up.email;
+        opt.textContent = `${up.name || up.email} (${this._ownerLevelLabel(up.level)})`;
+        if (owner && owner.uplineEmail === up.email) opt.selected = true;
+        uplineSelect.appendChild(opt);
+      });
+    }
+
+    if (phoneInput) phoneInput.value = owner ? owner.phone : '';
+    if (notesInput) notesInput.value = owner ? owner.notes : '';
+  },
+
+
+  // ═══════════════════════════════════════════════════════
   // HELPERS
   // ═══════════════════════════════════════════════════════
+
+  _countDescendants(node) {
+    let count = node.children.length;
+    node.children.forEach(child => { count += this._countDescendants(child); });
+    return count;
+  },
 
   _ownerLevelLabel(level) {
     const cfg = ADMIN_CONFIG.ownerLevels[level];

@@ -9,8 +9,10 @@ const AdminApp = {
     currentPage: 'offices',
     currentEmail: '',
     currentName: '',
+    owners: {},
     editingOfficeId: null,  // null = add mode, string = edit mode
-    editingAdminEmail: null
+    editingAdminEmail: null,
+    editingOwnerEmail: null
   },
 
   // ═══════════════════════════════════════════════════════
@@ -311,6 +313,7 @@ const AdminApp = {
     this.state.currentName = '';
     this.state.adminRoster = {};
     this.state.offices = [];
+    this.state.owners = {};
     const dashboard = document.getElementById('admin-dashboard');
     if (dashboard) dashboard.style.display = 'none';
     this.showLoginScreen();
@@ -336,6 +339,7 @@ const AdminApp = {
 
       this.state.adminRoster = data.adminRoster || {};
       this.state.offices = data.offices || [];
+      this.state.owners = data.owners || {};
 
       this.hideLoading();
       this.showDashboard();
@@ -386,7 +390,7 @@ const AdminApp = {
     });
 
     // Hide all pages, show target
-    ['offices', 'people', 'settings'].forEach(p => {
+    ['offices', 'owners', 'people', 'settings'].forEach(p => {
       const el = document.getElementById('page-' + p);
       if (el) el.style.display = (p === page) ? 'block' : 'none';
     });
@@ -395,6 +399,9 @@ const AdminApp = {
     switch (page) {
       case 'offices':
         AdminRender.renderOffices(this.state.offices);
+        break;
+      case 'owners':
+        AdminRender.renderOwners(this.state.owners, this.state.offices, this.buildOwnerTree());
         break;
       case 'people':
         AdminRender.renderPeople(this.state.adminRoster);
@@ -555,6 +562,152 @@ const AdminApp = {
 
     try {
       await this._post('updateAdmin', { email, deactivated: newState ? 'TRUE' : 'FALSE' });
+      await this.loadData();
+    } catch (err) {
+      alert('Failed to update: ' + err.message);
+    }
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // OWNER HIERARCHY
+  // ═══════════════════════════════════════════════════════
+
+  buildOwnerTree() {
+    const owners = this.state.owners;
+    const byEmail = {};
+
+    // Clone each owner into a tree node with children array
+    Object.values(owners).forEach(o => {
+      byEmail[o.email] = { ...o, children: [], officeCount: 0 };
+    });
+
+    // Count offices per owner
+    this.state.offices.forEach(office => {
+      const email = (office.ownerEmail || '').toLowerCase();
+      if (byEmail[email]) byEmail[email].officeCount++;
+    });
+
+    // Link parent-child via uplineEmail
+    const roots = [];
+    Object.values(byEmail).forEach(node => {
+      if (node.uplineEmail && byEmail[node.uplineEmail]) {
+        byEmail[node.uplineEmail].children.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+
+    // Sort alphabetically at each level
+    const sortByName = (a, b) => a.name.localeCompare(b.name);
+    roots.sort(sortByName);
+    Object.values(byEmail).forEach(node => node.children.sort(sortByName));
+
+    return roots;
+  },
+
+  getAvailableUplines(excludeEmail) {
+    const owners = this.state.owners;
+    if (!excludeEmail) return Object.values(owners);
+
+    // Walk downline recursively to find all descendants
+    const descendants = new Set();
+    const walk = (email) => {
+      Object.values(owners).forEach(o => {
+        if (o.uplineEmail === email && !descendants.has(o.email)) {
+          descendants.add(o.email);
+          walk(o.email);
+        }
+      });
+    };
+    descendants.add(excludeEmail);
+    walk(excludeEmail);
+
+    return Object.values(owners).filter(o => !descendants.has(o.email));
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // OWNER CRUD
+  // ═══════════════════════════════════════════════════════
+
+  showAddOwnerModal() {
+    this.state.editingOwnerEmail = null;
+    AdminRender.populateOwnerModal(null, this.getAvailableUplines(null));
+    document.getElementById('owner-modal')?.classList.add('open');
+  },
+
+  showEditOwnerModal(email) {
+    this.state.editingOwnerEmail = email;
+    const owner = this.state.owners[email];
+    AdminRender.populateOwnerModal(owner, this.getAvailableUplines(email));
+    document.getElementById('owner-modal')?.classList.add('open');
+  },
+
+  closeOwnerModal() {
+    document.getElementById('owner-modal')?.classList.remove('open');
+    const error = document.getElementById('owner-modal-error');
+    if (error) error.textContent = '';
+  },
+
+  async saveOwner() {
+    const email = document.getElementById('owner-email')?.value?.trim()?.toLowerCase();
+    const name = document.getElementById('owner-name')?.value?.trim();
+    const level = document.getElementById('owner-level')?.value;
+    const uplineEmail = document.getElementById('owner-upline')?.value || '';
+    const phone = document.getElementById('owner-phone')?.value?.trim() || '';
+    const notes = document.getElementById('owner-notes')?.value?.trim() || '';
+    const error = document.getElementById('owner-modal-error');
+
+    if (!email || !email.includes('@')) { if (error) error.textContent = 'Valid email required'; return; }
+    if (!name) { if (error) error.textContent = 'Name is required'; return; }
+
+    const saveBtn = document.getElementById('owner-modal-save');
+    if (saveBtn) { saveBtn.textContent = 'Saving...'; saveBtn.disabled = true; }
+
+    try {
+      if (this.state.editingOwnerEmail) {
+        await this._post('updateOwner', { email, name, level, uplineEmail, phone, notes });
+      } else {
+        await this._post('addOwner', { email, name, level, uplineEmail, phone, notes });
+      }
+      this.closeOwnerModal();
+      await this.loadData();
+    } catch (err) {
+      if (error) error.textContent = 'Failed to save: ' + err.message;
+    } finally {
+      if (saveBtn) { saveBtn.textContent = 'Save'; saveBtn.disabled = false; }
+    }
+  },
+
+  async deleteOwner(email) {
+    const owner = this.state.owners[email];
+    if (!owner) return;
+
+    const linkedOffices = this.state.offices.filter(o =>
+      (o.ownerEmail || '').toLowerCase() === email.toLowerCase()
+    );
+    const downline = Object.values(this.state.owners).filter(o => o.uplineEmail === email);
+
+    let msg = `Delete owner "${owner.name}"?`;
+    if (linkedOffices.length > 0) msg += ` Warning: ${linkedOffices.length} office(s) reference this owner.`;
+    if (downline.length > 0) msg += ` ${downline.length} downline owner(s) will become top-level.`;
+    if (!confirm(msg)) return;
+
+    try {
+      await this._post('deleteOwner', { email });
+      await this.loadData();
+    } catch (err) {
+      alert('Failed to delete: ' + err.message);
+    }
+  },
+
+  async toggleOwnerDeactivated(email) {
+    const owner = this.state.owners[email];
+    if (!owner) return;
+    const newState = !owner.deactivated;
+    if (newState && !confirm(`Deactivate ${owner.name}?`)) return;
+
+    try {
+      await this._post('updateOwner', { email, deactivated: newState ? 'TRUE' : 'FALSE' });
       await this.loadData();
     } catch (err) {
       alert('Failed to update: ' + err.message);

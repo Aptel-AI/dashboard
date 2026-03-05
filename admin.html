@@ -72,6 +72,9 @@
       <button class="sidebar-link active" data-page="offices" onclick="AdminApp.navTo('offices')">
         <span class="icon">📊</span> Offices
       </button>
+      <button class="sidebar-link" data-page="owners" onclick="AdminApp.navTo('owners')">
+        <span class="icon">👑</span> Owners
+      </button>
       <button class="sidebar-link" data-page="people" onclick="AdminApp.navTo('people')">
         <span class="icon">👥</span> People
       </button>
@@ -98,6 +101,18 @@
         <p>Manage your office deployments</p>
       </div>
       <div id="offices-grid" class="cards-grid"></div>
+    </div>
+
+    <!-- Owners Page -->
+    <div id="page-owners" style="display:none">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <h1>Owners</h1>
+          <p>Manage office owners and promotion hierarchy &mdash; <span id="owners-count">0 owners</span></p>
+        </div>
+        <button class="btn btn-primary" onclick="AdminApp.showAddOwnerModal()">+ Add Owner</button>
+      </div>
+      <div id="owners-tree-wrap"></div>
     </div>
 
     <!-- People Page -->
@@ -241,6 +256,53 @@
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="AdminApp.closeAdminModal()">Cancel</button>
       <button class="btn btn-primary" id="admin-modal-save" onclick="AdminApp.saveAdmin()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     OWNER MODAL (Add/Edit Owner)
+     ═══════════════════════════════════════════════════════ -->
+<div id="owner-modal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-title" id="owner-modal-title">Add Owner</div>
+
+    <div class="form-group">
+      <label for="owner-email">Email</label>
+      <input id="owner-email" type="email" placeholder="owner@company.com">
+    </div>
+
+    <div class="form-group">
+      <label for="owner-name">Name</label>
+      <input id="owner-name" type="text" placeholder="Full name">
+    </div>
+
+    <div class="form-group">
+      <label for="owner-level">Owner Level</label>
+      <select id="owner-level"></select>
+    </div>
+
+    <div class="form-group">
+      <label for="owner-upline">Upline (Who Promoted Them)</label>
+      <select id="owner-upline"></select>
+      <div class="hint">Select the owner who promoted this person. Leave empty if they are at the top.</div>
+    </div>
+
+    <div class="form-group">
+      <label for="owner-phone">Phone</label>
+      <input id="owner-phone" type="tel" placeholder="(optional)">
+    </div>
+
+    <div class="form-group">
+      <label for="owner-notes">Notes</label>
+      <textarea id="owner-notes" rows="3" placeholder="(optional)" style="width:100%;padding:10px 14px;border:1px solid var(--gray-200);border-radius:var(--radius);font-family:inherit;font-size:14px;resize:vertical"></textarea>
+    </div>
+
+    <div id="owner-modal-error" class="login-error" style="text-align:left"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="AdminApp.closeOwnerModal()">Cancel</button>
+      <button class="btn btn-primary" id="owner-modal-save" onclick="AdminApp.saveOwner()">Save</button>
     </div>
   </div>
 </div>
