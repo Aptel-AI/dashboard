@@ -220,13 +220,13 @@ const Orders = {
           if (orderDate < cutoff) return false;
         }
       }
-      // Hide completed — orders where ALL device statuses are Active, Canceled, or Disconnected
+      // Hide completed — orders where ALL remapped device statuses are Active, Canceled, or Disconnected
       if (hideCompleted) {
         if (o.tableau && o.tableau.devices && o.tableau.devices.length > 0) {
-          const allCompleted = o.tableau.devices.every(d => {
-            const s = (d.dtrStatus || '').trim().toLowerCase();
-            return COMPLETED_STATUSES.includes(s);
-          });
+          const remapped = Orders._remapDeviceStatuses(o.tableau);
+          const allCompleted = Object.keys(remapped).every(s =>
+            COMPLETED_STATUSES.includes(s.toLowerCase())
+          );
           if (allCompleted) return false;
         } else if (o.status) {
           if (COMPLETED_STATUSES.includes((o.status || '').toLowerCase())) return false;
