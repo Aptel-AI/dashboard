@@ -818,10 +818,10 @@ th.week-col { color: var(--silver); }
 
 /* ── CHURN BUCKETS ── */
 .churn-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 4px; }
-.churn-bucket { background: rgba(255,255,255,0.4); border: 1px solid rgba(0,0,0,0.15); border-radius: 8px; padding: 12px 8px; text-align: center; }
+.churn-bucket { background: rgba(255,255,255,0.4); border: 1px solid rgba(0,0,0,0.15); border-radius: 8px; padding: 12px 8px; text-align: center; transition: background 0.2s; }
 .churn-label { font-family: var(--font-subheading); font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--silver-dim); text-transform: uppercase; margin-bottom: 6px; }
-.churn-fraction { font-family: var(--font-heading); font-size: 18px; font-weight: 700; color: var(--white); }
-.churn-pct { font-size: 11px; font-weight: 600; margin-top: 2px; }
+.churn-pct { font-family: var(--font-heading); font-size: 18px; font-weight: 700; }
+.churn-fraction { font-size: 11px; font-weight: 600; color: var(--silver-dim); margin-top: 2px; }
 
 /* ── CHARTS ── */
 .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }

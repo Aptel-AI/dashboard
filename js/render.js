@@ -8,6 +8,17 @@ const Render = {
   expandedPeriods: {},
   currentView: 'days', // 'days' | 'weeks'
 
+  // Map spreadsheet color names → CSS values for churn buckets
+  _CHURN_COLOR_MAP: {
+    green:  { text: '#22c55e', bg: 'rgba(34, 197, 94, 0.13)',  border: 'rgba(34, 197, 94, 0.3)' },
+    red:    { text: '#e53535', bg: 'rgba(229, 53, 53, 0.13)',   border: 'rgba(229, 53, 53, 0.3)' },
+    yellow: { text: '#f0b429', bg: 'rgba(240, 180, 41, 0.13)',  border: 'rgba(240, 180, 41, 0.3)' },
+    orange: { text: '#f97316', bg: 'rgba(249, 115, 22, 0.13)',  border: 'rgba(249, 115, 22, 0.3)' },
+  },
+  _getChurnColor(colorName) {
+    return this._CHURN_COLOR_MAP[(colorName || '').toLowerCase()] || null;
+  },
+
   // ── Helpers ──
   fmt(v) { return (v === null || v === undefined) ? '—' : v; },
   pct(n, d) { return d > 0 ? ((n / d) * 100).toFixed(1) : '0.0'; },
@@ -445,12 +456,17 @@ const Render = {
     const vsColor = m.vsPct >= 0 ? '#2E8B57' : '#E5564A';
     const vsArrow = m.vsPct >= 0 ? '↑' : '↓';
 
-    const churnHTML = m.churnBuckets.map(b => `
-      <div class="churn-bucket">
+    const cc = this._getChurnColor(m.churnColor);
+    const churnHTML = m.churnBuckets.map(b => {
+      const hasDisco = b.pct !== 'N/A' && b.disco > 0;
+      const pctColor = b.pct === 'N/A' ? 'var(--silver-dim)' : (cc ? cc.text : (hasDisco ? '#f97316' : 'var(--silver-dim)'));
+      const cardBg = (b.pct !== 'N/A' && cc) ? `background:${cc.bg};border-color:${cc.border}` : '';
+      return `<div class="churn-bucket" style="${cardBg}">
         <div class="churn-label">${b.label}</div>
-        <div class="churn-pct" style="color:${b.pct === 'N/A' ? 'var(--silver-dim)' : (b.disco > 0 ? '#f97316' : 'var(--silver-dim)')}">${b.pct === 'N/A' ? 'Pending' : (b.disco > 0 ? b.pct + '%' : '0%')}</div>
-        <div class="churn-fraction">${b.pct === 'N/A' ? '' : (b.disco > 0 ? `(${b.disco}/${b.activated})` : `(0/${b.activated})`)}</div>
-      </div>`).join('');
+        <div class="churn-pct" style="color:${pctColor}">${b.pct === 'N/A' ? 'Pending' : (hasDisco ? b.pct + '%' : '0%')}</div>
+        <div class="churn-fraction">${b.pct === 'N/A' ? '' : (hasDisco ? `(${b.disco}/${b.activated})` : `(0/${b.activated})`)}</div>
+      </div>`;
+    }).join('');
 
     // Sales Trends + Products Sold only visible when owner/superadmin views someone else's profile
     const viewerRole = App.state.currentRole;
@@ -562,12 +578,15 @@ const Render = {
     const vsArrow = m.vsPct >= 0 ? '↑' : '↓';
     const total = Math.max(m.totalActs, 1);
 
-    const churnHTML = m.churnBuckets.map(b => `
-      <div class="churn-bucket">
+    const churnHTML = m.churnBuckets.map(b => {
+      const hasDisco = b.pct !== 'N/A' && b.disco > 0;
+      const pctColor = b.pct === 'N/A' ? 'var(--silver-dim)' : (hasDisco ? '#f97316' : 'var(--silver-dim)');
+      return `<div class="churn-bucket">
         <div class="churn-label">${b.label}</div>
-        <div class="churn-pct" style="color:${b.pct === 'N/A' ? 'var(--silver-dim)' : (b.disco > 0 ? '#f97316' : 'var(--silver-dim)')}">${b.pct === 'N/A' ? 'Pending' : (b.disco > 0 ? b.pct + '%' : '0%')}</div>
-        <div class="churn-fraction">${b.pct === 'N/A' ? '' : (b.disco > 0 ? `(${b.disco}/${b.activated})` : `(0/${b.activated})`)}</div>
-      </div>`).join('');
+        <div class="churn-pct" style="color:${pctColor}">${b.pct === 'N/A' ? 'Pending' : (hasDisco ? b.pct + '%' : '0%')}</div>
+        <div class="churn-fraction">${b.pct === 'N/A' ? '' : (hasDisco ? `(${b.disco}/${b.activated})` : `(0/${b.activated})`)}</div>
+      </div>`;
+    }).join('');
 
     this.openProfilePage(`
       <div class="profile-stats-bar">

@@ -901,10 +901,15 @@ const DataPipeline = {
         byRep[repName] = {
           activated: new Array(5).fill(0),
           disco: new Array(5).fill(0),
-          hasData: new Array(5).fill(false)
+          hasData: new Array(5).fill(false),
+          color: ''
         };
       }
       const rd = byRep[repName];
+
+      // Capture color from the spreadsheet (e.g. "Green", "Red")
+      const rowColor = String(row['30-60 Color Churn (copy)'] || '').trim();
+      if (rowColor && !rd.color) rd.color = rowColor;
 
       cols.forEach((col, i) => {
         const val = row[col];
@@ -924,6 +929,9 @@ const DataPipeline = {
       // uses full Tableau names which differ from roster display names
       const repData = byRep[p.metrics.tableauName] || byRep[p.name];
       if (!repData) return;
+
+      // Store churn color from spreadsheet
+      p.metrics.churnColor = repData.color || '';
 
       cols.forEach((col, i) => {
         if (!repData.hasData[i]) return;
