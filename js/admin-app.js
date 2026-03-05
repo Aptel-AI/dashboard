@@ -104,8 +104,18 @@ const AdminApp = {
 
   async handleEmailStep(email) {
     const error = document.getElementById('login-error');
-    if (!email || !email.includes('@')) {
-      if (error) error.textContent = 'Please enter a valid email';
+    if (!email) {
+      if (error) error.textContent = 'Please enter your email or alias';
+      return;
+    }
+
+    // Resolve alias (e.g. "alex" → full email)
+    const aliases = ADMIN_CONFIG.loginAliases || {};
+    const resolved = aliases[email.toLowerCase()] || email;
+    email = resolved;
+
+    if (!email.includes('@')) {
+      if (error) error.textContent = 'Unknown alias. Enter a full email or a configured alias.';
       return;
     }
 

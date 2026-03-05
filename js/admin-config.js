@@ -18,6 +18,11 @@ const ADMIN_CONFIG = {
   sessionKey: 'aptel_admin_session',
   sessionDuration: 24 * 60 * 60 * 1000,  // 24 hours
 
+  // Login aliases — shorthand names that expand to full emails
+  loginAliases: {
+    'alex': 'alex.aspirehr@gmail.com'
+  },
+
   // Template types available for offices
   templates: {
     'att-b2b': {
