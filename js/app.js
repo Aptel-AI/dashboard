@@ -1047,8 +1047,6 @@ const App = {
     Roster.renderRoster(this.state.people, this.state.currentRole, OFFICE_CONFIG);
     Render.renderMainTable(this.state.people);
     Render.renderTeamGrid(this.state.teams);
-    // Refresh manage team tab if visible
-    Render._refreshManageTeam();
     // Refresh team roster page if visible
     this._refreshTeamRoster();
   },
