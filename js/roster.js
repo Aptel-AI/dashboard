@@ -443,7 +443,9 @@ const Roster = {
         </td>
         <td style="padding:12px 16px">
           <div id="roster-phone-display-${safeEmail}" style="display:flex;align-items:center;gap:6px">
-            ${phone ? `<a href="tel:${phone.replace(/[^+\\d]/g, '')}" style="font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;color:var(--sc-cyan);text-decoration:none" title="Call ${phone}">${phone}</a>` : `<span style="font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;color:var(--silver-dim)">—</span>`}
+            ${phone ? `<span style="position:relative;display:inline-block">
+              <span onclick="Roster.showPhoneMenu(this,'${phone.replace(/'/g, "\\'")}','${phone.replace(/[^+\\d]/g, '')}')" style="font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;color:var(--sc-cyan);cursor:pointer">${phone}</span>
+            </span>` : `<span style="font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;color:var(--silver-dim)">—</span>`}
             <button onclick="Roster.startEditPhone('${safeEmail}')" title="Edit phone"
               style="background:none;border:none;padding:2px;cursor:pointer;font-size:11px;color:var(--silver-dim);line-height:1;opacity:0.5">✏️</button>
           </div>
@@ -496,5 +498,46 @@ const Roster = {
     const edit = document.getElementById('roster-phone-edit-' + email);
     if (display) display.style.display = 'flex';
     if (edit) edit.style.display = 'none';
+  },
+
+  // ── Phone click menu (Call / Copy) ──
+  showPhoneMenu(el, display, digits) {
+    // Remove any existing menu
+    const old = document.getElementById('phone-action-menu');
+    if (old) old.remove();
+
+    const menu = document.createElement('div');
+    menu.id = 'phone-action-menu';
+    menu.style.cssText = 'position:absolute;top:100%;left:0;z-index:999;background:var(--card-bg);border:1px solid rgba(0,200,255,0.25);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.25);padding:4px 0;min-width:130px;margin-top:4px';
+
+    const btnStyle = 'display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;border:none;background:none;cursor:pointer;font-family:"Cerebri Sans","DM Sans","Inter",sans-serif;font-size:13px;color:var(--white);text-align:left';
+    const hoverIn = "this.style.background='rgba(0,200,255,0.1)'";
+    const hoverOut = "this.style.background='none'";
+
+    menu.innerHTML = `
+      <button onmouseover="${hoverIn}" onmouseout="${hoverOut}" style="${btnStyle}" onclick="window.location.href='tel:${digits}';document.getElementById('phone-action-menu')?.remove()">
+        📞 <span>Call</span>
+      </button>
+      <button onmouseover="${hoverIn}" onmouseout="${hoverOut}" style="${btnStyle}" onclick="Roster._copyPhone('${display.replace(/'/g, "\\'")}')">
+        📋 <span>Copy</span>
+      </button>`;
+
+    el.parentElement.appendChild(menu);
+
+    // Close on outside click
+    setTimeout(() => {
+      const close = (e) => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', close); } };
+      document.addEventListener('click', close);
+    }, 10);
+  },
+
+  _copyPhone(phone) {
+    navigator.clipboard.writeText(phone).then(() => {
+      const menu = document.getElementById('phone-action-menu');
+      if (menu) {
+        menu.innerHTML = '<div style="padding:8px 14px;font-family:\'Cerebri Sans\',\'DM Sans\',\'Inter\',sans-serif;font-size:13px;color:var(--sc-green)">✓ Copied!</div>';
+        setTimeout(() => menu.remove(), 800);
+      }
+    });
   }
 };
