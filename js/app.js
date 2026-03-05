@@ -234,6 +234,11 @@ const App = {
     TeamsManager.init(this.state.teamsData);
     this.updateNav();
     Render.renderAll(this.state.people, this.state.teams);
+    // Show leaderboard section when on leaderboard, profile, or team views
+    const lbSection = document.getElementById('leaderboard-section');
+    if (lbSection && ['leaderboard', 'profile', 'team'].includes(this.state.currentNav)) {
+      lbSection.style.display = '';
+    }
     // Land on My Profile by default
     if (this.state.currentNav === 'profile') {
       this.openPersonProfile(this.state.currentPersona);
@@ -410,57 +415,65 @@ const App = {
   },
 
   navTo(tab) {
-    // Hide overlay pages when navigating away
-    const overlays = { roster: 'roster-page', teams: 'teams-page', allOrders: 'all-orders-page', myOrders: 'my-orders-page', office: 'office-page', payroll: 'payroll-page', teamRoster: 'team-roster-page' };
-    Object.entries(overlays).forEach(([key, id]) => {
-      if (tab !== key) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+    // Hide ALL page sections
+    const sections = {
+      leaderboard: 'leaderboard-section',
+      roster: 'roster-page',
+      teams: 'teams-page',
+      allOrders: 'all-orders-page',
+      myOrders: 'my-orders-page',
+      office: 'office-page',
+      payroll: 'payroll-page',
+      teamRoster: 'team-roster-page'
+    };
+    Object.values(sections).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
     });
 
     this.state.currentNav = tab;
     this.updateNav();
 
-    if (tab === 'leaderboard') { Render.closeProfile(); return; }
-    if (tab === 'profile') { this.openPersonProfile(this.state.currentPersona); return; }
+    // Profile & Team open overlay on top of leaderboard
+    if (tab === 'profile') {
+      const lb = document.getElementById('leaderboard-section');
+      if (lb) lb.style.display = '';
+      this.openPersonProfile(this.state.currentPersona);
+      return;
+    }
     if (tab === 'team') {
+      const lb = document.getElementById('leaderboard-section');
+      if (lb) lb.style.display = '';
       const myTeam = Roster.getEffectiveTeam(this.state.currentPersona, this.state.people);
       if (myTeam) this.openTeamProfile(myTeam);
       return;
     }
-    if (tab === 'roster') {
-      Render.closeProfile();
+
+    // Close profile overlay for all other tabs
+    Render.closeProfile();
+
+    // Show the target section
+    if (tab === 'leaderboard') {
+      const lb = document.getElementById('leaderboard-section');
+      if (lb) lb.style.display = '';
+    } else if (tab === 'roster') {
       Roster.renderRoster(this.state.people, this.state.currentRole, OFFICE_CONFIG);
-      return;
-    }
-    if (tab === 'teamRoster') {
-      Render.closeProfile();
+    } else if (tab === 'teamRoster') {
       this._renderTeamRoster();
-      return;
-    }
-    if (tab === 'teams') {
-      Render.closeProfile();
+    } else if (tab === 'teams') {
       TeamsManager.renderTeamsPage(this.state.people, this.state.currentRole, OFFICE_CONFIG);
-      return;
-    }
-    if (tab === 'allOrders') {
-      Render.closeProfile();
+    } else if (tab === 'allOrders') {
       this._loadAndRenderOrders('all');
-      return;
-    }
-    if (tab === 'myOrders') {
-      Render.closeProfile();
+    } else if (tab === 'myOrders') {
       this._loadAndRenderOrders('my');
-      return;
-    }
-    if (tab === 'office') {
-      Render.closeProfile();
+    } else if (tab === 'office') {
       this._renderOfficePage();
-      return;
-    }
-    if (tab === 'payroll') {
-      Render.closeProfile();
+    } else if (tab === 'payroll') {
       this._loadAndRenderPayroll();
-      return;
     }
+
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'instant' });
   },
 
   async _loadAndRenderOrders(mode) {
@@ -884,6 +897,9 @@ const App = {
     this.updateNav();
     Render.closeProfile();
     Render.renderAll(this.state.people, this.state.teams);
+    // Ensure leaderboard section is visible behind profile overlay
+    const lb = document.getElementById('leaderboard-section');
+    if (lb) lb.style.display = '';
     this.openPersonProfile(this.state.currentPersona);
   },
 
@@ -894,6 +910,9 @@ const App = {
     this.updateNav();
     Render.closeProfile();
     Render.renderAll(this.state.people, this.state.teams);
+    // Ensure leaderboard section is visible behind profile overlay
+    const lb = document.getElementById('leaderboard-section');
+    if (lb) lb.style.display = '';
     this.openPersonProfile(name);
   },
 

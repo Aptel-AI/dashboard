@@ -121,7 +121,7 @@
         <span id="roster-notif-badge" style="display:none;position:absolute;top:4px;right:4px;min-width:16px;height:16px;background:#f97316;border-radius:8px;border:2px solid var(--black);font-size:9px;font-weight:900;color:#fff;align-items:center;justify-content:center;padding:0 3px;font-family:'Barlow Condensed',sans-serif;letter-spacing:0">0</span>
       </button>
       <button class="nav-tab" id="nav-teams" onclick="App.navTo('teams')" style="display:none">Teams</button>
-      <button class="nav-tab active" id="nav-leaderboard" onclick="App.navTo('leaderboard')">Leaderboard</button>
+      <button class="nav-tab" id="nav-leaderboard" onclick="App.navTo('leaderboard')">Leaderboard</button>
       <button class="nav-tab" id="nav-payroll" onclick="App.navTo('payroll')" style="display:none">Payroll</button>
       <button class="nav-tab" id="nav-office" onclick="App.navTo('office')" style="display:none">Office</button>
     </nav>
@@ -166,14 +166,13 @@
   <!-- ════════════════════════════════════════════════
        ROSTER PAGE (People Management)
        ════════════════════════════════════════════════ -->
-  <div id="roster-page" style="display:none;position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#c8dff0 0%,#daeaf5 40%,#c2daea 70%,#b8d4e8 100%);overflow-y:auto">
-    <div style="max-width:1100px;margin:0 auto;padding:24px 24px 80px">
+  <div id="roster-page" style="display:none">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 0 80px">
 
       <!-- Header -->
       <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid rgba(26,92,229,0.3);margin-bottom:28px">
         <div style="display:flex;align-items:center;gap:16px">
           <div>
-            <button class="profile-back" onclick="App.navTo('leaderboard')" style="margin-bottom:8px"><span>&larr;</span> Back</button>
             <div style="display:flex;align-items:center;gap:16px">
               <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:var(--white);letter-spacing:2px">People</div>
               <button id="add-member-btn" onclick="App.openAddMemberModal()" style="display:none;background:var(--blue-core);border:none;border-radius:8px;padding:8px 16px;color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer">+ Add Member</button>
@@ -239,13 +238,12 @@
   <!-- ════════════════════════════════════════════════
        TEAM ROSTER PAGE (Scoped Team Management)
        ════════════════════════════════════════════════ -->
-  <div id="team-roster-page" style="display:none;position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#c8dff0 0%,#daeaf5 40%,#c2daea 70%,#b8d4e8 100%);overflow-y:auto">
-    <div style="max-width:1100px;margin:0 auto;padding:24px 24px 80px">
+  <div id="team-roster-page" style="display:none">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 0 80px">
 
       <!-- Header -->
       <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid rgba(26,92,229,0.3);margin-bottom:28px">
         <div>
-          <button class="profile-back" onclick="App.navTo('leaderboard')" style="margin-bottom:8px"><span>&larr;</span> Back</button>
           <div style="display:flex;align-items:center;gap:16px">
             <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:var(--white);letter-spacing:2px" id="team-roster-title">Roster</div>
             <button id="team-roster-add-btn" onclick="App.openAddMemberModal(App._teamRosterTeamName)"
@@ -290,11 +288,10 @@
   <!-- ════════════════════════════════════════════════
        TEAMS MANAGEMENT PAGE
        ════════════════════════════════════════════════ -->
-  <div id="teams-page" style="display:none;position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#c8dff0 0%,#daeaf5 40%,#c2daea 70%,#b8d4e8 100%);overflow-y:auto">
-    <div style="max-width:1100px;margin:0 auto;padding:24px 24px 80px">
+  <div id="teams-page" style="display:none">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 0 80px">
       <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid rgba(26,92,229,0.3);margin-bottom:28px">
         <div>
-          <button class="profile-back" onclick="App.navTo('leaderboard')" style="margin-bottom:8px"><span>&larr;</span> Back</button>
           <div style="display:flex;align-items:center;gap:16px">
             <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:var(--white);letter-spacing:2px">Teams</div>
             <button id="create-team-btn" onclick="App.openCreateTeamModal()" style="background:var(--blue-core);border:none;border-radius:8px;padding:8px 16px;color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer">+ Create Team</button>
@@ -322,11 +319,10 @@
   <!-- ════════════════════════════════════════════════
        ALL ORDERS PAGE
        ════════════════════════════════════════════════ -->
-  <div id="all-orders-page" style="display:none;position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#c8dff0 0%,#daeaf5 40%,#c2daea 70%,#b8d4e8 100%);overflow-y:auto">
-    <div style="max-width:1100px;margin:0 auto;padding:24px 24px 80px">
+  <div id="all-orders-page" style="display:none">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 0 80px">
       <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid rgba(26,92,229,0.3);margin-bottom:28px">
         <div>
-          <button class="profile-back" onclick="App.navTo('leaderboard')" style="margin-bottom:8px"><span>&larr;</span> Back</button>
           <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:var(--white);letter-spacing:2px">All Orders</div>
           <div style="font-size:12px;color:var(--silver-dim);margin-top:4px" id="all-orders-page-subtitle"></div>
         </div>
@@ -391,11 +387,10 @@
   <!-- ════════════════════════════════════════════════
        MY ORDERS PAGE
        ════════════════════════════════════════════════ -->
-  <div id="my-orders-page" style="display:none;position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#c8dff0 0%,#daeaf5 40%,#c2daea 70%,#b8d4e8 100%);overflow-y:auto">
-    <div style="max-width:1100px;margin:0 auto;padding:24px 24px 80px">
+  <div id="my-orders-page" style="display:none">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 0 80px">
       <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid rgba(26,92,229,0.3);margin-bottom:28px">
         <div>
-          <button class="profile-back" onclick="App.navTo('leaderboard')" style="margin-bottom:8px"><span>&larr;</span> Back</button>
           <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:var(--white);letter-spacing:2px">My Orders</div>
           <div style="font-size:12px;color:var(--silver-dim);margin-top:4px" id="my-orders-page-subtitle"></div>
         </div>
@@ -442,10 +437,9 @@
   <!-- ════════════════════════════════════════════════
        OFFICE PAGE (Owner only)
        ════════════════════════════════════════════════ -->
-  <div id="office-page" style="display:none;position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#c8dff0 0%,#daeaf5 40%,#c2daea 70%,#b8d4e8 100%);overflow-y:auto">
-    <div style="max-width:800px;margin:0 auto;padding:24px 24px 80px">
+  <div id="office-page" style="display:none">
+    <div style="max-width:800px;margin:0 auto;padding:24px 0 80px">
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
-        <button class="profile-back" onclick="App.navTo('leaderboard')"><span>&larr;</span> Back</button>
         <div>
           <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;letter-spacing:-0.5px;color:var(--white)">Office</div>
           <div style="font-size:12px;color:var(--silver-dim);margin-top:4px">Office-level settings and assignments</div>
@@ -467,10 +461,9 @@
   <!-- ════════════════════════════════════════════════
        PAYROLL PAGE (Owner + Payroll Manager)
        ════════════════════════════════════════════════ -->
-  <div id="payroll-page" style="display:none;position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#c8dff0 0%,#daeaf5 40%,#c2daea 70%,#b8d4e8 100%);overflow-y:auto">
-    <div style="max-width:1100px;margin:0 auto;padding:24px 24px 80px">
+  <div id="payroll-page" style="display:none">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 0 80px">
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
-        <button class="profile-back" onclick="App.navTo('leaderboard')"><span>&larr;</span> Back</button>
         <div>
           <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;letter-spacing:-0.5px;color:var(--white)">Payroll</div>
           <div style="font-size:12px;color:var(--silver-dim);margin-top:4px" id="payroll-page-subtitle"></div>
@@ -685,6 +678,11 @@
   </div>
 
   <!-- ════════════════════════════════════════════════
+       LEADERBOARD SECTION (toggleable)
+       ════════════════════════════════════════════════ -->
+  <div id="leaderboard-section" style="display:none">
+
+  <!-- ════════════════════════════════════════════════
        ROLE SWITCHER (superadmin View-As)
        ════════════════════════════════════════════════ -->
   <div id="role-switcher" style="display:none">
@@ -773,6 +771,8 @@
     </div>
     <div class="team-grid" id="team-grid"></div>
   </div>
+
+  </div><!-- /#leaderboard-section -->
 
   <!-- ════════════════════════════════════════════════
        FOOTER
