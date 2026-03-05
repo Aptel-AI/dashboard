@@ -899,7 +899,9 @@ const DataPipeline = {
     });
 
     people.forEach(p => {
-      const repData = byRep[p.name];
+      // Match by tableauName (set during Tableau enrichment) since churn report
+      // uses full Tableau names which differ from roster display names
+      const repData = byRep[p.metrics.tableauName] || byRep[p.name];
       if (!repData) return;
 
       const activatedRow = repData['Activated SPE/SP'];
