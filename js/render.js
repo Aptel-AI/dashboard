@@ -448,8 +448,8 @@ const Render = {
     const churnHTML = m.churnBuckets.map(b => `
       <div class="churn-bucket">
         <div class="churn-label">${b.label}</div>
-        <div class="churn-fraction">${b.pct === 'N/A' ? 'N/A' : (b.disco > 0 ? `(${b.disco}/${b.activated})` : '---')}</div>
-        <div class="churn-pct" style="color:${b.pct === 'N/A' ? 'var(--silver-dim)' : (b.disco > 0 ? '#f97316' : 'var(--silver-dim)')}">${b.pct === 'N/A' ? 'Pending' : (b.disco > 0 ? b.pct + '%' : '---')}</div>
+        <div class="churn-pct" style="color:${b.pct === 'N/A' ? 'var(--silver-dim)' : (b.disco > 0 ? '#f97316' : 'var(--silver-dim)')}">${b.pct === 'N/A' ? 'Pending' : (b.disco > 0 ? b.pct + '%' : '0%')}</div>
+        <div class="churn-fraction">${b.pct === 'N/A' ? '' : (b.disco > 0 ? `(${b.disco}/${b.activated})` : `(0/${b.activated})`)}</div>
       </div>`).join('');
 
     // Sales Trends + Products Sold only visible when owner/superadmin views someone else's profile
@@ -565,8 +565,8 @@ const Render = {
     const churnHTML = m.churnBuckets.map(b => `
       <div class="churn-bucket">
         <div class="churn-label">${b.label}</div>
-        <div class="churn-fraction">${b.pct === 'N/A' ? 'N/A' : (b.disco > 0 ? `(${b.disco}/${b.activated})` : '---')}</div>
-        <div class="churn-pct" style="color:${b.pct === 'N/A' ? 'var(--silver-dim)' : (b.disco > 0 ? '#f97316' : 'var(--silver-dim)')}">${b.pct === 'N/A' ? 'Pending' : (b.disco > 0 ? b.pct + '%' : '---')}</div>
+        <div class="churn-pct" style="color:${b.pct === 'N/A' ? 'var(--silver-dim)' : (b.disco > 0 ? '#f97316' : 'var(--silver-dim)')}">${b.pct === 'N/A' ? 'Pending' : (b.disco > 0 ? b.pct + '%' : '0%')}</div>
+        <div class="churn-fraction">${b.pct === 'N/A' ? '' : (b.disco > 0 ? `(${b.disco}/${b.activated})` : `(0/${b.activated})`)}</div>
       </div>`).join('');
 
     this.openProfilePage(`

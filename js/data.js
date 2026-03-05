@@ -887,15 +887,36 @@ const DataPipeline = {
   // Enrich person metrics with _TableauChurnReport data
   enrichWithChurnReport(people, churnReport) {
     if (!churnReport || churnReport.length === 0) return;
+    const cols = this._CHURN_BUCKET_COLS;
 
-    // Group rows by rep name → { metricType: row }
+    // Group rows by rep name, summing across color rows (Green/Red/etc.)
+    // Result: byRep[name] = { activated: [5 vals], disco: [5 vals], churnPct: [5 vals] }
     const byRep = {};
     churnReport.forEach(row => {
       const repName = String(row['rep.Full Name'] || '').trim();
       const metricType = String(row['metricType'] || '').trim();
       if (!repName || !metricType || repName === 'Grand Total') return;
-      if (!byRep[repName]) byRep[repName] = {};
-      byRep[repName][metricType] = row;
+
+      if (!byRep[repName]) {
+        byRep[repName] = {
+          activated: new Array(5).fill(0),
+          disco: new Array(5).fill(0),
+          hasData: new Array(5).fill(false)
+        };
+      }
+      const rd = byRep[repName];
+
+      cols.forEach((col, i) => {
+        const val = row[col];
+        if (val === undefined || val === '') return;
+
+        if (metricType === 'Activated SPE/SP') {
+          rd.activated[i] += parseInt(val) || 0;
+          rd.hasData[i] = true;
+        } else if (metricType === 'Disconnect count (SPE/SP)') {
+          rd.disco[i] += parseInt(val) || 0;
+        }
+      });
     });
 
     people.forEach(p => {
@@ -904,26 +925,15 @@ const DataPipeline = {
       const repData = byRep[p.metrics.tableauName] || byRep[p.name];
       if (!repData) return;
 
-      const activatedRow = repData['Activated SPE/SP'];
-      const discoRow = repData['Disconnect count (SPE/SP)'];
-      const churnRow = repData['Churn Rate'];
-
-      if (!activatedRow && !discoRow && !churnRow) return;
-
-      this._CHURN_BUCKET_COLS.forEach((col, i) => {
+      cols.forEach((col, i) => {
+        if (!repData.hasData[i]) return;
         const bucket = p.metrics.churnBuckets[i];
-        if (activatedRow && activatedRow[col] !== undefined && activatedRow[col] !== '') {
-          bucket.activated = parseInt(activatedRow[col]) || 0;
-        }
-        if (discoRow && discoRow[col] !== undefined && discoRow[col] !== '') {
-          bucket.disco = parseInt(discoRow[col]) || 0;
-        }
-        if (churnRow && churnRow[col] !== undefined && churnRow[col] !== '') {
-          // Strip % suffix if present (e.g., "3.30%" → 3.3)
-          const raw = String(churnRow[col]).replace('%', '');
-          const pctVal = parseFloat(raw);
-          bucket.pct = isNaN(pctVal) ? 'N/A' : parseFloat(pctVal.toFixed(1));
-        }
+        bucket.activated = repData.activated[i];
+        bucket.disco = repData.disco[i];
+        // Calculate churn pct from activated/disco
+        bucket.pct = bucket.activated > 0
+          ? parseFloat((bucket.disco / bucket.activated * 100).toFixed(1))
+          : 0;
       });
     });
   },
