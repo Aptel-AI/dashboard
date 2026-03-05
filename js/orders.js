@@ -182,6 +182,9 @@ const Orders = {
     const repFilter = document.getElementById(prefix + '-filter-rep')?.value || '';
     const dateFilter = document.getElementById(prefix + '-filter-date')?.value || '';
     const productFilter = document.getElementById(prefix + '-filter-product')?.value || '';
+    const hideCompleted = document.getElementById(prefix + '-hide-completed')?.checked || false;
+
+    const COMPLETED_STATUSES = ['active', 'canceled', 'disconnected'];
 
     let filtered = this._orders.filter(o => {
       if (search) {
@@ -207,10 +210,26 @@ const Orders = {
         if (dateFilter === 'today') {
           const todayStr = now.toISOString().split('T')[0];
           if (o.dateOfSale !== todayStr) return false;
+        } else if (dateFilter === 'yesterday') {
+          const yesterday = new Date(now.getTime() - 86400000);
+          const yStr = yesterday.toISOString().split('T')[0];
+          if (o.dateOfSale !== yStr) return false;
         } else {
           const days = parseInt(dateFilter);
           const cutoff = new Date(now.getTime() - days * 86400000);
           if (orderDate < cutoff) return false;
+        }
+      }
+      // Hide completed — orders where ALL device statuses are Active, Canceled, or Disconnected
+      if (hideCompleted) {
+        if (o.tableau && o.tableau.devices && o.tableau.devices.length > 0) {
+          const allCompleted = o.tableau.devices.every(d => {
+            const s = (d.dtrStatus || '').trim().toLowerCase();
+            return COMPLETED_STATUSES.includes(s);
+          });
+          if (allCompleted) return false;
+        } else if (o.status) {
+          if (COMPLETED_STATUSES.includes((o.status || '').toLowerCase())) return false;
         }
       }
       return true;

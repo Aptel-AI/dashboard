@@ -335,6 +335,7 @@
         <select id="all-orders-filter-date" onchange="Orders.applyFilters('all')" style="background:rgba(255,255,255,0.6);border:1px solid rgba(26,92,229,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:12px;cursor:pointer;outline:none">
           <option value="">All Dates</option>
           <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
           <option value="7">Past 7 Days</option>
           <option value="14">Past 14 Days</option>
           <option value="30">Past 30 Days</option>
@@ -363,6 +364,9 @@
           <option value="Disconnected">Disconnected</option>
           <option value="Canceled">Canceled</option>
         </select>
+        <label style="display:flex;align-items:center;gap:6px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:var(--white);cursor:pointer;white-space:nowrap">
+          <input type="checkbox" id="all-orders-hide-completed" onchange="Orders.applyFilters('all')" style="cursor:pointer"> Hide Completed
+        </label>
       </div>
       <div id="all-orders-count" style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px"></div>
       <div style="background:rgba(255,255,255,0.5);border:1px solid rgba(26,92,229,0.2);border-radius:12px;overflow:hidden">
