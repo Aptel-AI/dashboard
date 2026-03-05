@@ -423,6 +423,20 @@ const Render = {
 
     const p = App.state.people.find(x => x.name === name);
     if (!p) return;
+
+    // Owner/Admin profiles — show construction placeholder
+    if (p._roleKey === 'owner' || p._roleKey === 'admin') {
+      this.openProfilePage(`
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:100px 24px;text-align:center">
+          <div style="font-size:64px;margin-bottom:20px;opacity:0.6;filter:sepia(0.3) hue-rotate(170deg) saturate(0.5)">🚧</div>
+          <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:24px;font-weight:700;color:var(--white);margin-bottom:10px">Profile Under Construction</div>
+          <div style="color:var(--silver-dim);font-size:14px;max-width:400px;line-height:1.6;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif">
+            This profile is being built out. Check back soon for updates.
+          </div>
+        </div>`, { name: p.name, sub: `${p.role} · Team: ${p.team || 'Unassigned'}` });
+      return;
+    }
+
     const m = p.metrics;
     const tw4 = this.getPeriod(p, 10);
     const twU = this.twUnits(p), twY = this.twYeses(p);
@@ -437,6 +451,11 @@ const Render = {
         <div class="churn-fraction">${b.pct === 'N/A' ? 'N/A' : (b.disco > 0 ? `(${b.disco}/${b.activated})` : '---')}</div>
         <div class="churn-pct" style="color:${b.pct === 'N/A' ? 'var(--silver-dim)' : (b.disco > 0 ? '#f97316' : 'var(--silver-dim)')}">${b.pct === 'N/A' ? 'Pending' : (b.disco > 0 ? b.pct + '%' : '---')}</div>
       </div>`).join('');
+
+    // Sales Trends + Products Sold only visible when owner/superadmin views someone else's profile
+    const viewerRole = App.state.currentRole;
+    const isViewingOther = name !== App.state.currentPersona;
+    const showCharts = isViewingOther && (viewerRole === 'owner' || viewerRole === 'superadmin');
 
     this.openProfilePage(`
       <div class="profile-stats-bar">
@@ -478,6 +497,7 @@ const Render = {
       <div class="profile-section-title">Churn Buckets</div>
       <div class="churn-grid">${churnHTML}</div>
 
+      ${showCharts ? `
       <div class="profile-section-title">Sales Trends</div>
       <div class="charts-row">
         <div class="chart-box">
@@ -504,10 +524,10 @@ const Render = {
           <div class="chart-title">4Wk Running</div>
           <div class="chart-wrap" style="height:180px"><canvas id="p4_${id}"></canvas></div>
         </div>
-      </div>
+      </div>` : ''}
     `, { name: p.name, sub: `${p.role} · Team: ${p.team || 'Unassigned'}` });
 
-    setTimeout(() => this.drawCharts(id, m), 100);
+    if (showCharts) setTimeout(() => this.drawCharts(id, m), 100);
   },
 
   // ── TEAM PROFILE ──

@@ -12,6 +12,7 @@ const TEAM_CUSTOM_TAB = '_TeamCustomizations';
 const UNLOCK_REQ_TAB = '_UnlockRequests';
 const TEAMS_TAB = '_Teams';
 const SETTINGS_TAB = '_Settings';
+const CHURN_REPORT_TAB = '_TableauChurnReport';
 
 const TEAM_EMOJI_MAP = {
   '🐙': 'Squids',
@@ -199,6 +200,7 @@ function doGet(e) {
       unlockRequests: readUnlockRequests(ss),
       settings: readSettings(ss),
       tableauSummary: tableauSummary,
+      churnReport: readChurnReport(ss),
       _debug: peopleResult._debug || null
     };
     return jsonResponse(data);
@@ -605,6 +607,27 @@ function readSettings(ss) {
     if (key) result[key] = String(data[i][1] || '').trim();
   }
   return result;
+}
+
+
+// === readChurnReport() — Read _TableauChurnReport tab ===
+
+function readChurnReport(ss) {
+  const sheet = ss.getSheetByName(CHURN_REPORT_TAB);
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+
+  const headers = data[0].map(h => String(h).trim());
+  const rows = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = {};
+    headers.forEach((h, j) => {
+      row[h] = data[i][j] !== undefined && data[i][j] !== null ? data[i][j] : '';
+    });
+    rows.push(row);
+  }
+  return rows;
 }
 
 

@@ -395,13 +395,13 @@ const DataPipeline = {
     else if (vsPct >= -20){ remark = 'Meaningful decline';   remarkColor = '#f97316'; }
     else                  { remark = 'Significant drop';     remarkColor = '#e53535'; }
 
-    // Churn buckets — N/A placeholders (requires order status data)
+    // Churn buckets — defaults (enriched from _TableauChurnReport when available)
     const churnBuckets = [
-      { label: '0–30 Day',   activated: 0, disco: 0, pct: 'N/A' },
-      { label: '30–60 Day',  activated: 0, disco: 0, pct: 'N/A' },
-      { label: '60–90 Day',  activated: 0, disco: 0, pct: 'N/A' },
-      { label: '90–120 Day', activated: 0, disco: 0, pct: 'N/A' },
-      { label: '120–150 Day',activated: 0, disco: 0, pct: 'N/A' }
+      { label: '0-30 Day', activated: 0, disco: 0, pct: 'N/A' },
+      { label: '30 Day',   activated: 0, disco: 0, pct: 'N/A' },
+      { label: '60 Day',   activated: 0, disco: 0, pct: 'N/A' },
+      { label: '90 Day',   activated: 0, disco: 0, pct: 'N/A' },
+      { label: '120 Day',  activated: 0, disco: 0, pct: 'N/A' }
     ];
 
     // Sales per day: 2-week avg per day-of-week
@@ -541,11 +541,11 @@ const DataPipeline = {
       else                  { remark = 'Significant drop';     remarkColor = '#e53535'; }
 
       const churnBuckets = [
-        { label: '0–30 Day',   activated: 0, disco: 0, pct: 'N/A' },
-        { label: '30–60 Day',  activated: 0, disco: 0, pct: 'N/A' },
-        { label: '60–90 Day',  activated: 0, disco: 0, pct: 'N/A' },
-        { label: '90–120 Day', activated: 0, disco: 0, pct: 'N/A' },
-        { label: '120–150 Day',activated: 0, disco: 0, pct: 'N/A' }
+        { label: '0-30 Day', activated: 0, disco: 0, pct: 'N/A' },
+        { label: '30 Day',   activated: 0, disco: 0, pct: 'N/A' },
+        { label: '60 Day',   activated: 0, disco: 0, pct: 'N/A' },
+        { label: '90 Day',   activated: 0, disco: 0, pct: 'N/A' },
+        { label: '120 Day',  activated: 0, disco: 0, pct: 'N/A' }
       ];
 
       // Sales per day: 2-week avg per day-of-week for team
@@ -747,11 +747,11 @@ const DataPipeline = {
     else                  { remark = 'Significant drop';     remarkColor = '#e53535'; }
 
     const churnBuckets = [
-      { label: '0–30 Day',   activated: 0, disco: 0, pct: 'N/A' },
-      { label: '30–60 Day',  activated: 0, disco: 0, pct: 'N/A' },
-      { label: '60–90 Day',  activated: 0, disco: 0, pct: 'N/A' },
-      { label: '90–120 Day', activated: 0, disco: 0, pct: 'N/A' },
-      { label: '120–150 Day',activated: 0, disco: 0, pct: 'N/A' }
+      { label: '0-30 Day', activated: 0, disco: 0, pct: 'N/A' },
+      { label: '30 Day',   activated: 0, disco: 0, pct: 'N/A' },
+      { label: '60 Day',   activated: 0, disco: 0, pct: 'N/A' },
+      { label: '90 Day',   activated: 0, disco: 0, pct: 'N/A' },
+      { label: '120 Day',  activated: 0, disco: 0, pct: 'N/A' }
     ];
 
     // Sales per day: 2-week avg per day-of-week for team
@@ -878,6 +878,74 @@ const DataPipeline = {
         team.metrics.activationRate = parseFloat((active / totalDevices * 100).toFixed(1));
         team.metrics.productBreakdown = productBreakdown;
       }
+    });
+  },
+
+  // Column keys from _TableauChurnReport matching bucket labels
+  _CHURN_BUCKET_COLS: ['0-30 Day', '30 Day', '60 Day', '90 Day', '120 Day'],
+
+  // Enrich person metrics with _TableauChurnReport data
+  enrichWithChurnReport(people, churnReport) {
+    if (!churnReport || churnReport.length === 0) return;
+
+    // Group rows by rep name → { metricType: { col: value } }
+    const byRep = {};
+    churnReport.forEach(row => {
+      const repName = (row['rep.Full Name'] || '').trim();
+      const metricType = (row['(Metric Type)'] || '').trim();
+      if (!repName || !metricType) return;
+      if (!byRep[repName]) byRep[repName] = {};
+      byRep[repName][metricType] = row;
+    });
+
+    people.forEach(p => {
+      const repData = byRep[p.name];
+      if (!repData) return;
+
+      const activatedRow = repData['Activated SPE/SP'];
+      const discoRow = repData['Disconnect count (SPE/SP)'];
+      const churnRow = repData['Churn Rate'];
+
+      if (!activatedRow && !discoRow && !churnRow) return;
+
+      this._CHURN_BUCKET_COLS.forEach((col, i) => {
+        const bucket = p.metrics.churnBuckets[i];
+        if (activatedRow && activatedRow[col] !== undefined && activatedRow[col] !== '') {
+          bucket.activated = parseInt(activatedRow[col]) || 0;
+        }
+        if (discoRow && discoRow[col] !== undefined && discoRow[col] !== '') {
+          bucket.disco = parseInt(discoRow[col]) || 0;
+        }
+        if (churnRow && churnRow[col] !== undefined && churnRow[col] !== '') {
+          const pctVal = parseFloat(churnRow[col]);
+          bucket.pct = isNaN(pctVal) ? 'N/A' : parseFloat(pctVal.toFixed(1));
+        }
+      });
+    });
+  },
+
+  // Enrich team metrics by aggregating member churn data
+  enrichTeamsWithChurn(teams) {
+    if (!teams) return;
+
+    teams.forEach(team => {
+      if (!team.metrics || !team.members || team.members.length === 0) return;
+
+      team.members.forEach(p => {
+        p.metrics.churnBuckets.forEach((bucket, i) => {
+          if (bucket.pct === 'N/A') return;
+          const tb = team.metrics.churnBuckets[i];
+          tb.activated += bucket.activated;
+          tb.disco += bucket.disco;
+        });
+      });
+
+      // Recalculate team-level percentages
+      team.metrics.churnBuckets.forEach(tb => {
+        if (tb.activated > 0) {
+          tb.pct = parseFloat((tb.disco / tb.activated * 100).toFixed(1));
+        }
+      });
     });
   }
 };

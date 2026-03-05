@@ -229,6 +229,10 @@ const App = {
     DataPipeline.enrichWithTableau(this.state.people, this.state.tableauByRep);
     DataPipeline.enrichTeamsWithTableau(this.state.teams, this.state.tableauByRep);
 
+    // Enrich churn buckets from _TableauChurnReport
+    DataPipeline.enrichWithChurnReport(this.state.people, apiData.churnReport);
+    DataPipeline.enrichTeamsWithChurn(this.state.teams);
+
     Roster.init(this.state.roster);
     Roster.initFromApi(apiData);
     TeamsManager.init(this.state.teamsData);
