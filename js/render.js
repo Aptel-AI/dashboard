@@ -664,6 +664,13 @@ const Render = {
           <button onclick="App.openAddMemberModal('${safeTeamName}')"
             style="margin-left:auto;background:var(--blue-core);border:none;border-radius:6px;padding:6px 16px;color:#fff;font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">+ Add Member</button>
         </div>
+        <div style="margin-bottom:12px">
+          <div class="view-toggle-group">
+            <button class="view-toggle active" id="manage-team-tab-active" onclick="Render.setManageTeamStatusTab('active')">Active</button>
+            <button class="view-toggle" id="manage-team-tab-deactivated" onclick="Render.setManageTeamStatusTab('deactivated')">Deactivated</button>
+          </div>
+        </div>
+        <div id="manage-team-subtitle" style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px"></div>
         <input type="text" id="manage-team-search" placeholder="Search by name..."
           oninput="Render._renderManageTeamRows('${safeTeamName}', this.value)"
           style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.5);border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;outline:none;margin-bottom:12px">
@@ -699,6 +706,7 @@ const Render = {
 
   // ── Manage Team tab switching ──
   _manageTeamName: null,
+  _manageTeamStatusTab: 'active',  // 'active' or 'deactivated'
 
   switchTeamTab(tab) {
     const overview = document.getElementById('team-tab-overview');
@@ -712,12 +720,31 @@ const Render = {
       manage.style.display = '';
       if (btnOverview) btnOverview.classList.remove('active');
       if (btnManage) btnManage.classList.add('active');
+      // Reset sub-tab to Active
+      this._manageTeamStatusTab = 'active';
+      const stActive = document.getElementById('manage-team-tab-active');
+      const stDeact = document.getElementById('manage-team-tab-deactivated');
+      if (stActive) stActive.classList.add('active');
+      if (stDeact) stDeact.classList.remove('active');
       if (this._manageTeamName) this._renderManageTeamRows(this._manageTeamName);
     } else {
       overview.style.display = '';
       manage.style.display = 'none';
       if (btnOverview) btnOverview.classList.add('active');
       if (btnManage) btnManage.classList.remove('active');
+    }
+  },
+
+  // ── Manage Team sub-tab toggle (Active / Deactivated) ──
+  setManageTeamStatusTab(tab) {
+    this._manageTeamStatusTab = tab;
+    const btnActive = document.getElementById('manage-team-tab-active');
+    const btnDeactivated = document.getElementById('manage-team-tab-deactivated');
+    if (btnActive) btnActive.classList.toggle('active', tab === 'active');
+    if (btnDeactivated) btnDeactivated.classList.toggle('active', tab === 'deactivated');
+    if (this._manageTeamName) {
+      const search = document.getElementById('manage-team-search');
+      this._renderManageTeamRows(this._manageTeamName, search ? search.value : '');
     }
   },
 
@@ -729,19 +756,33 @@ const Render = {
     const team = App.state.teams.find(t => t.name === teamName);
     if (!team) return;
 
+    const statusTab = this._manageTeamStatusTab || 'active';
     let teamMembers = (team.members || []).slice();
+
+    // Filter by sub-tab
+    teamMembers = teamMembers.filter(p =>
+      statusTab === 'active' ? !Roster.deactivated.has(p.name) : Roster.deactivated.has(p.name)
+    );
+
+    // Total in tab before search
+    const totalInTab = teamMembers.length;
+
+    // Search filter
     if (searchText && searchText.trim()) {
       const q = searchText.trim().toLowerCase();
       teamMembers = teamMembers.filter(p => p.name.toLowerCase().includes(q));
     }
 
-    // Sort: active first, then alphabetical
-    teamMembers.sort((a, b) => {
-      const aDeact = Roster.deactivated.has(a.name) ? 1 : 0;
-      const bDeact = Roster.deactivated.has(b.name) ? 1 : 0;
-      if (aDeact !== bDeact) return aDeact - bDeact;
-      return a.name.localeCompare(b.name);
-    });
+    // Sort alphabetically
+    teamMembers.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Update subtitle
+    const subtitle = document.getElementById('manage-team-subtitle');
+    if (subtitle) {
+      subtitle.textContent = statusTab === 'active'
+        ? `${totalInTab} active member${totalInTab !== 1 ? 's' : ''}`
+        : `${totalInTab} deactivated member${totalInTab !== 1 ? 's' : ''}`;
+    }
 
     if (teamMembers.length === 0) {
       tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--silver-dim);padding:32px;font-family:\'Cerebri Sans\',\'DM Sans\',\'Inter\',sans-serif;font-size:14px">No members found</td></tr>';
@@ -756,12 +797,11 @@ const Render = {
       const roleLabel = OFFICE_CONFIG.roles[roleKey]?.label || roleKey;
 
       const tr = document.createElement('tr');
-      tr.style.cssText = `border-bottom:1px solid rgba(0,0,0,0.06);${isDeactivated ? 'opacity:0.35;' : ''}`;
+      tr.style.cssText = `border-bottom:1px solid rgba(0,0,0,0.06);`;
       tr.innerHTML = `
         <td style="padding:12px 16px">
-          <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:15px;font-weight:700;color:${isDeactivated ? 'var(--silver-dim)' : 'var(--white)'}">
+          <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:15px;font-weight:700;color:var(--white)">
             ${p.name}
-            ${isDeactivated ? '<span style="font-size:10px;letter-spacing:1px;color:#E5564A;margin-left:8px;border:1px solid rgba(229,86,74,0.4);border-radius:4px;padding:1px 5px;text-transform:uppercase">Inactive</span>' : ''}
           </div>
           ${email ? `<div style="font-size:10px;color:var(--silver-dim);margin-top:2px">${email}</div>` : ''}
         </td>
