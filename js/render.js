@@ -13,7 +13,6 @@ const Render = {
     green:  { text: '#22c55e', bg: 'rgba(34, 197, 94, 0.13)',  border: 'rgba(34, 197, 94, 0.3)' },
     red:    { text: '#e53535', bg: 'rgba(229, 53, 53, 0.13)',   border: 'rgba(229, 53, 53, 0.3)' },
     yellow: { text: '#f0b429', bg: 'rgba(240, 180, 41, 0.13)',  border: 'rgba(240, 180, 41, 0.3)' },
-    orange: { text: '#f97316', bg: 'rgba(249, 115, 22, 0.13)',  border: 'rgba(249, 115, 22, 0.3)' },
   },
   _getChurnColor(colorName) {
     return this._CHURN_COLOR_MAP[(colorName || '').toLowerCase()] || null;
