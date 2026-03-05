@@ -1171,6 +1171,10 @@ const App = {
       return;
     }
 
+    // Role permission: current user's rank determines what they can assign
+    const myRole = this.state.currentRole || 'rep';
+    const myRank = OFFICE_CONFIG.roles[myRole]?.rank || 0;
+
     // Sort alphabetically (sub-tabs already separate active/deactivated)
     const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -1179,7 +1183,32 @@ const App = {
       const safeName = p.name.replace(/'/g, "\\'");
       const email = p.email || Roster.getEmail(p.name) || '';
       const roleKey = p._roleKey || 'rep';
-      const roleLabel = OFFICE_CONFIG.roles[roleKey]?.label || roleKey;
+
+      // Build per-row role cell based on permission hierarchy
+      const targetRank = OFFICE_CONFIG.roles[roleKey]?.rank || 0;
+      const canChangeRole = myRank > targetRank || myRole === 'superadmin';
+
+      let roleCell;
+      if (!canChangeRole) {
+        const roleLabel = OFFICE_CONFIG.roles[roleKey]?.label || roleKey;
+        roleCell = `<span style="font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;color:var(--silver-dim);padding:5px 0">${roleLabel}</span>`;
+      } else {
+        const roleOptions = Object.entries(OFFICE_CONFIG.roles)
+          .filter(([key, val]) => {
+            if (key === 'superadmin') return false;
+            if (key === 'owner') return false;
+            if (key === 'admin') return myRole === 'owner' || myRole === 'admin' || myRole === 'superadmin';
+            return val.rank < myRank || myRole === 'superadmin';
+          })
+          .map(([key, val]) => ({ key, label: val.label }));
+        const roleSelect = roleOptions.map(r =>
+          `<option value="${r.key}"${roleKey === r.key ? ' selected' : ''}>${r.label}</option>`
+        ).join('');
+        roleCell = `<select onchange="App.setPersonRole('${safeName}',this.value)"
+            style="background:rgba(0,0,0,0.06);border:1px solid rgba(0,0,0,0.25);border-radius:6px;color:var(--white);padding:5px 8px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;cursor:pointer;outline:none">
+            ${roleSelect}
+          </select>`;
+      }
 
       const tr = document.createElement('tr');
       tr.style.cssText = `border-bottom:1px solid rgba(0,0,0,0.06);`;
@@ -1191,7 +1220,7 @@ const App = {
           ${email ? `<div style="font-size:10px;color:var(--silver-dim);margin-top:2px">${email}</div>` : ''}
         </td>
         <td style="padding:12px 16px">
-          <span style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:13px;font-weight:600;color:var(--silver)">${roleLabel}</span>
+          ${roleCell}
         </td>
         <td style="padding:12px 16px;text-align:center">
           <button onclick="App.toggleDeactivate('${safeName}')"
