@@ -6,10 +6,10 @@
 
 const ADMIN_CONFIG = {
   // Google Sheet ID for the admin master sheet
-  sheetId: '',  // TODO: paste your admin sheet ID here
+  sheetId: '1xdf1yBOh-Vo3VHlYvrlkQ4v4UwRiKvK-12hFOsfnJc0',
 
   // Deployed AdminCode.gs web app URL
-  appsScriptUrl: '',  // TODO: paste your deployed URL here
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbz1WJARKP4YZzZjbWyyBjgrAkUOkJWiMHkcJxr4qV3QwRuBfo6YyleBe2MwV_ruRHWo/exec',
 
   // API key (must match Script Properties > API_KEY in AdminCode.gs)
   apiKey: 'aptel-admin-2026-secret',
