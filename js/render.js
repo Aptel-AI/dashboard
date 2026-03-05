@@ -455,10 +455,10 @@ const Render = {
     const vsColor = m.vsPct >= 0 ? '#2E8B57' : '#E5564A';
     const vsArrow = m.vsPct >= 0 ? '↑' : '↓';
 
-    const cc = this._getChurnColor(m.churnColor);
     const churnHTML = m.churnBuckets.map(b => {
       const hasDisco = b.pct !== 'N/A' && b.disco > 0;
-      const pctColor = b.pct === 'N/A' ? 'var(--silver-dim)' : (cc ? cc.text : (hasDisco ? '#f97316' : 'var(--silver-dim)'));
+      const cc = this._getChurnColor(b.color);
+      const pctColor = b.pct === 'N/A' ? 'var(--silver-dim)' : (cc ? cc.text : 'var(--silver-dim)');
       const cardBg = (b.pct !== 'N/A' && cc) ? `background:${cc.bg};border-color:${cc.border}` : '';
       return `<div class="churn-bucket" style="${cardBg}">
         <div class="churn-label">${b.label}</div>

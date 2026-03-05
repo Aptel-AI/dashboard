@@ -890,7 +890,10 @@ const DataPipeline = {
     const cols = this._CHURN_BUCKET_COLS;
 
     // Group rows by rep name, summing across color rows (Green/Red/etc.)
-    // Result: byRep[name] = { activated: [5 vals], disco: [5 vals], churnPct: [5 vals] }
+    // Color priority: Red > Yellow > Green (worst wins per bucket)
+    const COLOR_RANK = { red: 3, yellow: 2, green: 1 };
+
+    // Result: byRep[name] = { activated:[5], disco:[5], hasData:[5], colors:[5] }
     const byRep = {};
     churnReport.forEach(row => {
       const repName = String(row['rep.Full Name'] || '').trim();
@@ -902,14 +905,11 @@ const DataPipeline = {
           activated: new Array(5).fill(0),
           disco: new Array(5).fill(0),
           hasData: new Array(5).fill(false),
-          color: ''
+          colors: new Array(5).fill('')
         };
       }
       const rd = byRep[repName];
-
-      // Capture color from the spreadsheet (e.g. "Green", "Red")
       const rowColor = String(row['30-60 Color Churn (copy)'] || '').trim();
-      if (rowColor && !rd.color) rd.color = rowColor;
 
       cols.forEach((col, i) => {
         const val = row[col];
@@ -920,6 +920,12 @@ const DataPipeline = {
           rd.hasData[i] = true;
         } else if (metricType === 'Disconnect count (SPE/SP)') {
           rd.disco[i] += parseInt(val) || 0;
+        } else if (metricType === 'Churn Rate' && rowColor) {
+          // Per-bucket color from Churn Rate row, worst color wins
+          const cur = rd.colors[i];
+          const curRank = COLOR_RANK[cur.toLowerCase()] || 0;
+          const newRank = COLOR_RANK[rowColor.toLowerCase()] || 0;
+          if (newRank > curRank) rd.colors[i] = rowColor;
         }
       });
     });
@@ -930,14 +936,12 @@ const DataPipeline = {
       const repData = byRep[p.metrics.tableauName] || byRep[p.name];
       if (!repData) return;
 
-      // Store churn color from spreadsheet
-      p.metrics.churnColor = repData.color || '';
-
       cols.forEach((col, i) => {
         if (!repData.hasData[i]) return;
         const bucket = p.metrics.churnBuckets[i];
         bucket.activated = repData.activated[i];
         bucket.disco = repData.disco[i];
+        bucket.color = repData.colors[i] || '';
         // Calculate churn pct from activated/disco
         bucket.pct = bucket.activated > 0
           ? parseFloat((bucket.disco / bucket.activated * 100).toFixed(1))
