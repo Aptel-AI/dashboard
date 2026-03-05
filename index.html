@@ -188,6 +188,14 @@
         </div>
       </div>
 
+      <!-- Active / Deactivated sub-tabs -->
+      <div style="margin-bottom:16px">
+        <div class="view-toggle-group">
+          <button class="view-toggle active" id="roster-tab-active" onclick="Roster.setStatusTab('active')">Active</button>
+          <button class="view-toggle" id="roster-tab-deactivated" onclick="Roster.setStatusTab('deactivated')">Deactivated</button>
+        </div>
+      </div>
+
       <!-- Filter Bar -->
       <div id="roster-filters" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px">
         <input id="roster-search" type="text" placeholder="Search by name..."
@@ -200,12 +208,6 @@
         <select id="roster-filter-role" onchange="Roster.applyFilters()"
           style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;cursor:pointer;outline:none">
           <option value="">All Roles</option>
-        </select>
-        <select id="roster-filter-status" onchange="Roster.applyFilters()"
-          style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;cursor:pointer;outline:none">
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
         </select>
         <select id="roster-sort" onchange="Roster.applyFilters()"
           style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;cursor:pointer;outline:none">
@@ -254,17 +256,19 @@
         </div>
       </div>
 
+      <!-- Active / Deactivated sub-tabs -->
+      <div style="margin-bottom:16px">
+        <div class="view-toggle-group">
+          <button class="view-toggle active" id="team-roster-tab-active" onclick="App.setTeamRosterStatusTab('active')">Active</button>
+          <button class="view-toggle" id="team-roster-tab-deactivated" onclick="App.setTeamRosterStatusTab('deactivated')">Deactivated</button>
+        </div>
+      </div>
+
       <!-- Filters -->
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px">
         <input id="team-roster-search" type="text" placeholder="Search by name..."
           oninput="App.filterTeamRoster()"
           style="flex:1;min-width:160px;background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;outline:none">
-        <select id="team-roster-filter-status" onchange="App.filterTeamRoster()"
-          style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;cursor:pointer;outline:none">
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
       </div>
 
       <!-- Count -->

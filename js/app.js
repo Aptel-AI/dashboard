@@ -1057,6 +1057,7 @@ const App = {
   // TEAM ROSTER (Scoped roster for Manager/JD)
   // ══════════════════════════════════════════════
   _teamRosterTeamName: null,
+  _teamRosterStatusTab: 'active',  // 'active' or 'deactivated'
 
   _renderTeamRoster() {
     const page = document.getElementById('team-roster-page');
@@ -1066,6 +1067,13 @@ const App = {
     const persona = this.state.currentPersona;
     const myTeamName = Roster.getEffectiveTeam(persona, this.state.people);
     this._teamRosterTeamName = myTeamName;
+
+    // Reset sub-tab to Active
+    this._teamRosterStatusTab = 'active';
+    const tabBtnActive = document.getElementById('team-roster-tab-active');
+    const tabBtnDeactivated = document.getElementById('team-roster-tab-deactivated');
+    if (tabBtnActive) tabBtnActive.classList.add('active');
+    if (tabBtnDeactivated) tabBtnDeactivated.classList.remove('active');
 
     const team = this.state.teams.find(t => t.name === myTeamName);
     const subtitle = document.getElementById('team-roster-subtitle');
@@ -1082,16 +1090,26 @@ const App = {
     if (title) title.textContent = (display.emoji || '') + ' ' + display.name + ' — Roster';
 
     const members = team.members || [];
-    const deactCount = members.filter(p => Roster.deactivated.has(p.name)).length;
-    if (subtitle) subtitle.textContent = `${members.length} member${members.length !== 1 ? 's' : ''} · ${deactCount} deactivated`;
+    const activeCount = members.filter(p => !Roster.deactivated.has(p.name)).length;
+    if (subtitle) subtitle.textContent = `${activeCount} active member${activeCount !== 1 ? 's' : ''}`;
 
-    // Clear filters
+    // Clear search
     const search = document.getElementById('team-roster-search');
     if (search) search.value = '';
-    const statusFilter = document.getElementById('team-roster-filter-status');
-    if (statusFilter) statusFilter.value = '';
 
-    this._renderTeamRosterRows(members);
+    // Render only active members by default
+    const activeMembers = members.filter(p => !Roster.deactivated.has(p.name));
+    this._renderTeamRosterRows(activeMembers);
+  },
+
+  // ── Team Roster sub-tab toggle ──
+  setTeamRosterStatusTab(tab) {
+    this._teamRosterStatusTab = tab;
+    const btnActive = document.getElementById('team-roster-tab-active');
+    const btnDeactivated = document.getElementById('team-roster-tab-deactivated');
+    if (btnActive) btnActive.classList.toggle('active', tab === 'active');
+    if (btnDeactivated) btnDeactivated.classList.toggle('active', tab === 'deactivated');
+    this.filterTeamRoster();
   },
 
   filterTeamRoster() {
@@ -1102,20 +1120,32 @@ const App = {
 
     const members = team.members || [];
     const search = (document.getElementById('team-roster-search')?.value || '').toLowerCase().trim();
-    const statusFilter = document.getElementById('team-roster-filter-status')?.value || '';
+    const statusTab = this._teamRosterStatusTab || 'active';
 
     let filtered = members.filter(p => {
+      if (statusTab === 'active' && Roster.deactivated.has(p.name)) return false;
+      if (statusTab === 'deactivated' && !Roster.deactivated.has(p.name)) return false;
       if (search && !p.name.toLowerCase().includes(search)) return false;
-      if (statusFilter === 'active' && Roster.deactivated.has(p.name)) return false;
-      if (statusFilter === 'inactive' && !Roster.deactivated.has(p.name)) return false;
       return true;
     });
 
+    // Total in current tab (before search filter)
+    const totalInTab = members.filter(p =>
+      statusTab === 'active' ? !Roster.deactivated.has(p.name) : Roster.deactivated.has(p.name)
+    ).length;
+
+    const subtitle = document.getElementById('team-roster-subtitle');
+    if (subtitle) {
+      subtitle.textContent = statusTab === 'active'
+        ? `${totalInTab} active member${totalInTab !== 1 ? 's' : ''}`
+        : `${totalInTab} deactivated member${totalInTab !== 1 ? 's' : ''}`;
+    }
+
     const countEl = document.getElementById('team-roster-count');
     if (countEl) {
-      countEl.textContent = filtered.length === members.length
-        ? `Showing all ${members.length}`
-        : `Showing ${filtered.length} of ${members.length}`;
+      countEl.textContent = filtered.length === totalInTab
+        ? `Showing all ${totalInTab}`
+        : `Showing ${filtered.length} of ${totalInTab}`;
     }
 
     this._renderTeamRosterRows(filtered);
@@ -1131,13 +1161,8 @@ const App = {
       return;
     }
 
-    // Sort: active first, then alphabetical
-    const sorted = [...filtered].sort((a, b) => {
-      const aDeact = Roster.deactivated.has(a.name) ? 1 : 0;
-      const bDeact = Roster.deactivated.has(b.name) ? 1 : 0;
-      if (aDeact !== bDeact) return aDeact - bDeact;
-      return a.name.localeCompare(b.name);
-    });
+    // Sort alphabetically (sub-tabs already separate active/deactivated)
+    const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
 
     sorted.forEach(p => {
       const isDeactivated = Roster.deactivated.has(p.name);
@@ -1147,12 +1172,11 @@ const App = {
       const roleLabel = OFFICE_CONFIG.roles[roleKey]?.label || roleKey;
 
       const tr = document.createElement('tr');
-      tr.style.cssText = `border-bottom:1px solid rgba(0,0,0,0.06);${isDeactivated ? 'opacity:0.35;' : ''}`;
+      tr.style.cssText = `border-bottom:1px solid rgba(0,0,0,0.06);`;
       tr.innerHTML = `
         <td style="padding:12px 16px">
-          <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:15px;font-weight:700;color:${isDeactivated ? 'var(--silver-dim)' : 'var(--white)'}">
+          <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:15px;font-weight:700;color:var(--white)">
             ${p.name}
-            ${isDeactivated ? '<span style="font-size:10px;letter-spacing:1px;color:#E5564A;margin-left:8px;border:1px solid rgba(229,86,74,0.4);border-radius:4px;padding:1px 5px;text-transform:uppercase">Inactive</span>' : ''}
           </div>
           ${email ? `<div style="font-size:10px;color:var(--silver-dim);margin-top:2px">${email}</div>` : ''}
         </td>

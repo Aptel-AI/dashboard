@@ -10,6 +10,7 @@ const Roster = {
   phoneMap: {},              // name → phone
   unlockRequests: {},        // { name: 'pending'|'approved' }
   teamCustomizations: {},    // { persona: { emoji, name } }
+  _rosterStatusTab: 'active', // 'active' or 'deactivated' — sub-tab state
 
   // ── Initialize from roster data ──
   // rosterMap: email-keyed from API
@@ -212,10 +213,12 @@ const Roster = {
     this._rosterRole = currentRole;
     this._rosterConfig = config;
 
-    const subtitle = document.getElementById('roster-subtitle');
-    if (subtitle) {
-      subtitle.textContent = `${people.length} people · ${this.deactivated.size} deactivated`;
-    }
+    // Reset sub-tab to Active on page open
+    this._rosterStatusTab = 'active';
+    const tabBtnActive = document.getElementById('roster-tab-active');
+    const tabBtnDeactivated = document.getElementById('roster-tab-deactivated');
+    if (tabBtnActive) tabBtnActive.classList.add('active');
+    if (tabBtnDeactivated) tabBtnDeactivated.classList.remove('active');
 
     // Show/hide Add Member button based on role
     const addBtn = document.getElementById('add-member-btn');
@@ -276,6 +279,16 @@ const Roster = {
     }
   },
 
+  // ── Sub-tab toggle (Active / Deactivated) ──
+  setStatusTab(tab) {
+    this._rosterStatusTab = tab;
+    const btnActive = document.getElementById('roster-tab-active');
+    const btnDeactivated = document.getElementById('roster-tab-deactivated');
+    if (btnActive) btnActive.classList.toggle('active', tab === 'active');
+    if (btnDeactivated) btnDeactivated.classList.toggle('active', tab === 'deactivated');
+    this.applyFilters();
+  },
+
   // ── Apply filters & sort, then render rows ──
   applyFilters() {
     const people = this._rosterPeople;
@@ -285,16 +298,16 @@ const Roster = {
     const search = (document.getElementById('roster-search')?.value || '').toLowerCase().trim();
     const teamFilter = document.getElementById('roster-filter-team')?.value || '';
     const roleFilter = document.getElementById('roster-filter-role')?.value || '';
-    const statusFilter = document.getElementById('roster-filter-status')?.value || '';
+    const statusTab = this._rosterStatusTab || 'active';
     const sortVal = document.getElementById('roster-sort')?.value || 'name-asc';
 
-    // Filter
+    // Filter by sub-tab + search/team/role
     let filtered = people.filter(p => {
+      if (statusTab === 'active' && this.deactivated.has(p.name)) return false;
+      if (statusTab === 'deactivated' && !this.deactivated.has(p.name)) return false;
       if (search && !p.name.toLowerCase().includes(search)) return false;
       if (teamFilter && (p.team || 'Unassigned') !== teamFilter) return false;
       if (roleFilter && (p._roleKey || 'rep') !== roleFilter) return false;
-      if (statusFilter === 'active' && this.deactivated.has(p.name)) return false;
-      if (statusFilter === 'inactive' && !this.deactivated.has(p.name)) return false;
       return true;
     });
 
@@ -306,12 +319,25 @@ const Roster = {
     else if (sortVal === 'role-asc') filtered.sort((a, b) => roleRank(a._roleKey || 'rep') - roleRank(b._roleKey || 'rep'));
     else if (sortVal === 'team-asc') filtered.sort((a, b) => (a.team || 'Unassigned').localeCompare(b.team || 'Unassigned'));
 
+    // Total in current tab (before search/team/role filters)
+    const totalInTab = people.filter(p =>
+      statusTab === 'active' ? !this.deactivated.has(p.name) : this.deactivated.has(p.name)
+    ).length;
+
+    // Update subtitle
+    const subtitle = document.getElementById('roster-subtitle');
+    if (subtitle) {
+      subtitle.textContent = statusTab === 'active'
+        ? `${totalInTab} active people`
+        : `${totalInTab} deactivated people`;
+    }
+
     // Update count
     const countEl = document.getElementById('roster-count');
     if (countEl) {
-      countEl.textContent = filtered.length === people.length
-        ? `Showing all ${people.length}`
-        : `Showing ${filtered.length} of ${people.length}`;
+      countEl.textContent = filtered.length === totalInTab
+        ? `Showing all ${totalInTab}`
+        : `Showing ${filtered.length} of ${totalInTab}`;
     }
 
     // Render rows
@@ -355,14 +381,13 @@ const Roster = {
       ).join('') + `<option value="Unassigned"${effTeam === 'Unassigned' ? ' selected' : ''}>Unassigned</option>`;
 
       const tr = document.createElement('tr');
-      tr.style.cssText = `border-bottom:1px solid rgba(0,0,0,0.06);${isDeactivated ? 'opacity:0.35;' : ''}`;
+      tr.style.cssText = `border-bottom:1px solid rgba(0,0,0,0.06);`;
       tr.innerHTML = `
         <td style="padding:12px 16px">
           <div id="roster-display-${safeEmail}" style="display:flex;align-items:center;gap:8px">
             <div style="flex:1">
-              <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:15px;font-weight:700;color:${isDeactivated ? 'var(--silver-dim)' : 'var(--white)'}">
+              <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:15px;font-weight:700;color:var(--white)">
                 ${p.name}
-                ${isDeactivated ? '<span style="font-size:10px;letter-spacing:1px;color:#E5564A;margin-left:8px;border:1px solid rgba(229,86,74,0.4);border-radius:4px;padding:1px 5px;text-transform:uppercase">Inactive</span>' : ''}
               </div>
               ${email ? `<div style="font-size:10px;color:var(--silver-dim);margin-top:2px">${email}</div>` : ''}
             </div>
