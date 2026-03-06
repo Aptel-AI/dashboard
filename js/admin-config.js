@@ -46,5 +46,16 @@ const ADMIN_CONFIG = {
       description: 'AT&T Business-to-Business sales dashboard'
     }
     // Future: 'residential': { label: 'Residential', file: 'residential.html', ... }
+  },
+
+  // ── Campaign Sheet Config (AT&T B2B shared sheet) ──
+  // All AT&T B2B offices share a single campaign sheet + Code.gs deployment.
+  // When creating a new AT&T B2B office, these values auto-fill the form.
+  campaign: {
+    'att-b2b': {
+      sheetId: '1wxM6Htwfy8LrD_o_C7gmvnZEmkfV3FTCVjJU6IITZFc',
+      appsScriptUrl: 'https://script.google.com/macros/s/AKfycbwPx0jfdYdLKurHPlfQhOkYu70vVpirTISYrR3I2EIszVrVaRNwwjBvauSIO69thKFe/exec',
+      apiKey: 'elevate-dash-2026-secret'
+    }
   }
 };

@@ -2,14 +2,35 @@
 // ELEVATE — Apps Script API Layer
 // All reads and writes go through the deployed Apps Script
 // web app, keeping the underlying Google Sheet private.
+//
+// Multi-office: Every request includes officeId + sheetId
+// so Code.gs can open the correct campaign sheet and
+// read/write the correct per-office tabs.
 // ═══════════════════════════════════════════════════════
 
 const SheetsAPI = {
 
+  // ── Build GET query string with office params ──
+  _buildUrl(config, extraParams) {
+    let url = `${config.appsScriptUrl}?key=${encodeURIComponent(config.apiKey)}`;
+    url += `&officeId=${encodeURIComponent(config.officeId || '')}`;
+    if (config.sheetId) {
+      url += `&sheetId=${encodeURIComponent(config.sheetId)}`;
+    }
+    if (extraParams) {
+      for (const [k, v] of Object.entries(extraParams)) {
+        if (v !== undefined && v !== null && v !== '') {
+          url += `&${k}=${encodeURIComponent(v)}`;
+        }
+      }
+    }
+    return url;
+  },
+
   // ── Fetch all dashboard data via Apps Script doGet ──
   // Returns: { people, roster, teamMap, orderOverrides, teamCustomizations, unlockRequests }
   async fetchAllData(config) {
-    const url = `${config.appsScriptUrl}?key=${encodeURIComponent(config.apiKey)}`;
+    const url = this._buildUrl(config);
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Apps Script HTTP ${resp.status}`);
     const data = await resp.json();
@@ -20,7 +41,7 @@ const SheetsAPI = {
   // ── Write-back via Apps Script doPost ──
   // Actions: addRosterEntry, updateRosterEntry, deleteRosterEntry,
   //          toggleDeactivate, saveOrderOverride, setTeamCustomization,
-  //          setUnlockRequest, deleteUnlockRequest
+  //          setUnlockRequest, deleteUnlockRequest, addSale, etc.
   async post(config, action, payload) {
     if (!this.isConfigured(config)) {
       console.warn('Apps Script URL not configured — write skipped');
@@ -30,7 +51,13 @@ const SheetsAPI = {
       const resp = await fetch(config.appsScriptUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' }, // Avoids CORS preflight
-        body: JSON.stringify({ key: config.apiKey, action, ...payload })
+        body: JSON.stringify({
+          key: config.apiKey,
+          action,
+          officeId: config.officeId || '',
+          sheetId: config.sheetId || '',
+          ...payload
+        })
       });
       const result = await resp.json().catch(() => ({ ok: true }));
       return { ok: true, data: result };
@@ -42,10 +69,9 @@ const SheetsAPI = {
 
   // ── Fetch individual order rows (past 30 days) ──
   async fetchOrders(config, filterEmail) {
-    let url = `${config.appsScriptUrl}?key=${encodeURIComponent(config.apiKey)}&action=readOrders`;
-    if (filterEmail) {
-      url += `&email=${encodeURIComponent(filterEmail)}`;
-    }
+    const params = { action: 'readOrders' };
+    if (filterEmail) params.email = filterEmail;
+    const url = this._buildUrl(config, params);
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Apps Script HTTP ${resp.status}`);
     const data = await resp.json();
@@ -55,7 +81,7 @@ const SheetsAPI = {
 
   // ── Fetch payroll orders (trainee=Yes, past 2 months) ──
   async fetchPayrollOrders(config) {
-    const url = `${config.appsScriptUrl}?key=${encodeURIComponent(config.apiKey)}&action=readPayrollOrders`;
+    const url = this._buildUrl(config, { action: 'readPayrollOrders' });
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Apps Script HTTP ${resp.status}`);
     const data = await resp.json();
@@ -65,7 +91,7 @@ const SheetsAPI = {
 
   // ── Fetch Tableau summary (on-demand refresh) ──
   async fetchTableauSummary(config) {
-    const url = `${config.appsScriptUrl}?key=${encodeURIComponent(config.apiKey)}&action=readTableauSummary`;
+    const url = this._buildUrl(config, { action: 'readTableauSummary' });
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Apps Script HTTP ${resp.status}`);
     const data = await resp.json();
@@ -75,7 +101,7 @@ const SheetsAPI = {
 
   // ── Fetch Tableau device detail for a single DSI ──
   async fetchTableauDetail(config, dsi) {
-    const url = `${config.appsScriptUrl}?key=${encodeURIComponent(config.apiKey)}&action=readTableauDetail&dsi=${encodeURIComponent(dsi)}`;
+    const url = this._buildUrl(config, { action: 'readTableauDetail', dsi });
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Apps Script HTTP ${resp.status}`);
     const data = await resp.json();

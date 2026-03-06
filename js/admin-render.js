@@ -227,6 +227,17 @@ const AdminRender = {
         if (office && office.templateType === key) opt.selected = true;
         templateSelect.appendChild(opt);
       });
+
+      // Auto-fill campaign fields when template changes (new offices only)
+      if (!office) {
+        const newSelect = templateSelect.cloneNode(true);
+        templateSelect.parentNode.replaceChild(newSelect, templateSelect);
+        newSelect.addEventListener('change', () => {
+          this._autoFillCampaignFields(newSelect.value);
+        });
+        // Trigger initial auto-fill for default template
+        setTimeout(() => this._autoFillCampaignFields(newSelect.value), 0);
+      }
     }
 
     // Fill fields
@@ -502,6 +513,21 @@ const AdminRender = {
   // ═══════════════════════════════════════════════════════
   // HELPERS
   // ═══════════════════════════════════════════════════════
+
+  // Auto-fill Sheet ID, Script URL, and API Key from campaign config
+  _autoFillCampaignFields(templateType) {
+    const campaignCfg = (ADMIN_CONFIG.campaign || {})[templateType];
+    if (!campaignCfg) return;
+
+    const sheetIdInput = document.getElementById('office-sheet-id');
+    const scriptUrlInput = document.getElementById('office-script-url');
+    const apiKeyInput = document.getElementById('office-api-key');
+
+    // Only auto-fill if fields are empty (don't overwrite manual edits)
+    if (sheetIdInput && !sheetIdInput.value) sheetIdInput.value = campaignCfg.sheetId || '';
+    if (scriptUrlInput && !scriptUrlInput.value) scriptUrlInput.value = campaignCfg.appsScriptUrl || '';
+    if (apiKeyInput && !apiKeyInput.value) apiKeyInput.value = campaignCfg.apiKey || '';
+  },
 
   _countDescendants(node) {
     let count = node.children.length;

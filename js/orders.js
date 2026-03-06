@@ -299,10 +299,30 @@ const Orders = {
       OFFICE_CONFIG.columns.products.forEach(prod => {
         const val = o[prod.key] || 0;
         if (val > 0) {
-          soldParts.push(prod.type === 'boolean' ? prod.label : `${prod.label} x${val}`);
+          let label = prod.type === 'boolean' ? prod.label : `${prod.label} x${val}`;
+          // Append package detail from new schema fields
+          if (prod.key === 'fiber' && o.fiberPackage) label += ` (${o.fiberPackage})`;
+          if (prod.key === 'voip' && o.oomaPackage) label += ` (${o.oomaPackage})`;
+          if (prod.key === 'cell' && (o.newPhones || o.byods)) {
+            const parts = [];
+            if (o.newPhones > 0) parts.push(`${o.newPhones} new`);
+            if (o.byods > 0) parts.push(`${o.byods} BYOD`);
+            if (parts.length > 0) label += ` (${parts.join(', ')})`;
+          }
+          soldParts.push(label);
         }
       });
+      // DTV (excluded from main product list but show if present)
+      if (o.dtv > 0) {
+        let dtvLabel = 'DTV';
+        if (o.dtvPackage) dtvLabel += ` (${o.dtvPackage})`;
+        soldParts.push(dtvLabel);
+      }
       const soldStr = soldParts.length > 0 ? soldParts.join(', ') : '\u2014';
+      // Campaign badge (e.g., Ooma orders get a distinct badge)
+      const campaignBadge = (o.campaign && o.campaign !== 'attb2b')
+        ? `<span style="font-size:9px;font-weight:700;letter-spacing:0.5px;color:var(--sc-teal);background:rgba(0,229,204,0.12);border:1px solid rgba(0,229,204,0.3);border-radius:4px;padding:1px 5px;margin-right:4px;text-transform:uppercase">${this._escapeHtml(o.campaign)}</span>`
+        : '';
 
       // Use effective status (with Tableau override logic)
       const effective = this._getEffectiveStatus(o);
@@ -338,7 +358,7 @@ const Orders = {
         ${mode === 'all' ? `<td style="padding:10px 12px;font-weight:700;color:var(--white)">${this._escapeHtml(o.repName)}</td>` : ''}
         <td style="padding:10px 12px">${dsiClickable}</td>
         <td style="padding:10px 12px;color:var(--silver)">${o.dateOfSale}</td>
-        <td style="padding:10px 12px;color:var(--white)">${soldStr}</td>
+        <td style="padding:10px 12px;color:var(--white)">${campaignBadge}${soldStr}</td>
         <td style="padding:10px 12px;text-align:center">${statusHtml}</td>
         <td style="padding:10px 12px;font-size:11px;color:var(--silver-dim);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._escapeHtml(notePreview)}${noteCount > 1 ? ` <span style="color:var(--blue-core)">(${noteCount})</span>` : ''}</td>
         <td style="padding:10px 8px;text-align:right;white-space:nowrap">

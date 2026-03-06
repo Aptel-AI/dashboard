@@ -1,24 +1,42 @@
 // ═══════════════════════════════════════════════════════
-// ELEVATE Dashboard — Google Apps Script Middleware
+// Campaign Dashboard — Google Apps Script Middleware
 // ═══════════════════════════════════════════════════════
+// Single shared Code.gs for all AT&T B2B offices.
+// Accepts officeId + sheetId params to route to correct tabs/sheets.
 // Deploy as Web App: Execute as ME, Anyone can access.
 // Set API_KEY in Script Properties (Project Settings > Script Properties).
 
-// === CONFIG ===
-const ORDER_LOG_TAB = 'Order Log';
-const ROSTER_TAB = '_Roster';
-const ORDER_OVERRIDES_TAB = '_OrderOverrides';
-const TEAM_CUSTOM_TAB = '_TeamCustomizations';
-const UNLOCK_REQ_TAB = '_UnlockRequests';
-const TEAMS_TAB = '_Teams';
-const SETTINGS_TAB = '_Settings';
+
+// === PER-OFFICE TAB BASES ===
+const TAB = {
+  SALES: '_Sales',
+  ROSTER: '_Roster',
+  TEAMS: '_Teams',
+  TEAM_CUSTOM: '_TeamCustom',
+  OVERRIDES: '_Overrides',
+  UNLOCKS: '_Unlocks',
+  SETTINGS: '_Settings'
+};
+
+// Shared tabs (no officeId suffix — one copy per campaign sheet)
+const TABLEAU_TAB = '_TableauOrderLog';
 const CHURN_REPORT_TAB = '_TableauChurnReport';
 
-// Build team emoji maps dynamically from _Teams tab
-function buildTeamEmojiMaps(ss) {
+// Build per-office tab name: _Sales + _off_001 = _Sales_off_001
+function officeTab(base, officeId) {
+  return base + '_' + officeId;
+}
+
+// Default officeId when none is provided (backwards compat for existing Elevate office)
+const DEFAULT_OFFICE_ID = 'off_001';
+
+
+// === Build team emoji maps dynamically from _Teams tab ===
+
+function buildTeamEmojiMaps(ss, officeId) {
   var emojiMap = {};   // emoji → name
   var nameMap = {};    // name → emoji
-  var sheet = ss.getSheetByName(TEAMS_TAB);
+  var sheet = ss.getSheetByName(officeTab(TAB.TEAMS, officeId));
   if (!sheet) return { emojiMap: emojiMap, nameMap: nameMap };
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
@@ -35,8 +53,44 @@ function buildTeamEmojiMaps(ss) {
 // Ranks that appear in the "Leaders" section of the leaderboard
 const LEADER_RANKS = ['owner', 'manager', 'jd', 'l1'];
 
-// Order Log column indices (0-based)
+
+// === _Sales column indices (0-based, sequential A–AD, 30 columns) ===
+
 const OL = {
+  TIMESTAMP: 0,
+  EMAIL: 1,
+  REP_NAME: 2,
+  DATE_OF_SALE: 3,
+  CAMPAIGN: 4,
+  DSI: 5,
+  ACCOUNT_TYPE: 6,
+  CLIENT_NAME: 7,
+  TRAINEE: 8,
+  TRAINEE_NAME: 9,
+  AIR: 10,
+  NEW_PHONES: 11,
+  BYODS: 12,
+  CELL: 13,
+  FIBER: 14,
+  FIBER_PACKAGE: 15,
+  INSTALL_DATE: 16,
+  VOIP_QTY: 17,
+  DTV: 18,
+  DTV_PACKAGE: 19,
+  OOMA_PACKAGE: 20,
+  ACCOUNT_NOTES: 21,
+  ACTIVATION_SUPPORT: 22,
+  TEAM_EMOJI: 23,
+  YESES: 24,
+  UNITS: 25,
+  STATUS: 26,
+  NOTES: 27,
+  PAID_OUT: 28,
+  TICKETS: 29
+};
+
+// Legacy Order Log column indices (for migration only — remove after migration)
+const OL_LEGACY = {
   TIMESTAMP: 0,
   EMAIL: 2,
   DATE_OF_SALE: 3,
@@ -59,96 +113,64 @@ const OL = {
 };
 
 
-// _TableauOrderLog — header-based column lookup (resilient to column inserts/reorders)
-const TABLEAU_TAB = '_TableauOrderLog';
+// === _TableauOrderLog — header-based column lookup ===
 
-// Map header text (lowercased, trimmed) → internal key
-// Multiple aliases per key so column renames/variations still match
 const TOL_HEADER_MAP = {
-  // Col 0 — Owner & Office
   'owner & office': 'OWNER_OFFICE',
   'owner and office': 'OWNER_OFFICE',
-  // Col 1 — Rep
   'rep': 'REP',
-  // Col 2 — icd.Lead Rep ID
   'icd.lead rep id': 'LEAD_REP_ID',
   'lead rep id': 'LEAD_REP_ID',
-  // Col 3 — rep.Rep Number
   'rep.rep number': 'REP_NUMBER',
   'rep number': 'REP_NUMBER',
-  // Col 4 — sp.Order Date (copy)
   'sp.order date (copy)': 'ORDER_DATE',
   'order date (copy)': 'ORDER_DATE',
   'order date': 'ORDER_DATE',
-  // Col 5 — Order Time (Timezone)
   'order time (timezone)': 'ORDER_TIME',
   'order time': 'ORDER_TIME',
-  // Col 6 — sp.SPM Number  (THIS IS THE DSI COLUMN)
   'sp.spm number': 'DSI',
   'spm number': 'DSI',
   'dsi': 'DSI',
-  // Col 7 — spe.Name  (THIS IS THE SPE COLUMN)
   'spe.name': 'SPE',
   'spe name': 'SPE',
   'spe': 'SPE',
-  // Col 8 — spe.Account BAN
   'spe.account ban': 'BAN',
   'account ban': 'BAN',
   'ban': 'BAN',
-  // Col 9 — Product Type (Broken Out)
   'product type (broken out)': 'PRODUCT_TYPE',
   'product type': 'PRODUCT_TYPE',
-  // Col 10 — CRU/IRU
   'cru/iru': 'CRU_IRU',
   'cru / iru': 'CRU_IRU',
-  // Col 11 — DTR Status (enriched)
   'dtr status (enriched)': 'DTR_STATUS',
   'dtr status': 'DTR_STATUS',
-  // Col 12 — Disconnect Reason (Consolidated)
   'disconnect reason (consolidated)': 'DISCO_REASON',
   'disconnect reason': 'DISCO_REASON',
   'disco reason': 'DISCO_REASON',
-  // Col 13 — spe.Port Carrier
   'spe.port carrier': 'PORT_CARRIER',
   'port carrier': 'PORT_CARRIER',
-  // Col 14 — Notes.Note
   'notes.note': 'NOTES',
   'notes': 'NOTES',
-  // Col 15 — DTR Status Date
   'dtr status date': 'DTR_STATUS_DATE',
-  // Col 16 — Order Status
   'order status': 'ORDER_STATUS',
-  // Col 17 — spe.dtr Posted Date (copy)
   'spe.dtr posted date (copy)': 'POSTED_DATE',
   'posted date (copy)': 'POSTED_DATE',
   'posted date': 'POSTED_DATE',
-  // Col 18 — Max Posted
   'max posted': 'MAX_POSTED',
-  // Col 19 — First Streaming Date
   'first streaming date': 'FIRST_STREAMING',
   'first streaming': 'FIRST_STREAMING',
-  // Col 20 — Voice Line Count
   'voice line count': 'VOICE_LINE_COUNT',
-  // Col 21 — spe.TN Type
   'spe.tn type': 'TN_TYPE',
   'tn type': 'TN_TYPE',
-  // Col 22 — spe.Phone
   'spe.phone': 'PHONE',
   'phone': 'PHONE',
-  // Col 23 — spe.Install Date
   'spe.install date': 'INSTALL_DATE',
   'install date': 'INSTALL_DATE',
-  // Col 24 — B2B Rep Volume Bonus Tiers
   'b2b rep volume bonus tiers': 'BONUS_TIERS',
   'bonus tiers': 'BONUS_TIERS',
-  // Col 25 — Tier Bonus Payout/DNQ Reason
   'tier bonus payout/dnq reason': 'PAYOUT_REASON',
   'payout reason': 'PAYOUT_REASON',
-  // Col 26 — Unit Count
   'unit count': 'UNIT_COUNT',
-  // Col 27 — Total Volume
   'total volume': 'TOTAL_VOLUME',
-  // Col 28 — Total Activations
   'total activations': 'TOTAL_ACTS',
   'total acts': 'TOTAL_ACTS'
 };
@@ -190,28 +212,47 @@ function jsonResponse(data) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function getOrCreateSheet(name) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(name);
+// Shard-ready: open correct spreadsheet based on sheetId param
+function getSheet(params) {
+  var sheetId = (params && params.sheetId) || '';
+  if (sheetId) {
+    return SpreadsheetApp.openById(sheetId);
+  }
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+// Create or get a per-office tab, using baseName for header template
+function getOrCreateSheet(ss, tabName, baseName) {
+  let sheet = ss.getSheetByName(tabName);
   if (!sheet) {
-    sheet = ss.insertSheet(name);
-    switch (name) {
-      case ROSTER_TAB:
+    sheet = ss.insertSheet(tabName);
+    switch (baseName) {
+      case TAB.SALES:
+        sheet.appendRow([
+          'Timestamp', 'Email', 'Rep Name', 'Date of Sale', 'Campaign',
+          'DSI', 'Account Type', 'Client Name', 'Trainee', 'Trainee Name',
+          'Air', 'New Phones', 'BYODs', 'Cell', 'Fiber',
+          'Fiber Package', 'Install Date', 'VoIP Qty', 'DTV', 'DTV Package',
+          'Ooma Package', 'Account Notes', 'Activation Support', 'Team Emoji',
+          'Yeses', 'Units', 'Status', 'Notes', 'Paid Out', 'Tickets'
+        ]);
+        break;
+      case TAB.ROSTER:
         sheet.appendRow(['email', 'name', 'team', 'rank', 'deactivated', 'dateAdded', 'pinHash', 'phone', 'tableauName']);
         break;
-      case ORDER_OVERRIDES_TAB:
+      case TAB.OVERRIDES:
         sheet.appendRow(['key', 'product', 'status', 'date', 'order', 'notes_json']);
         break;
-      case TEAM_CUSTOM_TAB:
+      case TAB.TEAM_CUSTOM:
         sheet.appendRow(['persona', 'emoji', 'displayName']);
         break;
-      case UNLOCK_REQ_TAB:
+      case TAB.UNLOCKS:
         sheet.appendRow(['persona', 'status']);
         break;
-      case TEAMS_TAB:
+      case TAB.TEAMS:
         sheet.appendRow(['teamId', 'name', 'parentId', 'leaderId', 'emoji', 'createdDate']);
         break;
-      case SETTINGS_TAB:
+      case TAB.SETTINGS:
         sheet.appendRow(['key', 'value']);
         break;
     }
@@ -261,27 +302,28 @@ function doGet(e) {
 
   try {
     const action = (e && e.parameter && e.parameter.action) || '';
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const officeId = (e && e.parameter && e.parameter.officeId) || DEFAULT_OFFICE_ID;
+    const ss = getSheet(e && e.parameter);
 
     // Orders-specific request
     if (action === 'readOrders') {
       const filterEmail = (e.parameter && e.parameter.email) || '';
-      const orders = readOrders(ss, filterEmail || null);
+      const orders = readOrders(ss, officeId, filterEmail || null);
       return jsonResponse({ orders: orders });
     }
 
     // Payroll orders — trainee=Yes, past 2 months
     if (action === 'readPayrollOrders') {
-      const orders = readPayrollOrders(ss);
+      const orders = readPayrollOrders(ss, officeId);
       return jsonResponse({ orders: orders });
     }
 
-    // Tableau summary (on-demand refresh)
+    // Tableau summary (shared tab, but needs officeId for DSI→email mapping)
     if (action === 'readTableauSummary') {
-      return jsonResponse(getTableauSummaryWithCache(ss));
+      return jsonResponse(getTableauSummaryWithCache(ss, officeId));
     }
 
-    // Tableau device detail for a single DSI
+    // Tableau device detail for a single DSI (shared tab)
     if (action === 'readTableauDetail') {
       const dsi = (e.parameter && e.parameter.dsi) || '';
       return jsonResponse({ devices: readTableauDetail(ss, dsi) });
@@ -289,33 +331,33 @@ function doGet(e) {
 
     // Leaderboard snapshot (used by Make.com for daily Discord post)
     if (action === 'leaderboard') {
-      return jsonResponse(readLeaderboard(ss));
+      return jsonResponse(readLeaderboard(ss, officeId));
     }
 
     // Leaderboard as pre-built HTML (for HTML-to-Image rendering)
     if (action === 'leaderboardHtml') {
-      var lb = readLeaderboard(ss);
+      var lb = readLeaderboard(ss, officeId);
       return jsonResponse({ html: buildLeaderboardHtml(lb) });
     }
 
     // Default: return full dashboard data (includes Tableau summary)
-    let roster = readRoster(ss);
-    const teamMaps = buildTeamEmojiMaps(ss);
-    const peopleResult = readPeople(ss, roster, teamMaps.nameMap);
-    const tableauSummary = getTableauSummaryWithCache(ss);
+    let roster = readRoster(ss, officeId);
+    const teamMaps = buildTeamEmojiMaps(ss, officeId);
+    const peopleResult = readPeople(ss, officeId, roster, teamMaps.nameMap);
+    const tableauSummary = getTableauSummaryWithCache(ss, officeId);
 
     // Auto-assign Tableau names (managers first, then down the ranks)
-    roster = autoAssignTableauNames(ss, roster, tableauSummary.possibleTableauNames);
+    roster = autoAssignTableauNames(ss, officeId, roster, tableauSummary.possibleTableauNames);
 
     const data = {
       people: peopleResult.people || peopleResult,
       roster: roster,
       teamMap: teamMaps.emojiMap,
-      teams: readTeams(ss),
-      orderOverrides: readOrderOverrides(ss),
-      teamCustomizations: readTeamCustomizations(ss),
-      unlockRequests: readUnlockRequests(ss),
-      settings: readSettings(ss),
+      teams: readTeams(ss, officeId),
+      orderOverrides: readOrderOverrides(ss, officeId),
+      teamCustomizations: readTeamCustomizations(ss, officeId),
+      unlockRequests: readUnlockRequests(ss, officeId),
+      settings: readSettings(ss, officeId),
       tableauSummary: tableauSummary,
       churnReport: readChurnReport(ss)
     };
@@ -372,8 +414,8 @@ function getWeekStart() {
 
 // === READ HELPERS ===
 
-function readRoster(ss) {
-  const sheet = ss.getSheetByName(ROSTER_TAB);
+function readRoster(ss, officeId) {
+  const sheet = ss.getSheetByName(officeTab(TAB.ROSTER, officeId));
   if (!sheet) return {};
   const data = sheet.getDataRange().getValues();
   const result = {};
@@ -395,13 +437,13 @@ function readRoster(ss) {
   return result;
 }
 
-function readPeople(ss, roster, teamNameToEmoji) {
-  const olSheet = ss.getSheetByName(ORDER_LOG_TAB);
-  if (!olSheet) return { people: [], _debug: { error: 'No Order Log sheet' } };
+function readPeople(ss, officeId, roster, teamNameToEmoji) {
+  const olSheet = ss.getSheetByName(officeTab(TAB.SALES, officeId));
+  if (!olSheet) return { people: [], _debug: { error: 'No Sales sheet' } };
   if (!roster || Object.keys(roster).length === 0) return { people: [], _debug: { error: 'Empty roster' } };
 
   const olData = olSheet.getDataRange().getValues();
-  if (olData.length < 2) return { people: [], _debug: { error: 'Order Log has no data rows' } };
+  if (olData.length < 2) return { people: [], _debug: { error: 'Sales sheet has no data rows' } };
 
   // Debug counters
   var _dbg = {
@@ -415,11 +457,11 @@ function readPeople(ss, roster, teamNameToEmoji) {
     headerRow: olData[0].slice(0, 10).map(String),
     sampleRow2: olData.length > 1 ? [
       'col0=' + String(olData[1][0]),
-      'col2(email)=' + String(olData[1][OL.EMAIL]),
+      'col1(email)=' + String(olData[1][OL.EMAIL]),
       'col3(date)=' + String(olData[1][OL.DATE_OF_SALE]),
-      'col4(name)=' + String(olData[1][OL.REP_NAME]),
-      'col34(yeses)=' + String(olData[1][OL.YESES]),
-      'col36(units)=' + String(olData[1][OL.UNITS])
+      'col2(name)=' + String(olData[1][OL.REP_NAME]),
+      'col24(yeses)=' + String(olData[1][OL.YESES]),
+      'col25(units)=' + String(olData[1][OL.UNITS])
     ] : [],
     rosterEmails: Object.keys(roster).slice(0, 5),
     olEmails: []
@@ -591,8 +633,8 @@ function readPeople(ss, roster, teamNameToEmoji) {
 
 // === readOrders() — Individual order rows for past 30 days ===
 
-function readOrders(ss, filterEmail) {
-  const olSheet = ss.getSheetByName(ORDER_LOG_TAB);
+function readOrders(ss, officeId, filterEmail) {
+  const olSheet = ss.getSheetByName(officeTab(TAB.SALES, officeId));
   if (!olSheet) return [];
 
   const olData = olSheet.getDataRange().getValues();
@@ -624,10 +666,20 @@ function readOrders(ss, filterEmail) {
       repName: String(row[OL.REP_NAME] || '').trim(),
       dsi: String(row[OL.DSI] || '').trim(),
       dateOfSale: saleDate.toISOString().split('T')[0],
+      campaign: String(row[OL.CAMPAIGN] || '').trim(),
+      accountType: String(row[OL.ACCOUNT_TYPE] || '').trim(),
+      clientName: String(row[OL.CLIENT_NAME] || '').trim(),
       air:   Number(row[OL.AIR]) || 0,
+      newPhones: Number(row[OL.NEW_PHONES]) || 0,
+      byods: Number(row[OL.BYODS]) || 0,
       cell:  Number(row[OL.CELL]) || 0,
       fiber: Number(row[OL.FIBER]) || 0,
+      fiberPackage: String(row[OL.FIBER_PACKAGE] || '').trim(),
+      installDate: String(row[OL.INSTALL_DATE] || '').trim(),
       voip:  Number(row[OL.VOIP_QTY]) || 0,
+      dtv:   Number(row[OL.DTV]) || 0,
+      dtvPackage: String(row[OL.DTV_PACKAGE] || '').trim(),
+      oomaPackage: String(row[OL.OOMA_PACKAGE] || '').trim(),
       units: Number(row[OL.UNITS]) || 0,
       status: String(row[OL.STATUS] || 'Pending').trim(),
       notes:  String(row[OL.NOTES] || '').trim(),
@@ -640,10 +692,10 @@ function readOrders(ss, filterEmail) {
 }
 
 
-// === readPayrollOrders() — Trainee orders (col G = Yes) past 2 months ===
+// === readPayrollOrders() — Trainee orders past 2 months ===
 
-function readPayrollOrders(ss) {
-  const olSheet = ss.getSheetByName(ORDER_LOG_TAB);
+function readPayrollOrders(ss, officeId) {
+  const olSheet = ss.getSheetByName(officeTab(TAB.SALES, officeId));
   if (!olSheet) return [];
 
   const olData = olSheet.getDataRange().getValues();
@@ -660,7 +712,7 @@ function readPayrollOrders(ss) {
     const email = String(row[OL.EMAIL] || '').trim().toLowerCase();
     if (!email) continue;
 
-    // Only include rows where "Did you have a trainee?" = Yes
+    // Only include rows where Trainee = Yes
     const trainee = String(row[OL.TRAINEE] || '').trim().toLowerCase();
     if (trainee !== 'yes') continue;
 
@@ -671,7 +723,7 @@ function readPayrollOrders(ss) {
     saleDate.setHours(0, 0, 0, 0);
     if (saleDate < cutoff) continue;
 
-    // Parse paid-out JSON (col AO) — defaults to empty object
+    // Parse paid-out JSON — defaults to empty object
     let paidOut = {};
     try {
       const rawPaid = String(row[OL.PAID_OUT] || '').trim();
@@ -697,7 +749,7 @@ function readPayrollOrders(ss) {
   }
 
   // Enrich payroll orders with Tableau SPE data
-  var tableauSummary = getTableauSummaryWithCache(ss);
+  var tableauSummary = getTableauSummaryWithCache(ss, officeId);
   var dsiSummary = tableauSummary.dsiSummary || {};
   orders.forEach(function(order) {
     var ts = dsiSummary[order.dsi];
@@ -712,10 +764,10 @@ function readPayrollOrders(ss) {
 }
 
 
-// === readSettings() — Key-value settings from _Settings tab ===
+// === readSettings() — Key-value settings from per-office _Settings tab ===
 
-function readSettings(ss) {
-  const sheet = ss.getSheetByName(SETTINGS_TAB);
+function readSettings(ss, officeId) {
+  const sheet = ss.getSheetByName(officeTab(TAB.SETTINGS, officeId));
   if (!sheet) return {};
   const data = sheet.getDataRange().getValues();
   const result = {};
@@ -727,7 +779,7 @@ function readSettings(ss) {
 }
 
 
-// === readChurnReport() — Read _TableauChurnReport tab ===
+// === readChurnReport() — Read shared _TableauChurnReport tab ===
 
 function readChurnReport(ss) {
   const sheet = ss.getSheetByName(CHURN_REPORT_TAB);
@@ -754,8 +806,8 @@ function readChurnReport(ss) {
 
 // === writeSetting() — Upsert a key-value setting ===
 
-function writeSetting(body) {
-  const sheet = getOrCreateSheet(SETTINGS_TAB);
+function writeSetting(body, ss, officeId) {
+  const sheet = getOrCreateSheet(ss, officeTab(TAB.SETTINGS, officeId), TAB.SETTINGS);
   const key = String(body.key || '').trim();
   const value = String(body.value || '').trim();
   if (!key) return { error: 'missing key' };
@@ -773,8 +825,8 @@ function writeSetting(body) {
 }
 
 
-function readOrderOverrides(ss) {
-  const sheet = ss.getSheetByName(ORDER_OVERRIDES_TAB);
+function readOrderOverrides(ss, officeId) {
+  const sheet = ss.getSheetByName(officeTab(TAB.OVERRIDES, officeId));
   if (!sheet) return {};
   const data = sheet.getDataRange().getValues();
   const result = {};
@@ -794,8 +846,8 @@ function readOrderOverrides(ss) {
   return result;
 }
 
-function readTeamCustomizations(ss) {
-  const sheet = ss.getSheetByName(TEAM_CUSTOM_TAB);
+function readTeamCustomizations(ss, officeId) {
+  const sheet = ss.getSheetByName(officeTab(TAB.TEAM_CUSTOM, officeId));
   if (!sheet) return {};
   const data = sheet.getDataRange().getValues();
   const result = {};
@@ -810,8 +862,8 @@ function readTeamCustomizations(ss) {
   return result;
 }
 
-function readUnlockRequests(ss) {
-  const sheet = ss.getSheetByName(UNLOCK_REQ_TAB);
+function readUnlockRequests(ss, officeId) {
+  const sheet = ss.getSheetByName(officeTab(TAB.UNLOCKS, officeId));
   if (!sheet) return {};
   const data = sheet.getDataRange().getValues();
   const result = {};
@@ -823,8 +875,8 @@ function readUnlockRequests(ss) {
   return result;
 }
 
-function readTeams(ss) {
-  const sheet = ss.getSheetByName(TEAMS_TAB);
+function readTeams(ss, officeId) {
+  const sheet = ss.getSheetByName(officeTab(TAB.TEAMS, officeId));
   if (!sheet) return {};
   const data = sheet.getDataRange().getValues();
   const result = {};
@@ -846,9 +898,9 @@ function readTeams(ss) {
 
 // === TABLEAU ORDER LOG ===
 
-// Build DSI → email map from Order Log (for joining Tableau DSIs to roster emails)
-function buildDsiEmailMap(ss) {
-  var olSheet = ss.getSheetByName(ORDER_LOG_TAB);
+// Build DSI → email map from per-office Sales tab (for joining Tableau DSIs to roster emails)
+function buildDsiEmailMap(ss, officeId) {
+  var olSheet = ss.getSheetByName(officeTab(TAB.SALES, officeId));
   if (!olSheet) return { dsiToEmail: {}, emailToDsis: {} };
   var olData = olSheet.getDataRange().getValues();
   var dsiToEmail = {};   // DSI → first email (first-wins)
@@ -865,8 +917,8 @@ function buildDsiEmailMap(ss) {
   return { dsiToEmail: dsiToEmail, emailToDsis: emailToDsis };
 }
 
-// Read and aggregate _TableauOrderLog by DSI and by rep email
-function readTableauSummary(ss) {
+// Read and aggregate shared _TableauOrderLog by DSI and by rep email
+function readTableauSummary(ss, officeId) {
   var sheet = ss.getSheetByName(TABLEAU_TAB);
   if (!sheet) return { dsiSummary: {}, repSummary: {} };
 
@@ -876,8 +928,8 @@ function readTableauSummary(ss) {
   // Build column map from header row
   var col = buildTableauColumnMap(data[0]);
 
-  // Build DSI → email map + email → DSIs map for rep aggregation
-  var maps = buildDsiEmailMap(ss);
+  // Build DSI → email map from this office's Sales tab
+  var maps = buildDsiEmailMap(ss, officeId);
   var dsiEmailMap = maps.dsiToEmail;
   var emailToDsis = maps.emailToDsis;
 
@@ -919,7 +971,7 @@ function readTableauSummary(ss) {
         disconnectReasons: {},
         speList: [],
         devices: [],
-        monthWirelessSPEs: {}  // spe → { orderStatus, dtrStatus }
+        monthWirelessSPEs: {}
       };
     }
 
@@ -939,7 +991,6 @@ function readTableauSummary(ss) {
     }
     if (spe) {
       s.speList.push(spe);
-      // Track WIRELESS SPEs within 30-day window for Active/Pending/Cancel/Disco %
       var ptUpper = productType.toUpperCase();
       var isWireless = ptUpper === 'WIRELESS';
       var isInMonth = orderDate instanceof Date && orderDate >= thirtyDaysAgo;
@@ -995,7 +1046,6 @@ function readTableauSummary(ss) {
     Object.keys(ds.productCounts).forEach(function(pt) {
       rs.productCounts[pt] = (rs.productCounts[pt] || 0) + ds.productCounts[pt];
     });
-    // Merge month-window wireless SPEs across DSIs
     Object.keys(ds.monthWirelessSPEs).forEach(function(spe) {
       rs.monthWirelessSPEs[spe] = ds.monthWirelessSPEs[spe];
     });
@@ -1095,7 +1145,7 @@ function readTableauSummary(ss) {
 
 // Auto-assign tableauNames to roster members who don't have one yet.
 // Processes top-down by rank so managers claim first, then reps get what's left.
-function autoAssignTableauNames(ss, roster, possibleTableauNames) {
+function autoAssignTableauNames(ss, officeId, roster, possibleTableauNames) {
   if (!possibleTableauNames || Object.keys(possibleTableauNames).length === 0) return roster;
 
   // Rank priority: higher index = claims first
@@ -1124,7 +1174,7 @@ function autoAssignTableauNames(ss, roster, possibleTableauNames) {
   });
 
   // Process top-down: claim the sole unclaimed name if exactly one exists
-  var sheet = ss.getSheetByName(ROSTER_TAB);
+  var sheet = ss.getSheetByName(officeTab(TAB.ROSTER, officeId));
   var newAssignments = [];
 
   unassigned.forEach(function(entry) {
@@ -1133,7 +1183,7 @@ function autoAssignTableauNames(ss, roster, possibleTableauNames) {
 
     if (unclaimed.length === 1) {
       var name = unclaimed[0];
-      claimed[name] = true;  // mark it so lower-rank reps can't take it
+      claimed[name] = true;
       roster[entry.email].tableauName = name;
       newAssignments.push({ email: entry.email, name: name });
     }
@@ -1158,7 +1208,7 @@ function autoAssignTableauNames(ss, roster, possibleTableauNames) {
 }
 
 
-// Lazy-load per-device detail rows for a single DSI
+// Lazy-load per-device detail rows for a single DSI (shared Tableau tab)
 function readTableauDetail(ss, dsi) {
   var sheet = ss.getSheetByName(TABLEAU_TAB);
   if (!sheet) return [];
@@ -1168,7 +1218,6 @@ function readTableauDetail(ss, dsi) {
   var targetDsi = String(dsi || '').trim();
   if (!targetDsi) return [];
 
-  // Build column map from header row
   var col = buildTableauColumnMap(data[0]);
 
   var devices = [];
@@ -1193,16 +1242,16 @@ function readTableauDetail(ss, dsi) {
   return devices;
 }
 
-// Cached wrapper for readTableauSummary (6-hour TTL)
-function getTableauSummaryWithCache(ss) {
+// Cached wrapper for readTableauSummary (6-hour TTL, per-office cache key)
+function getTableauSummaryWithCache(ss, officeId) {
   var cache = CacheService.getScriptCache();
-  var cacheKey = 'tableauSummary_v5';
+  var cacheKey = 'tableauSummary_v5_' + officeId;
   var cached = cache.get(cacheKey);
   if (cached) {
     try { return JSON.parse(cached); } catch (e) { /* fall through */ }
   }
 
-  var summary = readTableauSummary(ss);
+  var summary = readTableauSummary(ss, officeId);
   try {
     var json = JSON.stringify(summary);
     // CacheService limit is 100KB per value
@@ -1214,9 +1263,9 @@ function getTableauSummaryWithCache(ss) {
 }
 
 // Manual Tableau cache bust (owner/admin action)
-function writeBustTableauCache() {
+function writeBustTableauCache(officeId) {
   try {
-    CacheService.getScriptCache().remove('tableauSummary_v5');
+    CacheService.getScriptCache().remove('tableauSummary_v5_' + officeId);
   } catch (e) { /* non-critical */ }
   return { ok: true, message: 'Tableau cache cleared' };
 }
@@ -1236,40 +1285,45 @@ function doPost(e) {
     return jsonResponse({ error: 'unauthorized' });
   }
 
+  const officeId = body.officeId || DEFAULT_OFFICE_ID;
+  const ss = getSheet(body);  // uses body.sheetId if provided
+
   try {
     let result;
     switch (body.action) {
       // Roster management (JD+ only — enforced client-side)
-      case 'addRosterEntry':      result = writeAddRosterEntry(body); break;
-      case 'updateRosterEntry':   result = writeUpdateRosterEntry(body); break;
-      case 'setTableauName':      result = writeSetTableauName(body); break;
-      case 'deleteRosterEntry':   result = writeDeleteRosterEntry(body); break;
-      case 'toggleDeactivate':    result = writeToggleDeactivate(body); break;
+      case 'addRosterEntry':      result = writeAddRosterEntry(body, ss, officeId); break;
+      case 'updateRosterEntry':   result = writeUpdateRosterEntry(body, ss, officeId); break;
+      case 'setTableauName':      result = writeSetTableauName(body, ss, officeId); break;
+      case 'deleteRosterEntry':   result = writeDeleteRosterEntry(body, ss, officeId); break;
+      case 'toggleDeactivate':    result = writeToggleDeactivate(body, ss, officeId); break;
       // Existing actions
-      case 'saveOrderOverride':    result = writeSaveOrderOverride(body); break;
-      case 'setTeamCustomization': result = writeSetTeamCustomization(body); break;
-      case 'setUnlockRequest':     result = writeSetUnlockRequest(body); break;
-      case 'deleteUnlockRequest':  result = writeDeleteUnlockRequest(body); break;
+      case 'saveOrderOverride':    result = writeSaveOrderOverride(body, ss, officeId); break;
+      case 'setTeamCustomization': result = writeSetTeamCustomization(body, ss, officeId); break;
+      case 'setUnlockRequest':     result = writeSetUnlockRequest(body, ss, officeId); break;
+      case 'deleteUnlockRequest':  result = writeDeleteUnlockRequest(body, ss, officeId); break;
       // Team hierarchy management
-      case 'addTeam':              result = writeAddTeam(body); break;
-      case 'updateTeam':           result = writeUpdateTeam(body); break;
-      case 'deleteTeam':           result = writeDeleteTeam(body); break;
+      case 'addTeam':              result = writeAddTeam(body, ss, officeId); break;
+      case 'updateTeam':           result = writeUpdateTeam(body, ss, officeId); break;
+      case 'deleteTeam':           result = writeDeleteTeam(body, ss, officeId); break;
       // PIN authentication
-      case 'setPin':               result = writeSetPin(body); break;
-      case 'validatePin':          result = writeValidatePin(body); break;
-      case 'changePin':            result = writeChangePin(body); break;
+      case 'setPin':               result = writeSetPin(body, ss, officeId); break;
+      case 'validatePin':          result = writeValidatePin(body, ss, officeId); break;
+      case 'changePin':            result = writeChangePin(body, ss, officeId); break;
       // Order management
-      case 'writeOrderNote':       result = writeOrderNote(body); break;
-      case 'setOrderStatus':       result = writeSetOrderStatus(body); break;
-      case 'updateOrder':          result = writeUpdateOrder(body); break;
-      case 'setSetting':           result = writeSetting(body); break;
-      case 'savePaidOut':          result = writeSavePaidOut(body); break;
+      case 'writeOrderNote':       result = writeOrderNote(body, ss, officeId); break;
+      case 'setOrderStatus':       result = writeSetOrderStatus(body, ss, officeId); break;
+      case 'updateOrder':          result = writeUpdateOrder(body, ss, officeId); break;
+      case 'setSetting':           result = writeSetting(body, ss, officeId); break;
+      case 'savePaidOut':          result = writeSavePaidOut(body, ss, officeId); break;
       // Ticket management
-      case 'addTicket':            result = writeAddTicket(body); break;
-      case 'toggleTicket':         result = writeToggleTicket(body); break;
+      case 'addTicket':            result = writeAddTicket(body, ss, officeId); break;
+      case 'toggleTicket':         result = writeToggleTicket(body, ss, officeId); break;
       // Sale submission
-      case 'addSale':              result = writeAddSale(body); break;
-      case 'bustTableauCache':     result = writeBustTableauCache(); break;
+      case 'addSale':              result = writeAddSale(body, ss, officeId); break;
+      case 'bustTableauCache':     result = writeBustTableauCache(officeId); break;
+      // Office provisioning (called by admin portal)
+      case 'createOfficeTabs':     result = createOfficeTabs(body, ss); break;
       default: result = { error: 'unknown action: ' + body.action };
     }
     return jsonResponse(result);
@@ -1281,8 +1335,8 @@ function doPost(e) {
 
 // === ROSTER WRITE HELPERS ===
 
-function writeAddRosterEntry(body) {
-  const sheet = getOrCreateSheet(ROSTER_TAB);
+function writeAddRosterEntry(body, ss, officeId) {
+  const sheet = getOrCreateSheet(ss, officeTab(TAB.ROSTER, officeId), TAB.ROSTER);
   const email = String(body.email || '').trim().toLowerCase();
   if (!email) return { error: 'missing email' };
 
@@ -1297,14 +1351,14 @@ function writeAddRosterEntry(body) {
     false,
     new Date().toISOString().split('T')[0],
     '',  // pinHash — empty until first login
-    body.phone || '',  // phone
+    body.phone || '',
     ''   // tableauName — empty until rep picks from popup
   ]);
   return { ok: true };
 }
 
-function writeUpdateRosterEntry(body) {
-  const sheet = getOrCreateSheet(ROSTER_TAB);
+function writeUpdateRosterEntry(body, ss, officeId) {
+  const sheet = getOrCreateSheet(ss, officeTab(TAB.ROSTER, officeId), TAB.ROSTER);
   const email = String(body.email || '').trim().toLowerCase();
   if (!email) return { error: 'missing email' };
 
@@ -1327,15 +1381,15 @@ function writeUpdateRosterEntry(body) {
     body.deactivated !== undefined ? body.deactivated : cur[4],
     cur[5], // preserve dateAdded
     cur[6], // preserve pinHash
-    body.phone !== undefined ? body.phone : (cur[7] || ''),  // phone
-    body.tableauName !== undefined ? body.tableauName : (cur[8] || '')  // tableauName
+    body.phone !== undefined ? body.phone : (cur[7] || ''),
+    body.tableauName !== undefined ? body.tableauName : (cur[8] || '')
   ];
   sheet.getRange(rowIdx, 1, 1, 9).setValues([rowData]);
   return { ok: true };
 }
 
-function writeDeleteRosterEntry(body) {
-  const sheet = getOrCreateSheet(ROSTER_TAB);
+function writeDeleteRosterEntry(body, ss, officeId) {
+  const sheet = getOrCreateSheet(ss, officeTab(TAB.ROSTER, officeId), TAB.ROSTER);
   const email = String(body.email || '').trim().toLowerCase();
   if (!email) return { error: 'missing email' };
 
@@ -1344,8 +1398,8 @@ function writeDeleteRosterEntry(body) {
   return { ok: true };
 }
 
-function writeToggleDeactivate(body) {
-  const sheet = getOrCreateSheet(ROSTER_TAB);
+function writeToggleDeactivate(body, ss, officeId) {
+  const sheet = getOrCreateSheet(ss, officeTab(TAB.ROSTER, officeId), TAB.ROSTER);
   const email = String(body.email || '').trim().toLowerCase();
   if (!email) return { error: 'missing email' };
 
@@ -1357,8 +1411,8 @@ function writeToggleDeactivate(body) {
 }
 
 
-function writeSetTableauName(body) {
-  const sheet = getOrCreateSheet(ROSTER_TAB);
+function writeSetTableauName(body, ss, officeId) {
+  const sheet = getOrCreateSheet(ss, officeTab(TAB.ROSTER, officeId), TAB.ROSTER);
   const email = String(body.email || '').trim().toLowerCase();
   if (!email) return { error: 'missing email' };
   const tableauName = String(body.tableauName || '').trim();
@@ -1367,7 +1421,6 @@ function writeSetTableauName(body) {
   const rowIdx = findRowCI(sheet, 0, email);
   if (rowIdx < 0) return { error: 'email not found' };
 
-  // Column 9 = tableauName (1-based index)
   sheet.getRange(rowIdx, 9).setValue(tableauName);
   return { ok: true };
 }
@@ -1375,8 +1428,8 @@ function writeSetTableauName(body) {
 
 // === EXISTING WRITE HELPERS ===
 
-function writeSaveOrderOverride(body) {
-  const sheet = getOrCreateSheet(ORDER_OVERRIDES_TAB);
+function writeSaveOrderOverride(body, ss, officeId) {
+  const sheet = getOrCreateSheet(ss, officeTab(TAB.OVERRIDES, officeId), TAB.OVERRIDES);
   const key = String(body.key || '').trim();
   if (!key) return { error: 'missing key' };
 
@@ -1398,8 +1451,8 @@ function writeSaveOrderOverride(body) {
   return { ok: true };
 }
 
-function writeSetTeamCustomization(body) {
-  const sheet = getOrCreateSheet(TEAM_CUSTOM_TAB);
+function writeSetTeamCustomization(body, ss, officeId) {
+  const sheet = getOrCreateSheet(ss, officeTab(TAB.TEAM_CUSTOM, officeId), TAB.TEAM_CUSTOM);
   const persona = String(body.persona || '').trim();
   if (!persona) return { error: 'missing persona' };
 
@@ -1413,8 +1466,8 @@ function writeSetTeamCustomization(body) {
   return { ok: true };
 }
 
-function writeSetUnlockRequest(body) {
-  const sheet = getOrCreateSheet(UNLOCK_REQ_TAB);
+function writeSetUnlockRequest(body, ss, officeId) {
+  const sheet = getOrCreateSheet(ss, officeTab(TAB.UNLOCKS, officeId), TAB.UNLOCKS);
   const persona = String(body.persona || '').trim();
   if (!persona) return { error: 'missing persona' };
 
@@ -1428,8 +1481,8 @@ function writeSetUnlockRequest(body) {
   return { ok: true };
 }
 
-function writeDeleteUnlockRequest(body) {
-  const sheet = getOrCreateSheet(UNLOCK_REQ_TAB);
+function writeDeleteUnlockRequest(body, ss, officeId) {
+  const sheet = getOrCreateSheet(ss, officeTab(TAB.UNLOCKS, officeId), TAB.UNLOCKS);
   const persona = String(body.persona || '').trim();
   if (!persona) return { error: 'missing persona' };
 
@@ -1441,8 +1494,8 @@ function writeDeleteUnlockRequest(body) {
 
 // === PIN AUTHENTICATION ===
 
-function writeSetPin(body) {
-  var sheet = getOrCreateSheet(ROSTER_TAB);
+function writeSetPin(body, ss, officeId) {
+  var sheet = getOrCreateSheet(ss, officeTab(TAB.ROSTER, officeId), TAB.ROSTER);
   var email = String(body.email || '').trim().toLowerCase();
   var pin = String(body.pin || '').trim();
 
@@ -1462,8 +1515,8 @@ function writeSetPin(body) {
   return { ok: true };
 }
 
-function writeValidatePin(body) {
-  var sheet = getOrCreateSheet(ROSTER_TAB);
+function writeValidatePin(body, ss, officeId) {
+  var sheet = getOrCreateSheet(ss, officeTab(TAB.ROSTER, officeId), TAB.ROSTER);
   var email = String(body.email || '').trim().toLowerCase();
   var pin = String(body.pin || '').trim();
 
@@ -1491,8 +1544,8 @@ function writeValidatePin(body) {
 
 // === TEAM HIERARCHY WRITE HELPERS ===
 
-function writeAddTeam(body) {
-  const sheet = getOrCreateSheet(TEAMS_TAB);
+function writeAddTeam(body, ss, officeId) {
+  const sheet = getOrCreateSheet(ss, officeTab(TAB.TEAMS, officeId), TAB.TEAMS);
   const teamId = String(body.teamId || '').trim();
   const name = String(body.name || '').trim();
   if (!teamId || !name) return { error: 'missing teamId or name' };
@@ -1513,8 +1566,8 @@ function writeAddTeam(body) {
   return { ok: true };
 }
 
-function writeUpdateTeam(body) {
-  const sheet = getOrCreateSheet(TEAMS_TAB);
+function writeUpdateTeam(body, ss, officeId) {
+  const sheet = getOrCreateSheet(ss, officeTab(TAB.TEAMS, officeId), TAB.TEAMS);
   const teamId = String(body.teamId || '').trim();
   if (!teamId) return { error: 'missing teamId' };
 
@@ -1560,8 +1613,8 @@ function writeUpdateTeam(body) {
   return { ok: true };
 }
 
-function writeDeleteTeam(body) {
-  const sheet = getOrCreateSheet(TEAMS_TAB);
+function writeDeleteTeam(body, ss, officeId) {
+  const sheet = getOrCreateSheet(ss, officeTab(TAB.TEAMS, officeId), TAB.TEAMS);
   const teamId = String(body.teamId || '').trim();
   if (!teamId) return { error: 'missing teamId' };
 
@@ -1570,24 +1623,9 @@ function writeDeleteTeam(body) {
   return { ok: true };
 }
 
-// One-time migration: seed _Teams sheet from existing team config
-function migrateTeams() {
-  var sheet = getOrCreateSheet(TEAMS_TAB);
-  var existingTeams = ['Aces', 'Squids', 'Grind Team', 'Queenz', 'Different Breed', 'Sharks', 'Dawgs'];
-  var today = new Date().toISOString().split('T')[0];
 
-  existingTeams.forEach(function(name) {
-    var teamId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    var emoji = TEAM_NAME_TO_EMOJI[name] || '';
-    // Skip if already exists
-    if (findRow(sheet, 0, teamId) > 0) return;
-    sheet.appendRow([teamId, name, '', '', emoji, today]);
-  });
-}
-
-
-function writeChangePin(body) {
-  var sheet = getOrCreateSheet(ROSTER_TAB);
+function writeChangePin(body, ss, officeId) {
+  var sheet = getOrCreateSheet(ss, officeTab(TAB.ROSTER, officeId), TAB.ROSTER);
   var email = String(body.email || '').trim().toLowerCase();
   var currentPin = String(body.currentPin || '').trim();
   var newPin = String(body.newPin || '').trim();
@@ -1612,10 +1650,9 @@ function writeChangePin(body) {
 
 // === ORDER NOTES & STATUS ===
 
-function writeOrderNote(body) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(ORDER_LOG_TAB);
-  if (!sheet) return { error: 'Order Log not found' };
+function writeOrderNote(body, ss, officeId) {
+  var sheet = ss.getSheetByName(officeTab(TAB.SALES, officeId));
+  if (!sheet) return { error: 'Sales sheet not found' };
 
   var rowIndex = Number(body.rowIndex);
   if (!rowIndex || rowIndex < 2) return { error: 'Invalid row' };
@@ -1639,10 +1676,9 @@ function writeOrderNote(body) {
 
 // === TICKET MANAGEMENT ===
 
-function writeAddTicket(body) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(ORDER_LOG_TAB);
-  if (!sheet) return { error: 'Order Log not found' };
+function writeAddTicket(body, ss, officeId) {
+  var sheet = ss.getSheetByName(officeTab(TAB.SALES, officeId));
+  if (!sheet) return { error: 'Sales sheet not found' };
 
   var rowIndex = Number(body.rowIndex);
   if (!rowIndex || rowIndex < 2) return { error: 'Invalid row' };
@@ -1672,10 +1708,9 @@ function writeAddTicket(body) {
   return { ok: true, tickets: tickets };
 }
 
-function writeToggleTicket(body) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(ORDER_LOG_TAB);
-  if (!sheet) return { error: 'Order Log not found' };
+function writeToggleTicket(body, ss, officeId) {
+  var sheet = ss.getSheetByName(officeTab(TAB.SALES, officeId));
+  if (!sheet) return { error: 'Sales sheet not found' };
 
   var rowIndex = Number(body.rowIndex);
   if (!rowIndex || rowIndex < 2) return { error: 'Invalid row' };
@@ -1701,10 +1736,9 @@ function writeToggleTicket(body) {
   return { ok: true, tickets: tickets };
 }
 
-function writeSetOrderStatus(body) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(ORDER_LOG_TAB);
-  if (!sheet) return { error: 'Order Log not found' };
+function writeSetOrderStatus(body, ss, officeId) {
+  var sheet = ss.getSheetByName(officeTab(TAB.SALES, officeId));
+  if (!sheet) return { error: 'Sales sheet not found' };
 
   var rowIndex = Number(body.rowIndex);
   if (!rowIndex || rowIndex < 2) return { error: 'Invalid row' };
@@ -1714,10 +1748,9 @@ function writeSetOrderStatus(body) {
   return { ok: true };
 }
 
-function writeUpdateOrder(body) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(ORDER_LOG_TAB);
-  if (!sheet) return { error: 'Order Log not found' };
+function writeUpdateOrder(body, ss, officeId) {
+  var sheet = ss.getSheetByName(officeTab(TAB.SALES, officeId));
+  if (!sheet) return { error: 'Sales sheet not found' };
 
   var rowIndex = Number(body.rowIndex);
   if (!rowIndex || rowIndex < 2) return { error: 'Invalid row' };
@@ -1738,10 +1771,9 @@ function writeUpdateOrder(body) {
 
 // === PAYROLL PAID-OUT ===
 
-function writeSavePaidOut(body) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(ORDER_LOG_TAB);
-  if (!sheet) return { error: 'Order Log not found' };
+function writeSavePaidOut(body, ss, officeId) {
+  var sheet = ss.getSheetByName(officeTab(TAB.SALES, officeId));
+  if (!sheet) return { error: 'Sales sheet not found' };
 
   var rowIndex = Number(body.rowIndex);
   if (!rowIndex || rowIndex < 2) return { error: 'Invalid row' };
@@ -1754,13 +1786,13 @@ function writeSavePaidOut(body) {
 
 // === LEADERBOARD SNAPSHOT (for daily Discord post) ===
 
-function readLeaderboard(ss) {
-  const roster = readRoster(ss);
-  const teams = readTeams(ss);
+function readLeaderboard(ss, officeId) {
+  const roster = readRoster(ss, officeId);
+  const teams = readTeams(ss, officeId);
 
-  // Read Order Log
-  const olSheet = ss.getSheetByName(ORDER_LOG_TAB);
-  if (!olSheet) return { error: 'No Order Log' };
+  // Read Sales tab
+  const olSheet = ss.getSheetByName(officeTab(TAB.SALES, officeId));
+  if (!olSheet) return { error: 'No Sales sheet' };
   const olData = olSheet.getDataRange().getValues();
 
   // Current week boundary (Monday 00:00)
@@ -1901,7 +1933,6 @@ function buildLeaderboardHtml(data) {
   }
 
   return '<div style="width:800px;background:#FEFAF3;padding:32px 32px 20px;font-family:Inter,sans-serif;">' +
-    // Hero stats banner
     '<div style="display:flex;align-items:center;background:rgba(255,255,255,0.5);border:1px solid rgba(0,0,0,0.3);border-radius:14px;margin-bottom:32px;overflow:hidden;">' +
       '<div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:24px 40px;gap:6px;">' +
         '<div style="font-family:Helvetica Neue,Inter,sans-serif;font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#708090;">Week Yeses</div>' +
@@ -1911,30 +1942,24 @@ function buildLeaderboardHtml(data) {
         '<div style="font-family:Helvetica Neue,Inter,sans-serif;font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#708090;">Week Units</div>' +
         '<div style="font-family:Inter,sans-serif;font-size:56px;font-weight:700;line-height:1;color:#43B3AE;">' + wU + '</div></div>' +
     '</div>' +
-    // TOP PERFORMERS heading
     '<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">' +
       '<div style="font-family:Helvetica Neue,Inter,sans-serif;font-size:16px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#242124;">Top Performers</div>' +
       '<div style="flex:1;height:1px;background:rgba(0,0,0,0.15);"></div>' +
       '<div style="font-size:13px;font-style:italic;color:#708090;">This week</div></div>' +
-    // INDIVIDUALS
     '<div style="font-family:Helvetica Neue,Inter,sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#708090;margin-bottom:12px;">Individuals</div>' +
     podiumRow(indOrder, false) +
-    // TEAMS
     '<div style="font-family:Helvetica Neue,Inter,sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#708090;margin-bottom:12px;">Teams</div>' +
     podiumRow(teamOrder, true) +
-    // Footer
     '<div style="text-align:center;padding-top:8px;border-top:1px solid rgba(0,0,0,0.08);">' +
       '<div style="font-size:11px;color:#708090;letter-spacing:0.5px;">End of Day Snapshot \u00B7 ' + dateStr + '</div></div>' +
   '</div>';
 }
 
 
-// === SALE SUBMISSION ===
+// === SALE SUBMISSION (30-column _Sales schema) ===
 
-function writeAddSale(body) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(ORDER_LOG_TAB);
-  if (!sheet) return { error: 'Order Log not found' };
+function writeAddSale(body, ss, officeId) {
+  var sheet = getOrCreateSheet(ss, officeTab(TAB.SALES, officeId), TAB.SALES);
 
   // Validate required fields
   var email = String(body.email || '').trim().toLowerCase();
@@ -1942,10 +1967,10 @@ function writeAddSale(body) {
   var dateOfSale = body.dateOfSale;
   if (!dateOfSale) return { error: 'Missing date of sale' };
 
-  // Look up team emoji from _Roster + _Teams
+  // Look up team emoji from Roster + Teams
   var teamEmoji = '';
   try {
-    var rosterSheet = ss.getSheetByName(ROSTER_TAB);
+    var rosterSheet = ss.getSheetByName(officeTab(TAB.ROSTER, officeId));
     if (rosterSheet) {
       var rosterData = rosterSheet.getDataRange().getValues();
       var teamName = '';
@@ -1956,7 +1981,7 @@ function writeAddSale(body) {
         }
       }
       if (teamName) {
-        var teamsSheet = ss.getSheetByName(TEAMS_TAB);
+        var teamsSheet = ss.getSheetByName(officeTab(TAB.TEAMS, officeId));
         if (teamsSheet) {
           var teamsData = teamsSheet.getDataRange().getValues();
           for (var t = 1; t < teamsData.length; t++) {
@@ -1990,36 +2015,45 @@ function writeAddSale(body) {
   // UNITS: sum of products (DTV excluded per config)
   var units = air + cell + fiber + voipQty;
 
-  // Build row array — write only to known OL column indices
-  var totalCols = OL.TICKETS + 2;  // ensure array is long enough
-  var newRow = [];
-  for (var i = 0; i < totalCols; i++) newRow.push('');
-
-  newRow[OL.TIMESTAMP]    = new Date();
-  newRow[OL.EMAIL]        = email;
-  newRow[OL.DATE_OF_SALE] = new Date(dateOfSale + 'T12:00:00');
-  newRow[OL.REP_NAME]     = String(body.repName || '').trim();
-  newRow[OL.DSI]          = String(body.dsi || '').trim();
-  newRow[OL.TRAINEE]      = body.trainee ? 'Yes' : 'No';
-  newRow[OL.TRAINEE_NAME] = body.trainee ? String(body.traineeName || '').trim() : '';
-  newRow[OL.VOIP_QTY]     = voipQty;
-  newRow[OL.TEAM_EMOJI]   = teamEmoji;
-  newRow[OL.FIBER]        = fiber;
-  newRow[OL.AIR]          = air;
-  newRow[OL.DTV]          = dtv;
-  newRow[OL.YESES]        = yeses;
-  newRow[OL.CELL]         = cell;
-  newRow[OL.UNITS]        = units;
-  newRow[OL.STATUS]       = 'Pending';
-  newRow[OL.NOTES]        = '';
-  newRow[OL.PAID_OUT]     = '';
-  newRow[OL.TICKETS]      = '[]';
+  // Build 30-column row (A–AD)
+  var newRow = [
+    new Date(),                                                    // 0  Timestamp
+    email,                                                         // 1  Email
+    String(body.repName || '').trim(),                              // 2  Rep Name
+    new Date(dateOfSale + 'T12:00:00'),                            // 3  Date of Sale
+    String(body.campaign || '').trim(),                             // 4  Campaign
+    String(body.dsi || '').trim(),                                  // 5  DSI
+    String(body.accountType || '').trim(),                          // 6  Account Type
+    String(body.clientName || '').trim(),                           // 7  Client Name
+    body.trainee ? 'Yes' : 'No',                                   // 8  Trainee
+    body.trainee ? String(body.traineeName || '').trim() : '',      // 9  Trainee Name
+    air,                                                           // 10 Air
+    newPhones,                                                     // 11 New Phones
+    byods,                                                         // 12 BYODs
+    cell,                                                          // 13 Cell
+    fiber,                                                         // 14 Fiber
+    String(body.fiberPackage || '').trim(),                         // 15 Fiber Package
+    String(body.installDate || '').trim(),                          // 16 Install Date
+    voipQty,                                                       // 17 VoIP Qty
+    dtv,                                                           // 18 DTV
+    String(body.dtvPackage || '').trim(),                           // 19 DTV Package
+    String(body.oomaPackage || '').trim(),                          // 20 Ooma Package
+    String(body.accountNotes || '').trim(),                         // 21 Account Notes
+    body.activationSupport ? 'Yes' : 'No',                         // 22 Activation Support
+    teamEmoji,                                                     // 23 Team Emoji
+    yeses,                                                         // 24 Yeses
+    units,                                                         // 25 Units
+    'Pending',                                                     // 26 Status
+    '',                                                            // 27 Notes
+    '',                                                            // 28 Paid Out
+    '[]'                                                           // 29 Tickets
+  ];
 
   sheet.appendRow(newRow);
 
   // Bust the Tableau cache so fresh data loads
   try {
-    CacheService.getScriptCache().remove('tableauSummary_v5');
+    CacheService.getScriptCache().remove('tableauSummary_v5_' + officeId);
   } catch (e) { /* non-critical */ }
 
   return {
@@ -2027,5 +2061,131 @@ function writeAddSale(body) {
     rowIndex: sheet.getLastRow(),
     units: units,
     yeses: yeses
+  };
+}
+
+
+// === OFFICE PROVISIONING (called by admin portal) ===
+
+function createOfficeTabs(body, ss) {
+  var oid = String(body.officeId || '').trim();
+  if (!oid) return { error: 'Missing officeId' };
+
+  var created = [];
+  [TAB.SALES, TAB.ROSTER, TAB.TEAMS, TAB.TEAM_CUSTOM,
+   TAB.OVERRIDES, TAB.UNLOCKS, TAB.SETTINGS].forEach(function(base) {
+    var tabName = officeTab(base, oid);
+    getOrCreateSheet(ss, tabName, base);
+    created.push(tabName);
+  });
+
+  return { success: true, officeId: oid, tabs: created };
+}
+
+
+// === ONE-TIME MIGRATION: Order Log → _Sales ===
+// Run from Apps Script editor: migrateOrderLog()
+// Reads old "Order Log" tab via OL_LEGACY indices,
+// writes to _Sales_off_001 with new 30-column schema,
+// renames existing per-office tabs to _off_001 suffix.
+
+function migrateOrderLog() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var officeId = 'off_001';
+  Logger.log('[Migration] Starting Order Log migration to _Sales_' + officeId);
+
+  // 1. Read old Order Log
+  var oldSheet = ss.getSheetByName('Order Log');
+  if (!oldSheet) {
+    Logger.log('[Migration] ERROR: "Order Log" tab not found');
+    return { error: 'Order Log tab not found' };
+  }
+  var oldData = oldSheet.getDataRange().getValues();
+  Logger.log('[Migration] Old Order Log: ' + (oldData.length - 1) + ' data rows');
+
+  // 2. Create new _Sales tab with headers
+  var salesTabName = officeTab(TAB.SALES, officeId);
+  var salesSheet = getOrCreateSheet(ss, salesTabName, TAB.SALES);
+
+  // 3. Migrate rows from old format to new 30-column schema
+  if (oldData.length > 1) {
+    var newRows = [];
+    for (var i = 1; i < oldData.length; i++) {
+      var old = oldData[i];
+      var newRow = [
+        old[OL_LEGACY.TIMESTAMP] || '',                        // 0  Timestamp
+        String(old[OL_LEGACY.EMAIL] || '').trim(),             // 1  Email
+        String(old[OL_LEGACY.REP_NAME] || '').trim(),          // 2  Rep Name
+        old[OL_LEGACY.DATE_OF_SALE] || '',                     // 3  Date of Sale
+        'attb2b',                                               // 4  Campaign (all old data is AT&T B2B)
+        String(old[OL_LEGACY.DSI] || '').trim(),               // 5  DSI
+        '',                                                     // 6  Account Type (not in old schema)
+        '',                                                     // 7  Client Name (not in old schema)
+        String(old[OL_LEGACY.TRAINEE] || '').trim(),           // 8  Trainee
+        String(old[OL_LEGACY.TRAINEE_NAME] || '').trim(),      // 9  Trainee Name
+        Number(old[OL_LEGACY.AIR]) || 0,                       // 10 Air
+        0,                                                      // 11 New Phones (not in old schema)
+        0,                                                      // 12 BYODs (not in old schema)
+        Number(old[OL_LEGACY.CELL]) || 0,                      // 13 Cell
+        Number(old[OL_LEGACY.FIBER]) || 0,                     // 14 Fiber
+        '',                                                     // 15 Fiber Package (not in old schema)
+        '',                                                     // 16 Install Date (not in old schema)
+        Number(old[OL_LEGACY.VOIP_QTY]) || 0,                 // 17 VoIP Qty
+        Number(old[OL_LEGACY.DTV]) || 0,                       // 18 DTV
+        '',                                                     // 19 DTV Package (not in old schema)
+        '',                                                     // 20 Ooma Package (not in old schema)
+        '',                                                     // 21 Account Notes (not in old schema)
+        '',                                                     // 22 Activation Support (not in old schema)
+        String(old[OL_LEGACY.TEAM_EMOJI] || '').trim(),        // 23 Team Emoji
+        Number(old[OL_LEGACY.YESES]) || 0,                     // 24 Yeses
+        Number(old[OL_LEGACY.UNITS]) || 0,                     // 25 Units
+        String(old[OL_LEGACY.STATUS] || 'Pending').trim(),     // 26 Status
+        String(old[OL_LEGACY.NOTES] || '').trim(),             // 27 Notes
+        String(old[OL_LEGACY.PAID_OUT] || '').trim(),          // 28 Paid Out
+        String(old[OL_LEGACY.TICKETS] || '[]').trim()          // 29 Tickets
+      ];
+      newRows.push(newRow);
+    }
+
+    // Bulk write for performance
+    if (newRows.length > 0) {
+      salesSheet.getRange(2, 1, newRows.length, 30).setValues(newRows);
+    }
+    Logger.log('[Migration] Wrote ' + newRows.length + ' rows to ' + salesTabName);
+  }
+
+  // 4. Rename existing per-office tabs to officeId suffix
+  var renameMap = {
+    '_Roster': officeTab(TAB.ROSTER, officeId),
+    '_Teams': officeTab(TAB.TEAMS, officeId),
+    '_TeamCustomizations': officeTab(TAB.TEAM_CUSTOM, officeId),
+    '_OrderOverrides': officeTab(TAB.OVERRIDES, officeId),
+    '_UnlockRequests': officeTab(TAB.UNLOCKS, officeId),
+    '_Settings': officeTab(TAB.SETTINGS, officeId)
+  };
+
+  Object.keys(renameMap).forEach(function(oldName) {
+    var s = ss.getSheetByName(oldName);
+    if (s) {
+      s.setName(renameMap[oldName]);
+      Logger.log('[Migration] Renamed: ' + oldName + ' → ' + renameMap[oldName]);
+    }
+  });
+
+  // 5. Rename old Order Log tab
+  oldSheet.setName('_OrderLog_Legacy');
+  Logger.log('[Migration] Renamed "Order Log" → "_OrderLog_Legacy"');
+
+  // 6. Verify
+  var newSalesSheet = ss.getSheetByName(salesTabName);
+  var newRowCount = newSalesSheet ? newSalesSheet.getLastRow() - 1 : 0;
+  Logger.log('[Migration] Verification: ' + salesTabName + ' has ' + newRowCount + ' data rows (expected ' + (oldData.length - 1) + ')');
+
+  return {
+    success: true,
+    oldRows: oldData.length - 1,
+    newRows: newRowCount,
+    salesTab: salesTabName,
+    renamedTabs: Object.values(renameMap)
   };
 }

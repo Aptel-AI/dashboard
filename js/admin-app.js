@@ -549,7 +549,31 @@ const AdminApp = {
         payload.officeId = this.state.editingOfficeId;
         await this._post('updateOffice', payload);
       } else {
-        await this._post('addOffice', payload);
+        // Create new office — AdminCode.gs returns the generated officeId
+        const resp = await this._post('addOffice', payload);
+
+        // Auto-create per-office tabs in the campaign sheet
+        if (resp.officeId && templateType) {
+          const campaignCfg = (ADMIN_CONFIG.campaign || {})[templateType];
+          if (campaignCfg) {
+            try {
+              console.log('[Admin] Creating office tabs for', resp.officeId, 'in campaign sheet');
+              await fetch(campaignCfg.appsScriptUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({
+                  key: campaignCfg.apiKey,
+                  action: 'createOfficeTabs',
+                  officeId: resp.officeId,
+                  sheetId: campaignCfg.sheetId
+                })
+              });
+              console.log('[Admin] Office tabs created successfully');
+            } catch (tabErr) {
+              console.warn('[Admin] Tab creation failed (non-blocking):', tabErr.message);
+            }
+          }
+        }
       }
 
       this.closeOfficeModal();
@@ -582,6 +606,7 @@ const AdminApp = {
 
     const template = ADMIN_CONFIG.templates[office.templateType] || ADMIN_CONFIG.templates['att-b2b'];
     const config = {
+      officeId: office.officeId,  // Per-office tab routing
       sheetId: office.sheetId,
       appsScriptUrl: office.appsScriptUrl,
       apiKey: office.apiKey,

@@ -6,37 +6,40 @@
 
 const OFFICE_CONFIG = {
   officeName: "Main Office",
+  officeId: "off_001",  // Per-office identifier — tabs are suffixed with this
 
   // ── Apps Script Middleware ──
   // All reads and writes go through Apps Script to keep the sheet private.
+  // For shared campaign sheets, all AT&T B2B offices use the same Code.gs URL.
   appsScriptUrl: "https://script.google.com/macros/s/AKfycbwPx0jfdYdLKurHPlfQhOkYu70vVpirTISYrR3I2EIszVrVaRNwwjBvauSIO69thKFe/exec",
   apiKey: "elevate-dash-2026-secret",
 
-  // ── Sheet reference (for documentation — reads go through Apps Script) ──
+  // ── Sheet reference ──
+  // Passed to Code.gs so it opens the correct campaign sheet (shard support).
   sheetId: "1wxM6Htwfy8LrD_o_C7gmvnZEmkfV3FTCVjJU6IITZFc",
-  salesTab:  "Order Log",
-  rosterTab: "_Roster",
+  salesTab:  "_Sales",    // Per-office: _Sales_{officeId}
+  rosterTab: "_Roster",   // Per-office: _Roster_{officeId}
 
   // ── Column mappings ──
-  // Maps Google Sheet column headers to internal product keys
+  // Maps new _Sales schema headers to internal product keys
   columns: {
-    repName:    "Representative's Name",
+    repName:    "Rep Name",
     dateOfSale: "Date of Sale",
     timestamp:  "Timestamp",  // For time-of-sale bucketing
 
     // Products: each entry defines how to read units from the sheet
-    // type: "boolean" → yes/no = 1/0
+    // type: "boolean" → 0/1 in sheet
     // type: "quantity" → parse integer from column
     // type: "sum" → sum multiple columns
     products: [
-      { key: "air",   label: "Air",   type: "boolean",  column: "Was Internet Air Sold?" },
-      { key: "cell",  label: "Cell",  type: "sum",      columns: ["Quantity of New Phones", "Quantity of BYODs"] },
-      { key: "fiber", label: "Fiber", type: "boolean",  column: "Was Fiber Optic Internet Sold?" },
-      { key: "voip",  label: "VoIP",  type: "quantity", column: "Quantity Sold" }
+      { key: "air",   label: "Air",   type: "boolean",  column: "Air" },
+      { key: "cell",  label: "Cell",  type: "sum",      columns: ["New Phones", "BYODs"] },
+      { key: "fiber", label: "Fiber", type: "boolean",  column: "Fiber" },
+      { key: "voip",  label: "VoIP",  type: "quantity", column: "VoIP Qty" }
     ],
 
     // Columns that exist but are EXCLUDED from yeses and units
-    excluded: ["Was DIRECTV Sold?"]
+    excluded: ["DTV"]
   },
 
   // ── Teams ──
@@ -123,13 +126,14 @@ const WEEK_PERIODS = new Set([7, 8, 9, 10, 11]);
   if (officeParam) {
     try {
       const cfg = JSON.parse(atob(officeParam));
+      if (cfg.officeId) OFFICE_CONFIG.officeId = cfg.officeId;
       if (cfg.sheetId) OFFICE_CONFIG.sheetId = cfg.sheetId;
       if (cfg.appsScriptUrl) OFFICE_CONFIG.appsScriptUrl = cfg.appsScriptUrl;
       if (cfg.apiKey) OFFICE_CONFIG.apiKey = cfg.apiKey;
       if (cfg.officeName) OFFICE_CONFIG.officeName = cfg.officeName;
       if (cfg.logoUrl) OFFICE_CONFIG.logoUrl = cfg.logoUrl;
       if (cfg.logoIconUrl) OFFICE_CONFIG.logoIconUrl = cfg.logoIconUrl;
-      console.log('[Multi-Office] Config overridden for:', cfg.officeName || 'Unknown office');
+      console.log('[Multi-Office] Config overridden for:', cfg.officeName || 'Unknown office', '| officeId:', cfg.officeId || 'default');
     } catch(e) {
       console.warn('[Multi-Office] Invalid office param, using defaults');
     }
