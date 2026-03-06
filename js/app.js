@@ -605,6 +605,24 @@ const App = {
     await SheetsAPI.post(OFFICE_CONFIG, 'setSetting', { key: 'payrollManager', value: email });
   },
 
+  async _bustTableauCache() {
+    // Works from either profile page or office page
+    const btn = document.getElementById('profile-tableau-refresh') || document.getElementById('office-tableau-refresh');
+    const msg = document.getElementById('profile-tableau-refreshed') || document.getElementById('office-tableau-refreshed');
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+    if (msg) { msg.style.display = 'block'; msg.textContent = 'Clearing cache...'; }
+
+    await SheetsAPI.post(OFFICE_CONFIG, 'bustTableauCache', {});
+
+    // Now re-fetch fresh data
+    if (msg) msg.textContent = 'Cache cleared — refreshing data...';
+    await this.refreshData();
+
+    if (msg) { msg.textContent = 'Done — Tableau data refreshed'; }
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    setTimeout(() => { if (msg) msg.style.display = 'none'; }, 3000);
+  },
+
   // ══════════════════════════════════════════════
   // PAYROLL PAGE
   // ══════════════════════════════════════════════

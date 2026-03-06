@@ -1210,6 +1210,14 @@ function getTableauSummaryWithCache(ss) {
   return summary;
 }
 
+// Manual Tableau cache bust (owner/admin action)
+function writeBustTableauCache() {
+  try {
+    CacheService.getScriptCache().remove('tableauSummary_v5');
+  } catch (e) { /* non-critical */ }
+  return { ok: true, message: 'Tableau cache cleared' };
+}
+
 
 // === doPost() — WRITE ACTIONS ===
 
@@ -1258,6 +1266,7 @@ function doPost(e) {
       case 'toggleTicket':         result = writeToggleTicket(body); break;
       // Sale submission
       case 'addSale':              result = writeAddSale(body); break;
+      case 'bustTableauCache':     result = writeBustTableauCache(); break;
       default: result = { error: 'unknown action: ' + body.action };
     }
     return jsonResponse(result);

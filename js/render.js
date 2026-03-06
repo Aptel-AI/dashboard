@@ -440,14 +440,21 @@ const Render = {
     const p = App.state.people.find(x => x.name === name);
     if (!p) return;
 
-    // Owner/Admin profiles — show construction placeholder
+    // Owner/Admin profiles — show construction placeholder + Tableau refresh
     if (p._roleKey === 'owner' || p._roleKey === 'admin') {
       this.openProfilePage(`
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:100px 24px;text-align:center">
           <div style="font-size:64px;margin-bottom:20px;opacity:0.6;filter:sepia(0.3) hue-rotate(170deg) saturate(0.5)">🚧</div>
           <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:24px;font-weight:700;color:var(--white);margin-bottom:10px">Profile Under Construction</div>
-          <div style="color:var(--silver-dim);font-size:14px;max-width:400px;line-height:1.6;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif">
+          <div style="color:var(--silver-dim);font-size:14px;max-width:400px;line-height:1.6;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;margin-bottom:32px">
             This profile is being built out. Check back soon for updates.
+          </div>
+          <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:12px;padding:24px;max-width:400px;width:100%;text-align:left">
+            <div style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px">Tableau Data</div>
+            <div style="font-size:12px;color:var(--silver-dim);margin-bottom:12px;line-height:1.5">Cached for 6 hours. Force a refresh to pull the latest data.</div>
+            <button id="profile-tableau-refresh" onclick="App._bustTableauCache()"
+              style="background:var(--blue-core);border:none;border-radius:8px;color:#fff;padding:10px 20px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.5px;cursor:pointer">&#x21bb; Refresh Tableau Data</button>
+            <div id="profile-tableau-refreshed" style="display:none;font-size:11px;color:var(--green);margin-top:8px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-weight:700;letter-spacing:1px;text-transform:uppercase"></div>
           </div>
         </div>`, { name: p.name, sub: `${p.role} · Team: ${p.team || 'Unassigned'}` });
       return;
