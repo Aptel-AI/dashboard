@@ -939,9 +939,12 @@ const App = {
   },
 
   _applySuperAdminViewAs() {
+    const switcher = document.getElementById('role-switcher');
     const toggleBtn = document.getElementById('view-as-toggle');
     const controls = document.getElementById('view-as-controls');
     const personaWrap = document.getElementById('role-persona-wrap');
+    // Show switcher globally
+    if (switcher) switcher.style.display = 'flex';
     if (toggleBtn) toggleBtn.style.display = '';
     // Start collapsed — view as admin
     this.state.viewAsActive = false;

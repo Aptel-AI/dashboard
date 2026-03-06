@@ -394,13 +394,8 @@ const Render = {
     const headerDiv = document.createElement('div');
     headerDiv.className = 'profile-header-bar';
     headerDiv.innerHTML = this._profileHeaderBar(info);
-    const switcher = document.getElementById('role-switcher');
-    page.insertBefore(headerDiv, switcher || inner);
+    page.insertBefore(headerDiv, inner);
     inner.innerHTML = html;
-    // Show role-switcher for superadmin inside profile page
-    if (switcher) {
-      switcher.style.display = App.state.realRole === 'superadmin' ? 'flex' : 'none';
-    }
     page.style.display = 'block';
     page.scrollTop = 0;
     document.body.style.overflow = 'hidden';
