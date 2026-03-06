@@ -808,7 +808,7 @@ th.week-col { color: var(--silver); }
 /* ── BREAKDOWN GRID ── */
 .breakdown-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
   gap: 8px; margin-bottom: 4px;
 }
 .breakdown-remark { border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: center; }
