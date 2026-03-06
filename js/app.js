@@ -1728,14 +1728,12 @@ const App = {
     if (!OFFICE_CONFIG.adminApiUrl || !OFFICE_CONFIG.adminApiKey) { console.log('[OfficeSwitcher] Skipped — no adminApiUrl/Key'); return; }
 
     try {
-      // Use scoped endpoint for SSO admins (filters by role + assigned offices/owner)
+      // For SSO admins, pass email param so listOfficesBasic returns scoped results
       const session = Auth.getSession();
       const isSSO = session && session.source === 'admin-portal';
-      let url;
+      let url = `${OFFICE_CONFIG.adminApiUrl}?key=${encodeURIComponent(OFFICE_CONFIG.adminApiKey)}&action=listOfficesBasic`;
       if (isSSO) {
-        url = `${OFFICE_CONFIG.adminApiUrl}?key=${encodeURIComponent(OFFICE_CONFIG.adminApiKey)}&action=listOfficesBasicScoped&email=${encodeURIComponent(this.state.currentEmail)}`;
-      } else {
-        url = `${OFFICE_CONFIG.adminApiUrl}?key=${encodeURIComponent(OFFICE_CONFIG.adminApiKey)}&action=listOfficesBasic`;
+        url += `&email=${encodeURIComponent(this.state.currentEmail)}`;
       }
       console.log('[OfficeSwitcher] Fetching offices...' + (isSSO ? ' (scoped)' : ''));
       const resp = await fetch(url);
