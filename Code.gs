@@ -794,7 +794,7 @@ function readTableauSummary(ss) {
         disconnectReasons: {},
         speList: [],
         devices: [],
-        monthSPEs: {}  // spe → true if Approved, false otherwise
+        monthWirelessSPEs: {}  // spe → { orderStatus, dtrStatus }
       };
     }
 
@@ -814,11 +814,15 @@ function readTableauSummary(ss) {
     }
     if (spe) {
       s.speList.push(spe);
-      // Track SPEs within 30-day window for Active % calculation
+      // Track WIRELESS SPEs within 30-day window for Active/Pending/Cancel/Disco %
+      var ptUpper = productType.toUpperCase();
+      var isWireless = ptUpper.indexOf('AIR') >= 0 || ptUpper.indexOf('AWB') >= 0;
       var isInMonth = orderDate instanceof Date && orderDate >= thirtyDaysAgo;
-      if (isInMonth) {
-        if (!s.monthSPEs[spe]) s.monthSPEs[spe] = false;
-        if (orderStatus.toLowerCase() === 'approved') s.monthSPEs[spe] = true;
+      if (isInMonth && isWireless) {
+        s.monthWirelessSPEs[spe] = {
+          orderStatus: orderStatus.toLowerCase(),
+          dtrStatus: dtrStatus
+        };
       }
     }
     s.devices.push({
@@ -851,7 +855,7 @@ function readTableauSummary(ss) {
         statusCounts: {},
         productCounts: {},
         tableauName: ds.tableauRep,
-        monthSPEs: {}
+        monthWirelessSPEs: {}
       };
     }
 
@@ -866,20 +870,29 @@ function readTableauSummary(ss) {
     Object.keys(ds.productCounts).forEach(function(pt) {
       rs.productCounts[pt] = (rs.productCounts[pt] || 0) + ds.productCounts[pt];
     });
-    // Merge month-window SPEs (Approved wins if any DSI has it)
-    Object.keys(ds.monthSPEs).forEach(function(spe) {
-      if (!rs.monthSPEs[spe]) rs.monthSPEs[spe] = false;
-      if (ds.monthSPEs[spe]) rs.monthSPEs[spe] = true;
+    // Merge month-window wireless SPEs across DSIs
+    Object.keys(ds.monthWirelessSPEs).forEach(function(spe) {
+      rs.monthWirelessSPEs[spe] = ds.monthWirelessSPEs[spe];
     });
   });
 
-  // Convert monthSPEs maps to counts for the response
+  // Convert monthWirelessSPEs to counts for the response
   Object.keys(repSummary).forEach(function(email) {
     var rs = repSummary[email];
-    var spValues = Object.keys(rs.monthSPEs);
-    rs.monthTotalSPEs = spValues.length;
-    rs.monthApprovedSPEs = spValues.filter(function(spe) { return rs.monthSPEs[spe]; }).length;
-    delete rs.monthSPEs; // don't send the full map to client
+    var spes = Object.keys(rs.monthWirelessSPEs);
+    rs.monthTotalSPEs = spes.length;
+    rs.monthApprovedSPEs = 0;
+    rs.monthPendingSPEs = 0;
+    rs.monthCanceledSPEs = 0;
+    rs.monthDiscoSPEs = 0;
+    spes.forEach(function(spe) {
+      var info = rs.monthWirelessSPEs[spe];
+      if (info.orderStatus === 'approved') rs.monthApprovedSPEs++;
+      else if (info.orderStatus === 'pending') rs.monthPendingSPEs++;
+      else if (info.orderStatus === 'canceled' || info.orderStatus === 'cancelled') rs.monthCanceledSPEs++;
+      if (info.dtrStatus === 'Disconnected') rs.monthDiscoSPEs++;
+    });
+    delete rs.monthWirelessSPEs;
   });
 
   return { dsiSummary: dsiSummary, repSummary: repSummary };

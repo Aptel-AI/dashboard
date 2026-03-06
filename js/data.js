@@ -842,12 +842,19 @@ const DataPipeline = {
         : 0;
       m.productBreakdown = rep.productCounts || {};
       m.tableauName = rep.tableauName || '';
-      // Active % — Approved SPEs / Total SPEs in 30-day window
+      // Wireless SPE counts in 30-day window
       m.monthTotalSPEs = rep.monthTotalSPEs || 0;
       m.monthApprovedSPEs = rep.monthApprovedSPEs || 0;
-      m.activePct = m.monthTotalSPEs > 0
-        ? parseFloat((m.monthApprovedSPEs / m.monthTotalSPEs * 100).toFixed(1))
-        : 0;
+      m.monthPendingSPEs = rep.monthPendingSPEs || 0;
+      m.monthCanceledSPEs = rep.monthCanceledSPEs || 0;
+      m.monthDiscoSPEs = rep.monthDiscoSPEs || 0;
+      // Percentages: Active/Pending/Cancel vs Total, ProjDisco vs Approved
+      const tot = m.monthTotalSPEs;
+      const pct = (n, d) => d > 0 ? parseFloat((n / d * 100).toFixed(1)) : 0;
+      m.activePct = pct(m.monthApprovedSPEs, tot);
+      m.pendingPct = pct(m.monthPendingSPEs, tot);
+      m.cancelPct = pct(m.monthCanceledSPEs, tot);
+      m.projDiscoPct = pct(m.monthDiscoSPEs, m.monthApprovedSPEs);
     });
   },
 
