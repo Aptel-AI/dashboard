@@ -285,6 +285,17 @@ function doGet(e) {
       return jsonResponse({ devices: readTableauDetail(ss, dsi) });
     }
 
+    // Leaderboard snapshot (used by Make.com for daily Discord post)
+    if (action === 'leaderboard') {
+      return jsonResponse(readLeaderboard(ss));
+    }
+
+    // Leaderboard as pre-built HTML (for HTML-to-Image rendering)
+    if (action === 'leaderboardHtml') {
+      var lb = readLeaderboard(ss);
+      return jsonResponse({ html: buildLeaderboardHtml(lb) });
+    }
+
     // Default: return full dashboard data (includes Tableau summary)
     let roster = readRoster(ss);
     const peopleResult = readPeople(ss, roster);
@@ -1726,6 +1737,183 @@ function writeSavePaidOut(body) {
   var paidOutJson = JSON.stringify(body.paidOut || {});
   sheet.getRange(rowIndex, OL.PAID_OUT + 1).setValue(paidOutJson);
   return { ok: true };
+}
+
+
+// === LEADERBOARD SNAPSHOT (for daily Discord post) ===
+
+function readLeaderboard(ss) {
+  const roster = readRoster(ss);
+  const teams = readTeams(ss);
+
+  // Read Order Log
+  const olSheet = ss.getSheetByName(ORDER_LOG_TAB);
+  if (!olSheet) return { error: 'No Order Log' };
+  const olData = olSheet.getDataRange().getValues();
+
+  // Current week boundary (Monday 00:00)
+  const thisWeekStart = getWeekStart();
+
+  // Aggregate this-week units and yeses per email
+  const personAgg = {};
+  Object.keys(roster).forEach(function(email) {
+    if (roster[email].deactivated) return;
+    personAgg[email] = { units: 0, yeses: 0 };
+  });
+
+  for (var i = 1; i < olData.length; i++) {
+    var row = olData[i];
+    var email = String(row[OL.EMAIL] || '').trim().toLowerCase();
+    if (!email || !personAgg[email]) continue;
+
+    var rawDate = row[OL.DATE_OF_SALE];
+    if (!rawDate) continue;
+    var saleDate = new Date(rawDate);
+    if (isNaN(saleDate.getTime())) continue;
+    saleDate.setHours(0, 0, 0, 0);
+
+    if (saleDate >= thisWeekStart) {
+      personAgg[email].units += Number(row[OL.UNITS]) || 0;
+      personAgg[email].yeses += Number(row[OL.YESES]) || 0;
+    }
+  }
+
+  // Role display labels
+  var ROLE_LABELS = {
+    owner: 'Owner', manager: 'Manager', jd: 'Jr. Director',
+    l1: 'Team Leader', rep: 'Client Rep'
+  };
+  var NON_SALES = { superadmin: true, admin: true };
+
+  // Build sorted individual list (exclude non-sales, deactivated, owners w/ 0 units)
+  var individuals = [];
+  Object.keys(personAgg).forEach(function(email) {
+    var info = roster[email];
+    var rank = (info.rank || 'rep').toLowerCase();
+    if (NON_SALES[rank]) return;
+    var agg = personAgg[email];
+    if (rank === 'owner' && agg.units === 0) return;
+    individuals.push({
+      name: info.name,
+      rank: ROLE_LABELS[rank] || rank,
+      team: info.team,
+      units: agg.units,
+      yeses: agg.yeses
+    });
+  });
+  individuals.sort(function(a, b) { return b.units - a.units || b.yeses - a.yeses; });
+
+  // Week totals
+  var weekUnits = 0, weekYeses = 0;
+  individuals.forEach(function(p) { weekUnits += p.units; weekYeses += p.yeses; });
+
+  // Team aggregation
+  var teamAgg = {};
+  individuals.forEach(function(p) {
+    var t = p.team || 'Unassigned';
+    if (!teamAgg[t]) teamAgg[t] = { name: t, emoji: '', units: 0, yeses: 0 };
+    teamAgg[t].units += p.units;
+    teamAgg[t].yeses += p.yeses;
+  });
+
+  // Set emojis from _Teams
+  Object.keys(teams).forEach(function(tid) {
+    var t = teams[tid];
+    if (teamAgg[t.name]) teamAgg[t.name].emoji = t.emoji || '';
+  });
+
+  var sortedTeams = [];
+  Object.keys(teamAgg).forEach(function(k) {
+    if (k !== 'Unassigned') sortedTeams.push(teamAgg[k]);
+  });
+  sortedTeams.sort(function(a, b) { return b.units - a.units || b.yeses - a.yeses; });
+
+  // Format date
+  var now = new Date();
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var dateStr = months[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear();
+
+  return {
+    weekUnits: weekUnits,
+    weekYeses: weekYeses,
+    topIndividuals: individuals.slice(0, 3),
+    topTeams: sortedTeams.slice(0, 3),
+    date: dateStr
+  };
+}
+
+function buildLeaderboardHtml(data) {
+  var wY = data.weekYeses, wU = data.weekUnits;
+  var top3 = data.topIndividuals || [];
+  var topT = data.topTeams || [];
+  var dateStr = data.date || '';
+
+  // Podium order: 2nd, 1st, 3rd (visual: silver-gold-bronze)
+  var indOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3;
+  var teamOrder = topT.length >= 3 ? [topT[1], topT[0], topT[2]] : topT;
+
+  var medals = ['\uD83E\uDD48', '\uD83E\uDD47', '\uD83E\uDD49']; // 🥈🥇🥉
+  var topGrad = [
+    'linear-gradient(90deg,#C0C0C0,#94a3b8)',
+    'linear-gradient(90deg,#FFD700,#fbbf24)',
+    'linear-gradient(90deg,#CD7F32,#b45309)'
+  ];
+
+  function card(item, idx, isTeam) {
+    var isGold = idx === 1;
+    var bg = isGold ? 'linear-gradient(180deg,rgba(255,215,0,0.06) 0%,#F5F2EE 60%)' : 'rgba(255,255,255,0.5)';
+    var bdr = isGold ? 'rgba(255,215,0,0.4)' : 'rgba(0,0,0,0.2)';
+    var pad = isGold ? '32px 20px 20px' : '24px 20px 20px';
+    var sub = isTeam
+      ? '<div style="font-size:28px;line-height:1;">' + (item.emoji || '') + '</div>'
+      : '<div style="font-family:Helvetica Neue,Inter,sans-serif;font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#708090;">' + (item.rank || '') + '</div>';
+    return '<div style="flex:1;max-width:340px;border-radius:12px;padding:' + pad + ';display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;overflow:hidden;border:1px solid ' + bdr + ';background:' + bg + ';">' +
+      '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:' + topGrad[idx] + ';"></div>' +
+      '<div style="font-size:28px;line-height:1;">' + medals[idx] + '</div>' +
+      '<div style="font-family:Inter,sans-serif;font-size:22px;font-weight:700;letter-spacing:1px;color:#242124;text-align:center;">' + item.name + '</div>' +
+      sub +
+      '<div style="display:flex;gap:20px;margin-top:8px;">' +
+        '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">' +
+          '<div style="font-family:Inter,sans-serif;font-size:32px;font-weight:700;line-height:1;color:#43B3AE;">' + item.units + '</div>' +
+          '<div style="font-family:Helvetica Neue,Inter,sans-serif;font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#708090;">Units</div></div>' +
+        '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">' +
+          '<div style="font-family:Inter,sans-serif;font-size:32px;font-weight:700;line-height:1;color:#4A5568;">' + item.yeses + '</div>' +
+          '<div style="font-family:Helvetica Neue,Inter,sans-serif;font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#708090;">Yeses</div></div>' +
+      '</div></div>';
+  }
+
+  function podiumRow(items, isTeam) {
+    var h = '';
+    for (var i = 0; i < items.length; i++) h += card(items[i], i, isTeam);
+    return '<div style="display:flex;gap:16px;align-items:flex-end;justify-content:center;margin-bottom:28px;">' + h + '</div>';
+  }
+
+  return '<div style="width:800px;background:#FEFAF3;padding:32px 32px 20px;font-family:Inter,sans-serif;">' +
+    // Hero stats banner
+    '<div style="display:flex;align-items:center;background:rgba(255,255,255,0.5);border:1px solid rgba(0,0,0,0.3);border-radius:14px;margin-bottom:32px;overflow:hidden;">' +
+      '<div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:24px 40px;gap:6px;">' +
+        '<div style="font-family:Helvetica Neue,Inter,sans-serif;font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#708090;">Week Yeses</div>' +
+        '<div style="font-family:Inter,sans-serif;font-size:56px;font-weight:700;line-height:1;color:#242124;">' + wY + '</div></div>' +
+      '<div style="width:1px;height:60px;background:rgba(0,0,0,0.3);"></div>' +
+      '<div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:24px 40px;gap:6px;">' +
+        '<div style="font-family:Helvetica Neue,Inter,sans-serif;font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#708090;">Week Units</div>' +
+        '<div style="font-family:Inter,sans-serif;font-size:56px;font-weight:700;line-height:1;color:#43B3AE;">' + wU + '</div></div>' +
+    '</div>' +
+    // TOP PERFORMERS heading
+    '<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">' +
+      '<div style="font-family:Helvetica Neue,Inter,sans-serif;font-size:16px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#242124;">Top Performers</div>' +
+      '<div style="flex:1;height:1px;background:rgba(0,0,0,0.15);"></div>' +
+      '<div style="font-size:13px;font-style:italic;color:#708090;">This week</div></div>' +
+    // INDIVIDUALS
+    '<div style="font-family:Helvetica Neue,Inter,sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#708090;margin-bottom:12px;">Individuals</div>' +
+    podiumRow(indOrder, false) +
+    // TEAMS
+    '<div style="font-family:Helvetica Neue,Inter,sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#708090;margin-bottom:12px;">Teams</div>' +
+    podiumRow(teamOrder, true) +
+    // Footer
+    '<div style="text-align:center;padding-top:8px;border-top:1px solid rgba(0,0,0,0.08);">' +
+      '<div style="font-size:11px;color:#708090;letter-spacing:0.5px;">End of Day Snapshot \u00B7 ' + dateStr + '</div></div>' +
+  '</div>';
 }
 
 
