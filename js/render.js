@@ -479,10 +479,6 @@ const Render = {
         <div class="profile-stat"><div class="profile-stat-val units-val">${tw4.units}</div><div class="profile-stat-lbl">4W Units</div></div>
         <div class="profile-stat"><div class="profile-stat-val">${tw4.y}</div><div class="profile-stat-lbl">4W Yeses</div></div>
         <div class="profile-stat"><div class="profile-stat-val" style="color:${vsColor}">${vsArrow}${Math.abs(m.vsPct)}%</div><div class="profile-stat-lbl">vs 4Wk Avg</div></div>
-        <div class="profile-stat"><div class="profile-stat-val" style="color:${m.activePct >= 85 ? '#22c55e' : m.activePct <= 70 ? '#e53535' : m.activePct > 0 ? '#f0b429' : 'var(--silver-dim)'}">${m.monthTotalSPEs > 0 ? m.activePct + '%' : '---'}</div><div class="profile-stat-lbl">Active %</div></div>
-        <div class="profile-stat"><div class="profile-stat-val" style="color:${m.monthTotalSPEs > 0 ? (m.pendingPct <= 15 ? '#22c55e' : m.pendingPct >= 30 ? '#e53535' : '#f0b429') : 'var(--silver-dim)'}">${m.monthTotalSPEs > 0 ? m.pendingPct + '%' : '---'}</div><div class="profile-stat-lbl">Pending %</div></div>
-        <div class="profile-stat"><div class="profile-stat-val" style="color:${m.monthTotalSPEs > 0 ? (m.cancelPct <= 5 ? '#22c55e' : m.cancelPct > 10 ? '#e53535' : '#f0b429') : 'var(--silver-dim)'}">${m.monthTotalSPEs > 0 ? m.cancelPct + '%' : '---'}</div><div class="profile-stat-lbl">Cancel %</div></div>
-        <div class="profile-stat"><div class="profile-stat-val" style="color:${m.monthApprovedSPEs > 0 ? (m.projDiscoPct <= 2.5 ? '#22c55e' : m.projDiscoPct >= 5 ? '#e53535' : '#f0b429') : 'var(--silver-dim)'}">${m.monthApprovedSPEs > 0 ? m.projDiscoPct + '%' : '---'}</div><div class="profile-stat-lbl">Proj. Disco %</div></div>
       </div>
 
       <div class="profile-section-title">Sales Breakdown</div>
@@ -494,10 +490,10 @@ const Render = {
         </div>
         <div class="breakdown-stat"><div class="breakdown-val">${m.recentAvg}</div><div class="breakdown-lbl">Rec. Wk Avg</div></div>
         <div class="breakdown-stat"><div class="breakdown-val" style="color:${vsColor}">${vsArrow}${Math.abs(m.vsPct)}%</div><div class="breakdown-lbl">vs 4Wk Avg</div></div>
-        <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(this.pct(m.active, total)) >= 75 ? '#2E8B57' : '#f0b429'}">${this.pct(m.active, total)}%</div><div class="breakdown-lbl">Active</div></div>
-        <div class="breakdown-stat"><div class="breakdown-val" style="color:#f0b429">${this.pct(m.pending, total)}%</div><div class="breakdown-lbl">Pending</div></div>
-        <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(this.pct(m.cancel, total)) > 10 ? '#E5564A' : 'var(--silver)'}">${this.pct(m.cancel, total)}%</div><div class="breakdown-lbl">Cancel</div></div>
-        <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(this.pct(m.projDisco, total)) > 5 ? '#f97316' : '#2E8B57'}">${this.pct(m.projDisco, total)}%</div><div class="breakdown-lbl">Proj. Disco</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:${m.monthTotalSPEs > 0 ? (m.activePct >= 85 ? '#22c55e' : m.activePct <= 70 ? '#e53535' : '#f0b429') : 'var(--silver-dim)'}">${m.monthTotalSPEs > 0 ? m.activePct + '%' : '---'}</div><div class="breakdown-lbl">Active</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:${m.monthTotalSPEs > 0 ? (m.pendingPct <= 15 ? '#22c55e' : m.pendingPct >= 30 ? '#e53535' : '#f0b429') : 'var(--silver-dim)'}">${m.monthTotalSPEs > 0 ? m.pendingPct + '%' : '---'}</div><div class="breakdown-lbl">Pending</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:${m.monthTotalSPEs > 0 ? (m.cancelPct <= 5 ? '#22c55e' : m.cancelPct > 10 ? '#e53535' : '#f0b429') : 'var(--silver-dim)'}">${m.monthTotalSPEs > 0 ? m.cancelPct + '%' : '---'}</div><div class="breakdown-lbl">Cancel</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:${m.monthApprovedSPEs > 0 ? (m.projDiscoPct <= 2.5 ? '#22c55e' : m.projDiscoPct >= 5 ? '#e53535' : '#f0b429') : 'var(--silver-dim)'}">${m.monthApprovedSPEs > 0 ? m.projDiscoPct + '%' : '---'}</div><div class="breakdown-lbl">Proj. Disco</div></div>
       </div>
 
       ${m.totalDevices > 0 ? `
