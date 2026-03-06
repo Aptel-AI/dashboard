@@ -187,9 +187,13 @@ function doGet(e) {
     }
 
     // Default: return full dashboard data (includes Tableau summary)
-    const roster = readRoster(ss);
+    let roster = readRoster(ss);
     const peopleResult = readPeople(ss, roster);
     const tableauSummary = getTableauSummaryWithCache(ss);
+
+    // Auto-assign Tableau names (managers first, then down the ranks)
+    roster = autoAssignTableauNames(ss, roster, tableauSummary.possibleTableauNames);
+
     const data = {
       people: peopleResult.people || peopleResult,
       roster: roster,
@@ -973,6 +977,71 @@ function readTableauSummary(ss) {
     possibleTableauNames: possibleTableauNames
   };
 }
+
+// Auto-assign tableauNames to roster members who don't have one yet.
+// Processes top-down by rank so managers claim first, then reps get what's left.
+function autoAssignTableauNames(ss, roster, possibleTableauNames) {
+  if (!possibleTableauNames || Object.keys(possibleTableauNames).length === 0) return roster;
+
+  // Rank priority: higher index = claims first
+  var RANK_ORDER = ['rep', 'l1', 'jd', 'manager', 'admin', 'owner', 'superadmin'];
+
+  // Build list of roster members who need assignment, sorted by rank (highest first)
+  var unassigned = [];
+  Object.keys(roster).forEach(function(email) {
+    var r = roster[email];
+    if (!r.tableauName && possibleTableauNames[email]) {
+      unassigned.push({ email: email, rank: r.rank || 'rep' });
+    }
+  });
+  unassigned.sort(function(a, b) {
+    return RANK_ORDER.indexOf(b.rank) - RANK_ORDER.indexOf(a.rank);
+  });
+
+  if (unassigned.length === 0) return roster;
+
+  // Build set of already-claimed names
+  var claimed = {};
+  Object.keys(roster).forEach(function(email) {
+    if (roster[email].tableauName) {
+      claimed[roster[email].tableauName] = true;
+    }
+  });
+
+  // Process top-down: claim the sole unclaimed name if exactly one exists
+  var sheet = ss.getSheetByName(ROSTER_TAB);
+  var newAssignments = [];
+
+  unassigned.forEach(function(entry) {
+    var possible = possibleTableauNames[entry.email] || [];
+    var unclaimed = possible.filter(function(n) { return !claimed[n]; });
+
+    if (unclaimed.length === 1) {
+      var name = unclaimed[0];
+      claimed[name] = true;  // mark it so lower-rank reps can't take it
+      roster[entry.email].tableauName = name;
+      newAssignments.push({ email: entry.email, name: name });
+    }
+  });
+
+  // Write all new assignments to the sheet in one pass
+  if (newAssignments.length > 0 && sheet) {
+    var data = sheet.getDataRange().getValues();
+    newAssignments.forEach(function(a) {
+      for (var i = 1; i < data.length; i++) {
+        if (String(data[i][0] || '').trim().toLowerCase() === a.email) {
+          sheet.getRange(i + 1, 9).setValue(a.name);  // col 9 = tableauName
+          break;
+        }
+      }
+    });
+    Logger.log('[AutoAssign] Assigned ' + newAssignments.length + ' Tableau names: ' +
+      newAssignments.map(function(a) { return a.email + ' → ' + a.name; }).join(', '));
+  }
+
+  return roster;
+}
+
 
 // Lazy-load per-device detail rows for a single DSI
 function readTableauDetail(ss, dsi) {
