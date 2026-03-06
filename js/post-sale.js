@@ -31,7 +31,7 @@ const PostSale = {
     this._campaign = 'attb2b';
     this._submitting = false;
     this._formData = {
-      dateOfSale: new Date().toISOString().split('T')[0],
+      dateOfSale: (() => { const n = new Date(); return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0'); })(),
       dsi: '',
       accountType: 'Business',
       accountNotes: '',
