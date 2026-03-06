@@ -57,18 +57,62 @@ const OL = {
 };
 
 
-// _TableauOrderLog column indices (0-based)
+// _TableauOrderLog — header-based column lookup (resilient to column inserts/reorders)
 const TABLEAU_TAB = '_TableauOrderLog';
-const TOL = {
-  OWNER_OFFICE: 0, REP: 1, LEAD_REP_ID: 2, REP_NUMBER: 3,
-  ORDER_DATE: 4, ORDER_TIME: 5, DSI: 6, SPE: 7, BAN: 8,
-  PRODUCT_TYPE: 9, CRU_IRU: 10, DTR_STATUS: 11, DISCO_REASON: 12,
-  PORT_CARRIER: 13, NOTES: 14, DTR_STATUS_DATE: 15, ORDER_STATUS: 16,
-  POSTED_DATE: 17, MAX_POSTED: 18, FIRST_STREAMING: 19,
-  VOICE_LINE_COUNT: 20, TN_TYPE: 21, PHONE: 22, INSTALL_DATE: 23,
-  BONUS_TIERS: 24, PAYOUT_REASON: 25,
-  UNIT_COUNT: 26, TOTAL_VOLUME: 27, TOTAL_ACTS: 28
+
+// Map header text (lowercased, trimmed) → internal key
+const TOL_HEADER_MAP = {
+  'owner & office': 'OWNER_OFFICE',
+  'rep': 'REP',
+  'lead rep id': 'LEAD_REP_ID',
+  'rep number': 'REP_NUMBER',
+  'order date': 'ORDER_DATE',
+  'order time': 'ORDER_TIME',
+  'dsi': 'DSI',
+  'spe': 'SPE',
+  'ban': 'BAN',
+  'product type (broken out)': 'PRODUCT_TYPE',
+  'product type': 'PRODUCT_TYPE',
+  'cru/iru': 'CRU_IRU',
+  'cru / iru': 'CRU_IRU',
+  'dtr status': 'DTR_STATUS',
+  'disconnect reason': 'DISCO_REASON',
+  'disco reason': 'DISCO_REASON',
+  'port carrier': 'PORT_CARRIER',
+  'notes': 'NOTES',
+  'dtr status date': 'DTR_STATUS_DATE',
+  'order status': 'ORDER_STATUS',
+  'posted date': 'POSTED_DATE',
+  'max posted': 'MAX_POSTED',
+  'first streaming': 'FIRST_STREAMING',
+  'voice line count': 'VOICE_LINE_COUNT',
+  'tn type': 'TN_TYPE',
+  'phone': 'PHONE',
+  'install date': 'INSTALL_DATE',
+  'bonus tiers': 'BONUS_TIERS',
+  'payout reason': 'PAYOUT_REASON',
+  'unit count': 'UNIT_COUNT',
+  'total volume': 'TOTAL_VOLUME',
+  'total acts': 'TOTAL_ACTS'
 };
+
+// Build column index map from header row
+function buildTableauColumnMap(headerRow) {
+  var col = {};
+  for (var i = 0; i < headerRow.length; i++) {
+    var raw = String(headerRow[i] || '').trim().toLowerCase();
+    var key = TOL_HEADER_MAP[raw];
+    if (key && !col.hasOwnProperty(key)) {
+      col[key] = i;
+    }
+  }
+  return col;
+}
+
+// Safe getter — returns '' for missing columns instead of crashing
+function tCol(row, col, key) {
+  return col.hasOwnProperty(key) ? row[col[key]] : '';
+}
 
 
 // === UTILITIES ===
@@ -761,6 +805,9 @@ function readTableauSummary(ss) {
   var data = sheet.getDataRange().getValues();
   if (data.length < 2) return { dsiSummary: {}, repSummary: {} };
 
+  // Build column map from header row
+  var col = buildTableauColumnMap(data[0]);
+
   // Build DSI → email map + email → DSIs map for rep aggregation
   var maps = buildDsiEmailMap(ss);
   var dsiEmailMap = maps.dsiToEmail;
@@ -775,23 +822,23 @@ function readTableauSummary(ss) {
 
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
-    var dsi = String(row[TOL.DSI] || '').trim();
+    var dsi = String(tCol(row, col, 'DSI') || '').trim();
     if (!dsi) continue;
 
     // Skip the "Total" grand total row
-    var ownerOffice = String(row[TOL.OWNER_OFFICE] || '').trim();
+    var ownerOffice = String(tCol(row, col, 'OWNER_OFFICE') || '').trim();
     if (ownerOffice.toLowerCase() === 'total' || dsi.toLowerCase() === 'total') continue;
 
-    var spe = String(row[TOL.SPE] || '').trim();
-    var productType = String(row[TOL.PRODUCT_TYPE] || '').trim();
-    var dtrStatus = String(row[TOL.DTR_STATUS] || '').trim();
-    var discoReason = String(row[TOL.DISCO_REASON] || '').trim();
-    var totalVolume = Number(row[TOL.TOTAL_VOLUME]) || 0;
-    var totalActs = Number(row[TOL.TOTAL_ACTS]) || 0;
-    var tableauRep = String(row[TOL.REP] || '').trim();
+    var spe = String(tCol(row, col, 'SPE') || '').trim();
+    var productType = String(tCol(row, col, 'PRODUCT_TYPE') || '').trim();
+    var dtrStatus = String(tCol(row, col, 'DTR_STATUS') || '').trim();
+    var discoReason = String(tCol(row, col, 'DISCO_REASON') || '').trim();
+    var totalVolume = Number(tCol(row, col, 'TOTAL_VOLUME')) || 0;
+    var totalActs = Number(tCol(row, col, 'TOTAL_ACTS')) || 0;
+    var tableauRep = String(tCol(row, col, 'REP') || '').trim();
 
-    var orderStatus = String(row[TOL.ORDER_STATUS] || '').trim();
-    var orderDate = row[TOL.ORDER_DATE];
+    var orderStatus = String(tCol(row, col, 'ORDER_STATUS') || '').trim();
+    var orderDate = tCol(row, col, 'ORDER_DATE');
 
     if (!dsiSummary[dsi]) {
       dsiSummary[dsi] = {
@@ -838,15 +885,15 @@ function readTableauSummary(ss) {
     s.devices.push({
       spe: spe,
       productType: productType,
-      cruIru: String(row[TOL.CRU_IRU] || '').trim(),
+      cruIru: String(tCol(row, col, 'CRU_IRU') || '').trim(),
       dtrStatus: dtrStatus,
       discoReason: discoReason,
-      phone: String(row[TOL.PHONE] || '').trim(),
-      tnType: String(row[TOL.TN_TYPE] || '').trim(),
-      orderStatus: String(row[TOL.ORDER_STATUS] || '').trim(),
-      postedDate: String(row[TOL.POSTED_DATE] || '').trim(),
-      installDate: String(row[TOL.INSTALL_DATE] || '').trim(),
-      firstStreaming: String(row[TOL.FIRST_STREAMING] || '').trim()
+      phone: String(tCol(row, col, 'PHONE') || '').trim(),
+      tnType: String(tCol(row, col, 'TN_TYPE') || '').trim(),
+      orderStatus: String(tCol(row, col, 'ORDER_STATUS') || '').trim(),
+      postedDate: String(tCol(row, col, 'POSTED_DATE') || '').trim(),
+      installDate: String(tCol(row, col, 'INSTALL_DATE') || '').trim(),
+      firstStreaming: String(tCol(row, col, 'FIRST_STREAMING') || '').trim()
     });
   }
 
@@ -1049,26 +1096,30 @@ function readTableauDetail(ss, dsi) {
   if (!sheet) return [];
 
   var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
   var targetDsi = String(dsi || '').trim();
   if (!targetDsi) return [];
+
+  // Build column map from header row
+  var col = buildTableauColumnMap(data[0]);
 
   var devices = [];
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
-    var rowDsi = String(row[TOL.DSI] || '').trim();
+    var rowDsi = String(tCol(row, col, 'DSI') || '').trim();
     if (rowDsi !== targetDsi) continue;
 
     devices.push({
-      spe: String(row[TOL.SPE] || '').trim(),
-      productType: String(row[TOL.PRODUCT_TYPE] || '').trim(),
-      cruIru: String(row[TOL.CRU_IRU] || '').trim(),
-      dtrStatus: String(row[TOL.DTR_STATUS] || '').trim(),
-      discoReason: String(row[TOL.DISCO_REASON] || '').trim(),
-      phone: String(row[TOL.PHONE] || '').trim(),
-      tnType: String(row[TOL.TN_TYPE] || '').trim(),
-      orderStatus: String(row[TOL.ORDER_STATUS] || '').trim(),
-      postedDate: String(row[TOL.POSTED_DATE] || '').trim(),
-      installDate: String(row[TOL.INSTALL_DATE] || '').trim()
+      spe: String(tCol(row, col, 'SPE') || '').trim(),
+      productType: String(tCol(row, col, 'PRODUCT_TYPE') || '').trim(),
+      cruIru: String(tCol(row, col, 'CRU_IRU') || '').trim(),
+      dtrStatus: String(tCol(row, col, 'DTR_STATUS') || '').trim(),
+      discoReason: String(tCol(row, col, 'DISCO_REASON') || '').trim(),
+      phone: String(tCol(row, col, 'PHONE') || '').trim(),
+      tnType: String(tCol(row, col, 'TN_TYPE') || '').trim(),
+      orderStatus: String(tCol(row, col, 'ORDER_STATUS') || '').trim(),
+      postedDate: String(tCol(row, col, 'POSTED_DATE') || '').trim(),
+      installDate: String(tCol(row, col, 'INSTALL_DATE') || '').trim()
     });
   }
   return devices;
