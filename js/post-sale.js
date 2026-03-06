@@ -232,6 +232,8 @@ const PostSale = {
     const keys = ['air', 'wireless', 'fiber', 'voip', 'dtv'];
     keys.forEach(k => {
       const p = prods[k];
+      // VoIP only available when Fiber is selected
+      if (k === 'voip' && !prods.fiber.on) return;
       cardsHTML += `
         <div class="product-card ${p.on ? 'selected' : ''}" onclick="PostSale.toggleProduct('${k}')">
           <div class="product-check">✓</div>
@@ -639,6 +641,11 @@ const PostSale = {
   toggleProduct(key) {
     this._collectStep2();
     this._products[key].on = !this._products[key].on;
+    // Turning off Fiber also turns off VoIP (can't have VoIP without Fiber)
+    if (key === 'fiber' && !this._products.fiber.on) {
+      this._products.voip.on = false;
+      this._formData.voipQty = 0;
+    }
     this._saveDraft();
     // Re-render step 2
     const body = document.getElementById('post-sale-body');
