@@ -1324,6 +1324,8 @@ function doPost(e) {
       case 'bustTableauCache':     result = writeBustTableauCache(officeId); break;
       // Office provisioning (called by admin portal)
       case 'createOfficeTabs':     result = createOfficeTabs(body, ss); break;
+      // One-time migration: old tabs → new per-office tabs
+      case 'migrateFromLegacy':    result = migrateFromLegacy(ss, officeId); break;
       default: result = { error: 'unknown action: ' + body.action };
     }
     return jsonResponse(result);
@@ -2083,109 +2085,153 @@ function createOfficeTabs(body, ss) {
 }
 
 
-// === ONE-TIME MIGRATION: Order Log → _Sales ===
-// Run from Apps Script editor: migrateOrderLog()
-// Reads old "Order Log" tab via OL_LEGACY indices,
-// writes to _Sales_off_001 with new 30-column schema,
-// renames existing per-office tabs to _off_001 suffix.
+// === ONE-TIME MIGRATION: Old tabs → Per-office _off_001 tabs ===
+// Can be called via API: POST { action: 'migrateFromLegacy' }
+// Or run directly from Apps Script editor: migrateFromLegacy()
+//
+// What it does:
+// 1. Reads old "Order Log" (42 sparse cols) → writes to _Sales_off_001 (30 clean cols)
+// 2. Copies data from _Roster, _Teams, etc. into _Roster_off_001, _Teams_off_001, etc.
+// 3. Renames old tabs with _Legacy suffix (preserves data, doesn't delete)
+//
+// Safe to run if new _off_001 tabs already exist — overwrites with old data.
 
-function migrateOrderLog() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var officeId = 'off_001';
-  Logger.log('[Migration] Starting Order Log migration to _Sales_' + officeId);
+function migrateFromLegacy(ss, officeId) {
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!officeId) officeId = 'off_001';
+  var log = [];
 
-  // 1. Read old Order Log
-  var oldSheet = ss.getSheetByName('Order Log');
-  if (!oldSheet) {
-    Logger.log('[Migration] ERROR: "Order Log" tab not found');
-    return { error: 'Order Log tab not found' };
-  }
-  var oldData = oldSheet.getDataRange().getValues();
-  Logger.log('[Migration] Old Order Log: ' + (oldData.length - 1) + ' data rows');
+  log.push('[Migration] Starting legacy → per-office migration for ' + officeId);
 
-  // 2. Create new _Sales tab with headers
+  // ── Step 1: Migrate Order Log → _Sales_off_001 ──
+  var oldOL = ss.getSheetByName('Order Log');
   var salesTabName = officeTab(TAB.SALES, officeId);
-  var salesSheet = getOrCreateSheet(ss, salesTabName, TAB.SALES);
+  var salesSheet = ss.getSheetByName(salesTabName);
+  if (!salesSheet) salesSheet = getOrCreateSheet(ss, salesTabName, TAB.SALES);
 
-  // 3. Migrate rows from old format to new 30-column schema
-  if (oldData.length > 1) {
-    var newRows = [];
-    for (var i = 1; i < oldData.length; i++) {
-      var old = oldData[i];
-      var newRow = [
-        old[OL_LEGACY.TIMESTAMP] || '',                        // 0  Timestamp
-        String(old[OL_LEGACY.EMAIL] || '').trim(),             // 1  Email
-        String(old[OL_LEGACY.REP_NAME] || '').trim(),          // 2  Rep Name
-        old[OL_LEGACY.DATE_OF_SALE] || '',                     // 3  Date of Sale
-        'attb2b',                                               // 4  Campaign (all old data is AT&T B2B)
-        String(old[OL_LEGACY.DSI] || '').trim(),               // 5  DSI
-        '',                                                     // 6  Account Type (not in old schema)
-        '',                                                     // 7  Client Name (not in old schema)
-        String(old[OL_LEGACY.TRAINEE] || '').trim(),           // 8  Trainee
-        String(old[OL_LEGACY.TRAINEE_NAME] || '').trim(),      // 9  Trainee Name
-        Number(old[OL_LEGACY.AIR]) || 0,                       // 10 Air
-        0,                                                      // 11 New Phones (not in old schema)
-        0,                                                      // 12 BYODs (not in old schema)
-        Number(old[OL_LEGACY.CELL]) || 0,                      // 13 Cell
-        Number(old[OL_LEGACY.FIBER]) || 0,                     // 14 Fiber
-        '',                                                     // 15 Fiber Package (not in old schema)
-        '',                                                     // 16 Install Date (not in old schema)
-        Number(old[OL_LEGACY.VOIP_QTY]) || 0,                 // 17 VoIP Qty
-        Number(old[OL_LEGACY.DTV]) || 0,                       // 18 DTV
-        '',                                                     // 19 DTV Package (not in old schema)
-        '',                                                     // 20 Ooma Package (not in old schema)
-        '',                                                     // 21 Account Notes (not in old schema)
-        '',                                                     // 22 Activation Support (not in old schema)
-        String(old[OL_LEGACY.TEAM_EMOJI] || '').trim(),        // 23 Team Emoji
-        Number(old[OL_LEGACY.YESES]) || 0,                     // 24 Yeses
-        Number(old[OL_LEGACY.UNITS]) || 0,                     // 25 Units
-        String(old[OL_LEGACY.STATUS] || 'Pending').trim(),     // 26 Status
-        String(old[OL_LEGACY.NOTES] || '').trim(),             // 27 Notes
-        String(old[OL_LEGACY.PAID_OUT] || '').trim(),          // 28 Paid Out
-        String(old[OL_LEGACY.TICKETS] || '[]').trim()          // 29 Tickets
-      ];
-      newRows.push(newRow);
+  if (oldOL) {
+    var oldData = oldOL.getDataRange().getValues();
+    var oldRowCount = oldData.length - 1;
+    log.push('[Migration] Order Log: ' + oldRowCount + ' data rows');
+
+    if (oldRowCount > 0) {
+      // Map old 42-col sparse schema → new 30-col sequential schema
+      var newRows = [];
+      for (var i = 1; i < oldData.length; i++) {
+        var old = oldData[i];
+        var email = String(old[OL_LEGACY.EMAIL] || '').trim();
+        if (!email) continue;  // skip blank rows
+
+        newRows.push([
+          old[OL_LEGACY.TIMESTAMP] || '',                        // 0  Timestamp
+          email.toLowerCase(),                                    // 1  Email
+          String(old[OL_LEGACY.REP_NAME] || '').trim(),          // 2  Rep Name
+          old[OL_LEGACY.DATE_OF_SALE] || '',                     // 3  Date of Sale
+          'attb2b',                                               // 4  Campaign
+          String(old[OL_LEGACY.DSI] || '').trim(),               // 5  DSI
+          '',                                                     // 6  Account Type
+          '',                                                     // 7  Client Name
+          String(old[OL_LEGACY.TRAINEE] || '').trim(),           // 8  Trainee
+          String(old[OL_LEGACY.TRAINEE_NAME] || '').trim(),      // 9  Trainee Name
+          Number(old[OL_LEGACY.AIR]) || 0,                       // 10 Air
+          0,                                                      // 11 New Phones
+          0,                                                      // 12 BYODs
+          Number(old[OL_LEGACY.CELL]) || 0,                      // 13 Cell
+          Number(old[OL_LEGACY.FIBER]) || 0,                     // 14 Fiber
+          '',                                                     // 15 Fiber Package
+          '',                                                     // 16 Install Date
+          Number(old[OL_LEGACY.VOIP_QTY]) || 0,                 // 17 VoIP Qty
+          Number(old[OL_LEGACY.DTV]) || 0,                       // 18 DTV
+          '',                                                     // 19 DTV Package
+          '',                                                     // 20 Ooma Package
+          '',                                                     // 21 Account Notes
+          '',                                                     // 22 Activation Support
+          String(old[OL_LEGACY.TEAM_EMOJI] || '').trim(),        // 23 Team Emoji
+          Number(old[OL_LEGACY.YESES]) || 0,                     // 24 Yeses
+          Number(old[OL_LEGACY.UNITS]) || 0,                     // 25 Units
+          String(old[OL_LEGACY.STATUS] || 'Pending').trim(),     // 26 Status
+          String(old[OL_LEGACY.NOTES] || '').trim(),             // 27 Notes
+          String(old[OL_LEGACY.PAID_OUT] || '').trim(),          // 28 Paid Out
+          String(old[OL_LEGACY.TICKETS] || '[]').trim()          // 29 Tickets
+        ]);
+      }
+
+      if (newRows.length > 0) {
+        // Clear any existing data in _Sales_off_001 (keep header), then write
+        if (salesSheet.getLastRow() > 1) {
+          salesSheet.getRange(2, 1, salesSheet.getLastRow() - 1, 30).clearContent();
+        }
+        salesSheet.getRange(2, 1, newRows.length, 30).setValues(newRows);
+        log.push('[Migration] Wrote ' + newRows.length + ' orders to ' + salesTabName);
+      }
     }
 
-    // Bulk write for performance
-    if (newRows.length > 0) {
-      salesSheet.getRange(2, 1, newRows.length, 30).setValues(newRows);
-    }
-    Logger.log('[Migration] Wrote ' + newRows.length + ' rows to ' + salesTabName);
+    // Rename old Order Log → _OrderLog_Legacy
+    oldOL.setName('_OrderLog_Legacy');
+    log.push('[Migration] Renamed "Order Log" → "_OrderLog_Legacy"');
+  } else {
+    log.push('[Migration] No "Order Log" tab found — skipping sales migration');
   }
 
-  // 4. Rename existing per-office tabs to officeId suffix
-  var renameMap = {
-    '_Roster': officeTab(TAB.ROSTER, officeId),
-    '_Teams': officeTab(TAB.TEAMS, officeId),
-    '_TeamCustomizations': officeTab(TAB.TEAM_CUSTOM, officeId),
-    '_OrderOverrides': officeTab(TAB.OVERRIDES, officeId),
-    '_UnlockRequests': officeTab(TAB.UNLOCKS, officeId),
-    '_Settings': officeTab(TAB.SETTINGS, officeId)
-  };
+  // ── Step 2: Copy data from old tabs into new _off_001 tabs ──
+  var copyMap = [
+    { old: '_Roster',             newTab: officeTab(TAB.ROSTER, officeId) },
+    { old: '_Teams',              newTab: officeTab(TAB.TEAMS, officeId) },
+    { old: '_TeamCustomizations', newTab: officeTab(TAB.TEAM_CUSTOM, officeId) },
+    { old: '_OrderOverrides',     newTab: officeTab(TAB.OVERRIDES, officeId) },
+    { old: '_UnlockRequests',     newTab: officeTab(TAB.UNLOCKS, officeId) },
+    { old: '_Settings',           newTab: officeTab(TAB.SETTINGS, officeId) }
+  ];
 
-  Object.keys(renameMap).forEach(function(oldName) {
-    var s = ss.getSheetByName(oldName);
-    if (s) {
-      s.setName(renameMap[oldName]);
-      Logger.log('[Migration] Renamed: ' + oldName + ' → ' + renameMap[oldName]);
+  copyMap.forEach(function(entry) {
+    var oldSheet = ss.getSheetByName(entry.old);
+    if (!oldSheet) {
+      log.push('[Migration] ' + entry.old + ' not found — skipping');
+      return;
     }
+
+    var newSheet = ss.getSheetByName(entry.newTab);
+    if (!newSheet) {
+      // New tab doesn't exist — just rename the old one directly
+      oldSheet.setName(entry.newTab);
+      log.push('[Migration] Renamed: ' + entry.old + ' → ' + entry.newTab);
+      return;
+    }
+
+    // Both tabs exist — copy data from old into new (skip old header row)
+    var oldData = oldSheet.getDataRange().getValues();
+    if (oldData.length > 1) {
+      var dataRows = oldData.slice(1);
+      var cols = dataRows[0].length;
+      // Clear existing data in new tab (keep header)
+      if (newSheet.getLastRow() > 1) {
+        newSheet.getRange(2, 1, newSheet.getLastRow() - 1, cols).clearContent();
+      }
+      newSheet.getRange(2, 1, dataRows.length, cols).setValues(dataRows);
+      log.push('[Migration] Copied ' + dataRows.length + ' rows: ' + entry.old + ' → ' + entry.newTab);
+    } else {
+      log.push('[Migration] ' + entry.old + ' has no data rows — skipping copy');
+    }
+
+    // Rename old tab to _Legacy suffix
+    oldSheet.setName(entry.old + '_Legacy');
+    log.push('[Migration] Renamed: ' + entry.old + ' → ' + entry.old + '_Legacy');
   });
 
-  // 5. Rename old Order Log tab
-  oldSheet.setName('_OrderLog_Legacy');
-  Logger.log('[Migration] Renamed "Order Log" → "_OrderLog_Legacy"');
+  // ── Step 3: Summary ──
+  var salesFinal = ss.getSheetByName(salesTabName);
+  var rosterFinal = ss.getSheetByName(officeTab(TAB.ROSTER, officeId));
 
-  // 6. Verify
-  var newSalesSheet = ss.getSheetByName(salesTabName);
-  var newRowCount = newSalesSheet ? newSalesSheet.getLastRow() - 1 : 0;
-  Logger.log('[Migration] Verification: ' + salesTabName + ' has ' + newRowCount + ' data rows (expected ' + (oldData.length - 1) + ')');
-
-  return {
+  var summary = {
     success: true,
-    oldRows: oldData.length - 1,
-    newRows: newRowCount,
-    salesTab: salesTabName,
-    renamedTabs: Object.values(renameMap)
+    officeId: officeId,
+    salesRows: salesFinal ? salesFinal.getLastRow() - 1 : 0,
+    rosterRows: rosterFinal ? rosterFinal.getLastRow() - 1 : 0,
+    log: log
   };
+
+  log.push('[Migration] Complete! Sales: ' + summary.salesRows + ', Roster: ' + summary.rosterRows);
+  Logger.log(log.join('\n'));
+
+  return summary;
 }
