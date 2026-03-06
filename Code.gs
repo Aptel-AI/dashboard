@@ -1245,6 +1245,8 @@ function doPost(e) {
       // Ticket management
       case 'addTicket':            result = writeAddTicket(body); break;
       case 'toggleTicket':         result = writeToggleTicket(body); break;
+      // Sale submission
+      case 'addSale':              result = writeAddSale(body); break;
       default: result = { error: 'unknown action: ' + body.action };
     }
     return jsonResponse(result);
@@ -1724,4 +1726,106 @@ function writeSavePaidOut(body) {
   var paidOutJson = JSON.stringify(body.paidOut || {});
   sheet.getRange(rowIndex, OL.PAID_OUT + 1).setValue(paidOutJson);
   return { ok: true };
+}
+
+
+// === SALE SUBMISSION ===
+
+function writeAddSale(body) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(ORDER_LOG_TAB);
+  if (!sheet) return { error: 'Order Log not found' };
+
+  // Validate required fields
+  var email = String(body.email || '').trim().toLowerCase();
+  if (!email) return { error: 'Missing email' };
+  var dateOfSale = body.dateOfSale;
+  if (!dateOfSale) return { error: 'Missing date of sale' };
+
+  // Look up team emoji from _Roster + _Teams
+  var teamEmoji = '';
+  try {
+    var rosterSheet = ss.getSheetByName(ROSTER_TAB);
+    if (rosterSheet) {
+      var rosterData = rosterSheet.getDataRange().getValues();
+      var teamName = '';
+      for (var r = 1; r < rosterData.length; r++) {
+        if (String(rosterData[r][0]).trim().toLowerCase() === email) {
+          teamName = String(rosterData[r][2] || '').trim();
+          break;
+        }
+      }
+      if (teamName) {
+        var teamsSheet = ss.getSheetByName(TEAMS_TAB);
+        if (teamsSheet) {
+          var teamsData = teamsSheet.getDataRange().getValues();
+          for (var t = 1; t < teamsData.length; t++) {
+            if (String(teamsData[t][1] || '').trim() === teamName) {
+              teamEmoji = String(teamsData[t][4] || '').trim();
+              break;
+            }
+          }
+        }
+      }
+    }
+  } catch (e) { /* emoji lookup failed, non-critical */ }
+
+  // Calculate product counts
+  var air = Number(body.air) || 0;
+  var newPhones = Number(body.newPhones) || 0;
+  var byods = Number(body.byods) || 0;
+  var cell = newPhones + byods;
+  var fiber = Number(body.fiber) || 0;
+  var voipQty = Number(body.voipQty) || 0;
+  var dtv = Number(body.dtv) || 0;
+
+  // YESES: count of products sold
+  var yeses = 0;
+  if (air > 0) yeses++;
+  if (cell > 0) yeses++;
+  if (fiber > 0) yeses++;
+  if (voipQty > 0) yeses++;
+  if (dtv > 0) yeses++;
+
+  // UNITS: sum of products (DTV excluded per config)
+  var units = air + cell + fiber + voipQty;
+
+  // Build row array — write only to known OL column indices
+  var totalCols = OL.TICKETS + 2;  // ensure array is long enough
+  var newRow = [];
+  for (var i = 0; i < totalCols; i++) newRow.push('');
+
+  newRow[OL.TIMESTAMP]    = new Date();
+  newRow[OL.EMAIL]        = email;
+  newRow[OL.DATE_OF_SALE] = new Date(dateOfSale + 'T12:00:00');
+  newRow[OL.REP_NAME]     = String(body.repName || '').trim();
+  newRow[OL.DSI]          = String(body.dsi || '').trim();
+  newRow[OL.TRAINEE]      = body.trainee ? 'Yes' : 'No';
+  newRow[OL.TRAINEE_NAME] = body.trainee ? String(body.traineeName || '').trim() : '';
+  newRow[OL.VOIP_QTY]     = voipQty;
+  newRow[OL.TEAM_EMOJI]   = teamEmoji;
+  newRow[OL.FIBER]        = fiber;
+  newRow[OL.AIR]          = air;
+  newRow[OL.DTV]          = dtv;
+  newRow[OL.YESES]        = yeses;
+  newRow[OL.CELL]         = cell;
+  newRow[OL.UNITS]        = units;
+  newRow[OL.STATUS]       = 'Pending';
+  newRow[OL.NOTES]        = '';
+  newRow[OL.PAID_OUT]     = '';
+  newRow[OL.TICKETS]      = '[]';
+
+  sheet.appendRow(newRow);
+
+  // Bust the Tableau cache so fresh data loads
+  try {
+    CacheService.getScriptCache().remove('tableauSummary_v5');
+  } catch (e) { /* non-critical */ }
+
+  return {
+    ok: true,
+    rowIndex: sheet.getLastRow(),
+    units: units,
+    yeses: yeses
+  };
 }

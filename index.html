@@ -100,6 +100,7 @@
       <!-- PERSONAL GROUP -->
       <button class="nav-tab" id="nav-profile" onclick="App.navTo('profile')">My Profile</button>
       <button class="nav-tab" id="nav-my-orders" onclick="App.navTo('myOrders')" style="display:none">My Orders</button>
+      <button class="nav-tab" id="nav-post-sale" onclick="App.navTo('postSale')" style="display:none">Post Sale</button>
 
       <!-- SEPARATOR 1: Personal | Team -->
       <span class="nav-separator" id="nav-sep-1" style="display:none"></span>
@@ -784,6 +785,21 @@
   </div><!-- /#leaderboard-section -->
 
   <!-- ════════════════════════════════════════════════
+       POST SALE PAGE (multi-step wizard)
+       ════════════════════════════════════════════════ -->
+  <div id="post-sale-page" style="display:none">
+    <div style="max-width:600px;margin:0 auto;padding:24px 16px 80px">
+      <div class="post-sale-header">
+        <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:28px;font-weight:700;color:var(--white);letter-spacing:0.5px">Post Sale</div>
+        <div id="post-sale-subtitle" style="font-size:12px;color:var(--silver-dim);margin-top:4px"></div>
+      </div>
+      <div id="post-sale-steps" class="wizard-steps"></div>
+      <div id="post-sale-body" class="wizard-body"></div>
+      <div id="post-sale-nav" class="wizard-nav"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
        FOOTER
        ════════════════════════════════════════════════ -->
   <footer style="text-align:center;padding:40px 24px 24px;opacity:0.5">
@@ -829,6 +845,7 @@
 <script src="js/teams-manager.js"></script>
 <script src="js/render.js"></script>
 <script src="js/orders.js"></script>
+<script src="js/post-sale.js"></script>
 <script src="js/app.js"></script>
 
 </body>

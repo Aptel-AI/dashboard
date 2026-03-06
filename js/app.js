@@ -393,6 +393,7 @@ const App = {
     // ── PERSONAL GROUP ──
     const showProfile = true;
     const showMyOrders = isSA || ['rep', 'l1', 'jd', 'manager', 'owner'].includes(role);
+    const showPostSale = isSA || ['rep', 'l1', 'jd', 'manager', 'owner'].includes(role);
 
     // ── TEAM GROUP ──
     const showTeam = isSA || ['jd', 'manager'].includes(role);
@@ -422,6 +423,7 @@ const App = {
     // Personal
     setDisplay('nav-profile', showProfile);
     setDisplay('nav-my-orders', showMyOrders);
+    setDisplay('nav-post-sale', showPostSale);
 
     // Separators
     setDisplay('nav-sep-1', showSep1);
@@ -467,7 +469,7 @@ const App = {
     }
 
     // Active tab highlight
-    const navIdMap = { allOrders: 'nav-all-orders', myOrders: 'nav-my-orders', roster: 'nav-people', teamRoster: 'nav-team-roster' };
+    const navIdMap = { allOrders: 'nav-all-orders', myOrders: 'nav-my-orders', roster: 'nav-people', teamRoster: 'nav-team-roster', postSale: 'nav-post-sale' };
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     const activeTab = document.getElementById(navIdMap[this.state.currentNav] || ('nav-' + this.state.currentNav));
     if (activeTab) activeTab.classList.add('active');
@@ -483,7 +485,8 @@ const App = {
       myOrders: 'my-orders-page',
       office: 'office-page',
       payroll: 'payroll-page',
-      teamRoster: 'team-roster-page'
+      teamRoster: 'team-roster-page',
+      postSale: 'post-sale-page'
     };
     Object.values(sections).forEach(id => {
       const el = document.getElementById(id);
@@ -529,6 +532,8 @@ const App = {
       this._renderOfficePage();
     } else if (tab === 'payroll') {
       this._loadAndRenderPayroll();
+    } else if (tab === 'postSale') {
+      PostSale.open();
     }
 
     // Scroll to top
