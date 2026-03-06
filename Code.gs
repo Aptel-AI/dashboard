@@ -738,7 +738,7 @@ function buildDsiEmailMap(ss) {
   for (var i = 1; i < olData.length; i++) {
     var dsi = String(olData[i][OL.DSI] || '').trim();
     var email = String(olData[i][OL.EMAIL] || '').trim().toLowerCase();
-    if (dsi && email && !map[dsi]) {
+    if (dsi && email) {
       map[dsi] = email;
     }
   }
