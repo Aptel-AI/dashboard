@@ -20,6 +20,8 @@ const PostSale = {
 
   // ── Open / Reset ──
   open() {
+    const page = document.getElementById('post-sale-page');
+    if (page) page.style.display = 'block';
     this._restoreDraft();
     this._render();
   },
