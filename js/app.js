@@ -1791,7 +1791,8 @@ const App = {
     };
 
     const encoded = btoa(JSON.stringify(config));
-    Auth.clearSession();
+    // Keep session — same email works across offices.
+    // If email isn't in the new roster, login screen shows automatically.
     window.location.href = 'index.html?office=' + encoded;
   },
 
