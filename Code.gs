@@ -61,38 +61,93 @@ const OL = {
 const TABLEAU_TAB = '_TableauOrderLog';
 
 // Map header text (lowercased, trimmed) → internal key
+// Multiple aliases per key so column renames/variations still match
 const TOL_HEADER_MAP = {
+  // Col 0 — Owner & Office
   'owner & office': 'OWNER_OFFICE',
+  'owner and office': 'OWNER_OFFICE',
+  // Col 1 — Rep
   'rep': 'REP',
+  // Col 2 — icd.Lead Rep ID
+  'icd.lead rep id': 'LEAD_REP_ID',
   'lead rep id': 'LEAD_REP_ID',
+  // Col 3 — rep.Rep Number
+  'rep.rep number': 'REP_NUMBER',
   'rep number': 'REP_NUMBER',
+  // Col 4 — sp.Order Date (copy)
+  'sp.order date (copy)': 'ORDER_DATE',
+  'order date (copy)': 'ORDER_DATE',
   'order date': 'ORDER_DATE',
+  // Col 5 — Order Time (Timezone)
+  'order time (timezone)': 'ORDER_TIME',
   'order time': 'ORDER_TIME',
+  // Col 6 — sp.SPM Number  (THIS IS THE DSI COLUMN)
+  'sp.spm number': 'DSI',
+  'spm number': 'DSI',
   'dsi': 'DSI',
+  // Col 7 — spe.Name  (THIS IS THE SPE COLUMN)
+  'spe.name': 'SPE',
+  'spe name': 'SPE',
   'spe': 'SPE',
+  // Col 8 — spe.Account BAN
+  'spe.account ban': 'BAN',
+  'account ban': 'BAN',
   'ban': 'BAN',
+  // Col 9 — Product Type (Broken Out)
   'product type (broken out)': 'PRODUCT_TYPE',
   'product type': 'PRODUCT_TYPE',
+  // Col 10 — CRU/IRU
   'cru/iru': 'CRU_IRU',
   'cru / iru': 'CRU_IRU',
+  // Col 11 — DTR Status (enriched)
+  'dtr status (enriched)': 'DTR_STATUS',
   'dtr status': 'DTR_STATUS',
+  // Col 12 — Disconnect Reason (Consolidated)
+  'disconnect reason (consolidated)': 'DISCO_REASON',
   'disconnect reason': 'DISCO_REASON',
   'disco reason': 'DISCO_REASON',
+  // Col 13 — spe.Port Carrier
+  'spe.port carrier': 'PORT_CARRIER',
   'port carrier': 'PORT_CARRIER',
+  // Col 14 — Notes.Note
+  'notes.note': 'NOTES',
   'notes': 'NOTES',
+  // Col 15 — DTR Status Date
   'dtr status date': 'DTR_STATUS_DATE',
+  // Col 16 — Order Status
   'order status': 'ORDER_STATUS',
+  // Col 17 — spe.dtr Posted Date (copy)
+  'spe.dtr posted date (copy)': 'POSTED_DATE',
+  'posted date (copy)': 'POSTED_DATE',
   'posted date': 'POSTED_DATE',
+  // Col 18 — Max Posted
   'max posted': 'MAX_POSTED',
+  // Col 19 — First Streaming Date
+  'first streaming date': 'FIRST_STREAMING',
   'first streaming': 'FIRST_STREAMING',
+  // Col 20 — Voice Line Count
   'voice line count': 'VOICE_LINE_COUNT',
+  // Col 21 — spe.TN Type
+  'spe.tn type': 'TN_TYPE',
   'tn type': 'TN_TYPE',
+  // Col 22 — spe.Phone
+  'spe.phone': 'PHONE',
   'phone': 'PHONE',
+  // Col 23 — spe.Install Date
+  'spe.install date': 'INSTALL_DATE',
   'install date': 'INSTALL_DATE',
+  // Col 24 — B2B Rep Volume Bonus Tiers
+  'b2b rep volume bonus tiers': 'BONUS_TIERS',
   'bonus tiers': 'BONUS_TIERS',
+  // Col 25 — Tier Bonus Payout/DNQ Reason
+  'tier bonus payout/dnq reason': 'PAYOUT_REASON',
   'payout reason': 'PAYOUT_REASON',
+  // Col 26 — Unit Count
   'unit count': 'UNIT_COUNT',
+  // Col 27 — Total Volume
   'total volume': 'TOTAL_VOLUME',
+  // Col 28 — Total Activations
+  'total activations': 'TOTAL_ACTS',
   'total acts': 'TOTAL_ACTS'
 };
 
@@ -1142,7 +1197,7 @@ function readTableauDetail(ss, dsi) {
 // Cached wrapper for readTableauSummary (6-hour TTL)
 function getTableauSummaryWithCache(ss) {
   var cache = CacheService.getScriptCache();
-  var cacheKey = 'tableauSummary_v4';
+  var cacheKey = 'tableauSummary_v5';
   var cached = cache.get(cacheKey);
   if (cached) {
     try { return JSON.parse(cached); } catch (e) { /* fall through */ }
