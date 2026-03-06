@@ -918,6 +918,7 @@ const DataPipeline = {
       if (!team.metrics || !team.members || team.members.length === 0) return;
 
       let active = 0, pending = 0, cancel = 0, disco = 0, totalDevices = 0;
+      let monthTotal = 0, monthApproved = 0, monthPending = 0, monthCanceled = 0, monthDisco = 0;
       const productBreakdown = {};
 
       team.members.forEach(p => {
@@ -932,6 +933,12 @@ const DataPipeline = {
             productBreakdown[pt] = (productBreakdown[pt] || 0) + count;
           });
         }
+        // Aggregate monthly wireless SPE counts
+        monthTotal += m.monthTotalSPEs || 0;
+        monthApproved += m.monthApprovedSPEs || 0;
+        monthPending += m.monthPendingSPEs || 0;
+        monthCanceled += m.monthCanceledSPEs || 0;
+        monthDisco += m.monthDiscoSPEs || 0;
       });
 
       if (totalDevices > 0) {
@@ -943,6 +950,24 @@ const DataPipeline = {
         team.metrics.activationRate = parseFloat((active / totalDevices * 100).toFixed(1));
         team.metrics.productBreakdown = productBreakdown;
       }
+
+      // Team-level monthly wireless SPE percentages
+      team.metrics.monthTotalSPEs = monthTotal;
+      team.metrics.monthApprovedSPEs = monthApproved;
+      team.metrics.monthPendingSPEs = monthPending;
+      team.metrics.monthCanceledSPEs = monthCanceled;
+      team.metrics.monthDiscoSPEs = monthDisco;
+      const pct = (n, d) => d > 0 ? parseFloat((n / d * 100).toFixed(1)) : 0;
+      team.metrics.activePct = pct(monthApproved, monthTotal);
+      team.metrics.pendingPct = pct(monthPending, monthTotal);
+      team.metrics.cancelPct = pct(monthCanceled, monthTotal);
+      team.metrics.projDiscoPct = pct(monthDisco, monthApproved);
+
+      // Per-headcount averages for team context
+      const activeMembers = team.members.filter(p => !p._deactivated);
+      const headcount = activeMembers.length || 1;
+      team.metrics.recentAvgPerHead = parseFloat((team.metrics.recentAvg / headcount).toFixed(2));
+      team.metrics.fourWkAvgPerHead = parseFloat((team.metrics.fourWkAvg / headcount).toFixed(2));
     });
   },
 

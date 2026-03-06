@@ -565,20 +565,25 @@ const Render = {
       </div>`;
     }).join('');
 
+    const headcount = (team.members || []).filter(p => !Roster.deactivated.has(p.name)).length || 1;
+    const perHead = m.recentAvgPerHead != null ? m.recentAvgPerHead : parseFloat((m.recentAvg / headcount).toFixed(2));
+    const fw4PerHead = m.fourWkAvgPerHead != null ? m.fourWkAvgPerHead : parseFloat((m.fourWkAvg / headcount).toFixed(2));
+
     this.openProfilePage(`
       <div class="profile-section-title">Team Breakdown</div>
       <div class="breakdown-grid">
         <div class="breakdown-remark" style="background:${m.remarkColor}22;border:1px solid ${m.remarkColor}55">
           <div style="font-size:10px;letter-spacing:0.5px;color:${m.remarkColor};text-transform:uppercase;font-family:'Helvetica Neue','Inter',sans-serif;font-weight:700;margin-bottom:6px">Remarks</div>
           <div style="font-size:18px;font-weight:700;color:${m.remarkColor}">${m.remark}</div>
-          <div style="font-size:11px;color:var(--silver-dim);margin-top:6px">Rec Wk Avg: <b style="color:var(--silver)">${m.recentAvg}</b> &nbsp;·&nbsp; 4Wk Avg: <b style="color:var(--silver)">${m.fourWkAvg}</b></div>
+          <div style="font-size:11px;color:var(--silver-dim);margin-top:6px">Team Avg: <b style="color:var(--silver)">${m.recentAvg}</b> &nbsp;·&nbsp; Per Rep: <b style="color:var(--silver)">${perHead}</b> &nbsp;·&nbsp; 4Wk: <b style="color:var(--silver)">${m.fourWkAvg}</b></div>
         </div>
         <div class="breakdown-stat"><div class="breakdown-val">${m.recentAvg}</div><div class="breakdown-lbl">Rec. Wk Avg</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val">${perHead}</div><div class="breakdown-lbl">Per Rep Avg</div></div>
         <div class="breakdown-stat"><div class="breakdown-val" style="color:${vsColor}">${vsArrow}${Math.abs(m.vsPct)}%</div><div class="breakdown-lbl">vs 4Wk Avg</div></div>
-        <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(this.pct(m.active, total)) >= 75 ? '#2E8B57' : '#f0b429'}">${this.pct(m.active, total)}%</div><div class="breakdown-lbl">Active</div></div>
-        <div class="breakdown-stat"><div class="breakdown-val" style="color:#f0b429">${this.pct(m.pending, total)}%</div><div class="breakdown-lbl">Pending</div></div>
-        <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(this.pct(m.cancel, total)) > 10 ? '#E5564A' : 'var(--silver)'}">${this.pct(m.cancel, total)}%</div><div class="breakdown-lbl">Cancel</div></div>
-        <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(this.pct(m.projDisco, total)) > 5 ? '#f97316' : '#2E8B57'}">${this.pct(m.projDisco, total)}%</div><div class="breakdown-lbl">Proj. Disco</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:${m.monthTotalSPEs > 0 ? (m.activePct >= 85 ? '#22c55e' : m.activePct <= 70 ? '#e53535' : '#f0b429') : 'var(--silver-dim)'}">${m.monthTotalSPEs > 0 ? m.activePct + '%' : '---'}</div><div class="breakdown-lbl">Active</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:${m.monthTotalSPEs > 0 ? (m.pendingPct <= 15 ? '#22c55e' : m.pendingPct >= 30 ? '#e53535' : '#f0b429') : 'var(--silver-dim)'}">${m.monthTotalSPEs > 0 ? m.pendingPct + '%' : '---'}</div><div class="breakdown-lbl">Pending</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:${m.monthTotalSPEs > 0 ? (m.cancelPct <= 5 ? '#22c55e' : m.cancelPct > 10 ? '#e53535' : '#f0b429') : 'var(--silver-dim)'}">${m.monthTotalSPEs > 0 ? m.cancelPct + '%' : '---'}</div><div class="breakdown-lbl">Cancel</div></div>
+        <div class="breakdown-stat"><div class="breakdown-val" style="color:${m.monthApprovedSPEs > 0 ? (m.projDiscoPct <= 2.5 ? '#22c55e' : m.projDiscoPct >= 5 ? '#e53535' : '#f0b429') : 'var(--silver-dim)'}">${m.monthApprovedSPEs > 0 ? m.projDiscoPct + '%' : '---'}</div><div class="breakdown-lbl">Proj. Disco</div></div>
       </div>
 
       <div class="profile-section-title">Churn Buckets</div>
