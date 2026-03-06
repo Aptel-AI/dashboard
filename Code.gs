@@ -238,22 +238,19 @@ function doGet(e) {
     // Auto-assign Tableau names (managers first, then down the ranks)
     roster = autoAssignTableauNames(ss, roster, tableauSummary.possibleTableauNames);
 
-    // Debug: trace Mason's Tableau data path
+    // Debug: dump actual Tableau headers so we can fix the column map
     var _masonDebug = {};
-    var _masonEmail = Object.keys(roster).find(function(e) { return roster[e].name === 'Mason Pickard'; });
-    _masonDebug.email = _masonEmail || 'NOT_IN_ROSTER';
-    _masonDebug.rosterTableauName = _masonEmail ? roster[_masonEmail].tableauName : 'N/A';
+    var _tolSheet = ss.getSheetByName(TABLEAU_TAB);
+    if (_tolSheet) {
+      var _tolData = _tolSheet.getDataRange().getValues();
+      _masonDebug.tableauHeaders = _tolData.length > 0 ? _tolData[0].map(function(h) { return String(h || '').trim(); }) : [];
+      _masonDebug.tableauRowCount = _tolData.length - 1;
+      _masonDebug.columnMap = buildTableauColumnMap(_tolData[0]);
+    } else {
+      _masonDebug.tableauHeaders = 'SHEET_NOT_FOUND';
+    }
+    _masonDebug.dsiCount = Object.keys(tableauSummary.dsiSummary || {}).length;
     _masonDebug.repByNameKeys = Object.keys(tableauSummary.repByName || {}).slice(0, 20);
-    _masonDebug.inRepByName = !!(tableauSummary.repByName && tableauSummary.repByName['Mason Pickard']);
-    _masonDebug.inRepSummary = !!(_masonEmail && tableauSummary.repSummary && tableauSummary.repSummary[_masonEmail]);
-    if (tableauSummary.repByName && tableauSummary.repByName['Mason Pickard']) {
-      var mn = tableauSummary.repByName['Mason Pickard'];
-      _masonDebug.repByNameData = { totalDevices: mn.totalDevices, monthTotalSPEs: mn.monthTotalSPEs, monthApproved: mn.monthApprovedSPEs, monthPending: mn.monthPendingSPEs };
-    }
-    if (_masonEmail && tableauSummary.repSummary && tableauSummary.repSummary[_masonEmail]) {
-      var mr = tableauSummary.repSummary[_masonEmail];
-      _masonDebug.repSummaryData = { totalDevices: mr.totalDevices, monthTotalSPEs: mr.monthTotalSPEs, monthApproved: mr.monthApprovedSPEs, monthPending: mr.monthPendingSPEs };
-    }
 
     const data = {
       people: peopleResult.people || peopleResult,
