@@ -40,7 +40,7 @@ const NATIONAL_CONFIG = {
     // Sheet 5: Ken's national recruiting data (copy of Maddy's weekly stats)
     // One tab per week, Column A has owners grouped under campaign headers.
     national: {
-      id: '',  // TODO: user provides sheet ID after creating
+      id: '1eGkwjQRD9RV4n-JR_TTlgE6VY858WZID8cAF8soYSYM',
       label: 'National Recruiting Data'
     }
   },
