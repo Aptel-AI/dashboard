@@ -88,7 +88,7 @@ function doPost(e) {
     var result;
     switch (body.action) {
       case 'importRecruiting':
-        result = importLatestRecruiting(body.weeks || 1);
+        result = importLatestRecruiting(typeof body.weeks === 'number' ? body.weeks : 1);
         break;
       default:
         result = { error: 'unknown action: ' + body.action };
@@ -108,7 +108,7 @@ function doPost(e) {
 
 function importLatestRecruiting(weekCount) {
   // weekCount: number of weeks to import (0 = all date-named tabs)
-  weekCount = weekCount || 1;
+  weekCount = typeof weekCount === 'number' ? weekCount : 1;
 
   // 1. Open source sheet (Maddy's All Campaigns Stats Tracker)
   var srcSS = SpreadsheetApp.openById(SHEETS.RECRUITING_WEEKLY);
