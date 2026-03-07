@@ -469,9 +469,6 @@ const NationalApp = {
 
     // Campaign-level recruiting table
     this._renderRecruitingTable(this.state.campaignRecruiting, 'campaign-recruiting');
-
-    // Status codes legend
-    this._renderStatusLegend('campaign-status-codes');
   },
 
   // ══════════════════════════════════════════════════
@@ -492,15 +489,9 @@ const NationalApp = {
     }
 
     container.innerHTML = owners.map((o, idx) => {
-      const sc = this.STATUS_CODES[o.statusCode];
-      const badgeHtml = sc
-        ? `<span class="status-badge ${sc.css}">${this._esc(sc.label)}</span>`
-        : '';
-
       return `
         <div class="owner-card" onclick="NationalApp.openOwnerDetail(${idx})">
           <span class="owner-card-name">${this._esc(o.name)}</span>
-          ${badgeHtml}
           <span class="owner-card-arrow">→</span>
         </div>`;
     }).join('');
@@ -532,15 +523,9 @@ const NationalApp = {
     detail.style.display = 'block';
 
     document.getElementById('detail-owner-name').textContent = owner.name;
-    const sc = this.STATUS_CODES[owner.statusCode];
     const badge = document.getElementById('detail-owner-badge');
-    if (sc) {
-      badge.textContent = sc.label;
-      badge.className = 'detail-badge status-badge ' + sc.css;
-    } else {
-      badge.textContent = NATIONAL_CONFIG.campaigns[this.state.campaign]?.label || '';
-      badge.className = 'detail-badge';
-    }
+    badge.textContent = NATIONAL_CONFIG.campaigns[this.state.campaign]?.label || '';
+    badge.className = 'detail-badge';
 
     document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
     document.querySelector('.detail-tab[data-tab="health"]').classList.add('active');
