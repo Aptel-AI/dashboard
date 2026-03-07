@@ -729,18 +729,15 @@ const NationalApp = {
     owner.nextGoals[field] = parseInt(value) || 0;
   },
 
-  // ── Production card (big actual / small goal) ──
+  // ── Production card (big actual / small goal + % badge) ──
   _prodCard(label, actual, goal) {
-    const delta = actual - goal;
     const pct = goal ? Math.round((actual / goal) * 100) : 0;
-    const deltaClass = delta >= 0 ? 'delta-pos' : 'delta-neg';
-    const deltaStr = delta >= 0 ? '+' + delta : '' + delta;
     return `
-      <div class="prod-card ${this._pctClass(pct)}">
+      <div class="prod-card">
         <div class="prod-card-label">${label}</div>
         <div class="prod-card-actual">${actual}</div>
-        <div class="prod-card-goal">/ ${goal} goal</div>
-        <div class="prod-card-delta ${deltaClass}">${deltaStr}</div>
+        <div class="prod-card-goal">goal ${goal}</div>
+        <span class="prod-card-pct ${this._pctClass(pct)}">${pct}%</span>
       </div>`;
   },
 
