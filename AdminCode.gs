@@ -187,6 +187,31 @@ function doGet(e) {
         return jsonResponse(findRepOffice(repEmail));
       }
 
+      // ── Get office config by officeId ──
+      case 'getOfficeConfig': {
+        var reqOfficeId = (e.parameter.officeId || '').trim();
+        if (!reqOfficeId) return jsonResponse({ found: false, error: 'officeId required' });
+        var allOffices = readOffices();
+        for (var oi = 0; oi < allOffices.length; oi++) {
+          if (allOffices[oi].officeId === reqOfficeId && allOffices[oi].status === 'active') {
+            var o = allOffices[oi];
+            return jsonResponse({
+              found: true,
+              office: {
+                officeId: o.officeId,
+                name: o.name,
+                sheetId: o.sheetId,
+                appsScriptUrl: o.appsScriptUrl,
+                apiKey: o.apiKey,
+                logoUrl: o.logoUrl || '',
+                logoIconUrl: o.logoIconUrl || ''
+              }
+            });
+          }
+        }
+        return jsonResponse({ found: false, error: 'Office not found or inactive' });
+      }
+
       default:
         return jsonResponse({ error: 'Unknown action: ' + action });
     }

@@ -89,107 +89,57 @@ const App = {
         this._applySuperAdminViewAs();
       }
     } else {
-      // Determine login flow: office-specific vs universal
-      const hasOfficeParam = new URLSearchParams(window.location.search).has('office');
+      // No session — resolve office config then show login
+      // If ?office= was a plain ID (e.g. "off_002"), resolve it first
+      if (OFFICE_CONFIG._pendingOfficeId) {
+        await this._resolveOfficeId(OFFICE_CONFIG._pendingOfficeId);
+      }
 
-      if (hasOfficeParam) {
-        // Office already specified (via ?office= URL param) — old flow
-        Auth.showLoading('Connecting...');
-        try {
-          const apiData = await SheetsAPI.fetchAllData(OFFICE_CONFIG);
-          this.state.roster = apiData.roster || {};
-          this._cachedApiData = apiData;
-          console.info('Roster loaded:', Object.keys(this.state.roster).length, 'entries');
-          Auth.hideLoading();
-          Auth.showLoginScreen((email) => this.handleEmailStep(email));
-        } catch (err) {
-          Auth.hideLoading();
-          this.showError('Unable to connect. Check your Apps Script deployment.', err);
-        }
-      } else {
-        // Universal login — find office from email
+      // Now fetch data and show login
+      Auth.showLoading('Connecting...');
+      try {
+        const apiData = await SheetsAPI.fetchAllData(OFFICE_CONFIG);
+        this.state.roster = apiData.roster || {};
+        this._cachedApiData = apiData;
+        console.info('Roster loaded:', Object.keys(this.state.roster).length, 'entries');
         Auth.hideLoading();
-        Auth.showLoginScreen((email) => this.handleUniversalEmailStep(email));
+        Auth.showLoginScreen((email) => this.handleEmailStep(email));
+      } catch (err) {
+        Auth.hideLoading();
+        this.showError('Unable to connect. Check your Apps Script deployment.', err);
       }
     }
+  },
+
+  // ── Resolve plain office ID (e.g. "off_002") via AdminCode.gs ──
+  async _resolveOfficeId(officeId) {
+    try {
+      console.log('[Multi-Office] Resolving office ID:', officeId);
+      const result = await SheetsAPI.getOfficeConfig(officeId);
+      if (result.found) {
+        const oc = result.office;
+        OFFICE_CONFIG.officeId = oc.officeId;
+        OFFICE_CONFIG.sheetId = oc.sheetId;
+        OFFICE_CONFIG.appsScriptUrl = oc.appsScriptUrl;
+        OFFICE_CONFIG.apiKey = oc.apiKey;
+        OFFICE_CONFIG.officeName = oc.name;
+        if (oc.logoUrl) OFFICE_CONFIG.logoUrl = oc.logoUrl;
+        if (oc.logoIconUrl) OFFICE_CONFIG.logoIconUrl = oc.logoIconUrl;
+        console.log('[Multi-Office] Resolved to:', oc.name);
+      } else {
+        console.warn('[Multi-Office] Office not found:', officeId, '— using defaults');
+      }
+    } catch (err) {
+      console.error('[Multi-Office] Failed to resolve office ID:', err);
+    }
+    delete OFFICE_CONFIG._pendingOfficeId;
   },
 
   // Temp login state (between email and PIN steps)
   _loginEmail: null,
   _loginRosterEntry: null,
 
-  // ── Step 1a: Universal email step (no office specified) ──
-  async handleUniversalEmailStep(email) {
-    const cleanEmail = String(email).trim().toLowerCase();
-    if (!cleanEmail) {
-      Auth.showLoginError('Please enter your email');
-      return;
-    }
-
-    // Show loading state on button + bookmark hint
-    const btn = document.getElementById('login-btn');
-    if (btn) { btn.textContent = 'FINDING OFFICE...'; btn.disabled = true; }
-    const errEl = document.getElementById('login-error');
-    if (errEl) {
-      errEl.style.color = 'var(--silver-dim, #4a7090)';
-      errEl.textContent = 'Tip: bookmark the next page for faster login next time';
-    }
-
-    try {
-      const result = await SheetsAPI.findRepOffice(cleanEmail);
-
-      if (!result.found) {
-        if (btn) { btn.textContent = 'Continue'; btn.disabled = false; }
-        if (errEl) errEl.style.color = '';
-        Auth.showLoginError('Email not found. Contact your JD or Admin to be added.');
-        return;
-      }
-
-      // Apply found office config
-      const oc = result.office;
-      OFFICE_CONFIG.officeId = oc.officeId;
-      OFFICE_CONFIG.sheetId = oc.sheetId;
-      OFFICE_CONFIG.appsScriptUrl = oc.appsScriptUrl;
-      OFFICE_CONFIG.apiKey = oc.apiKey;
-      OFFICE_CONFIG.officeName = oc.name;
-      if (oc.logoUrl) OFFICE_CONFIG.logoUrl = oc.logoUrl;
-      if (oc.logoIconUrl) OFFICE_CONFIG.logoIconUrl = oc.logoIconUrl;
-      console.log('[Universal Login] Routed to office:', oc.name, '| officeId:', oc.officeId);
-
-      // Update URL so page refresh preserves office context
-      try {
-        const encoded = btoa(JSON.stringify(oc));
-        history.replaceState(null, '', '?office=' + encoded);
-      } catch (urlErr) {
-        console.warn('Could not update URL:', urlErr);
-      }
-
-      // Store login state for PIN step
-      this._loginEmail = cleanEmail;
-      this._loginRosterEntry = result.rosterEntry;
-
-      if (btn) { btn.textContent = 'Continue'; btn.disabled = false; }
-
-      // Proceed to PIN step
-      const onBack = () => {
-        Auth.showLoginError('');
-        Auth._showEmailStep((e) => this.handleUniversalEmailStep(e));
-      };
-
-      if (result.rosterEntry.hasPin) {
-        Auth.showPinStep(cleanEmail, (pin) => this.handlePinValidation(pin), onBack);
-      } else {
-        Auth.showPinCreateStep(cleanEmail, (pin, confirm) => this.handlePinCreation(pin, confirm), onBack);
-      }
-    } catch (err) {
-      console.error('Universal login error:', err);
-      if (btn) { btn.textContent = 'Continue'; btn.disabled = false; }
-      if (errEl) errEl.style.color = '';
-      Auth.showLoginError('Connection error. Please try again.');
-    }
-  },
-
-  // ── Step 1b: Email submitted (office already known) ──
+  // ── Step 1: Email submitted (office already known) ──
   handleEmailStep(email) {
     const result = Auth.checkEmail(email, this.state.roster);
     if (!result.ok) {

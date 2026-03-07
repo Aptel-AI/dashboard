@@ -118,6 +118,15 @@ const SheetsAPI = {
     return await resp.json();
   },
 
+  // ── Look up office config by plain office ID ──
+  // Calls AdminCode.gs getOfficeConfig endpoint
+  async getOfficeConfig(officeId) {
+    const url = `${OFFICE_CONFIG.adminApiUrl}?key=${encodeURIComponent(OFFICE_CONFIG.adminApiKey)}&action=getOfficeConfig&officeId=${encodeURIComponent(officeId)}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Admin API HTTP ${resp.status}`);
+    return await resp.json();
+  },
+
   // ── Check if Apps Script URL is configured ──
   isConfigured(config) {
     return config.appsScriptUrl &&

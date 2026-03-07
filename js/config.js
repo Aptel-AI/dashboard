@@ -115,15 +115,16 @@ const WEEK_PERIODS = new Set([7, 8, 9, 10, 11]);
 // ═══════════════════════════════════════════════════════
 // Multi-Office Config Override
 // ═══════════════════════════════════════════════════════
-// When opened from the admin dashboard, the URL will contain
-// ?office=BASE64_ENCODED_CONFIG which overrides the defaults above.
-// If no ?office= param is present, the hardcoded config above is used
-// (backwards compatible — existing users are unaffected).
+// ?office= param supports two formats:
+//   1. BASE64 JSON (from admin portal SSO) — applied immediately
+//   2. Plain office ID like "off_002" — resolved at runtime via AdminCode.gs
+// If no ?office= param, defaults above are used (off_001).
 
 (function() {
   const params = new URLSearchParams(window.location.search);
   const officeParam = params.get('office');
   if (officeParam) {
+    // Try base64 JSON first (admin portal SSO format)
     try {
       const cfg = JSON.parse(atob(officeParam));
       if (cfg.officeId) OFFICE_CONFIG.officeId = cfg.officeId;
@@ -135,7 +136,10 @@ const WEEK_PERIODS = new Set([7, 8, 9, 10, 11]);
       if (cfg.logoIconUrl) OFFICE_CONFIG.logoIconUrl = cfg.logoIconUrl;
       console.log('[Multi-Office] Config overridden for:', cfg.officeName || 'Unknown office', '| officeId:', cfg.officeId || 'default');
     } catch(e) {
-      console.warn('[Multi-Office] Invalid office param, using defaults');
+      // Not valid base64 JSON — treat as plain office ID (e.g. "off_002")
+      // Will be resolved at runtime in app.js via AdminCode.gs
+      OFFICE_CONFIG._pendingOfficeId = officeParam;
+      console.log('[Multi-Office] Plain office ID detected:', officeParam, '— will resolve at runtime');
     }
   }
 
