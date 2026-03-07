@@ -186,6 +186,11 @@ const NationalApp = {
           { date: '3/3',  active: 12, leaders: 3, training: 4 }
         ],
         p: { totalGoal: 22, totalActual: 18, wirelessGoal: 15, wirelessActual: 12 },
+        prodHist: [
+          { date: '2/17', tA: 14, tG: 18, wA: 9, wG: 12 },
+          { date: '2/24', tA: 16, tG: 20, wA: 11, wG: 14 },
+          { date: '3/3',  tA: 18, tG: 22, wA: 12, wG: 15 }
+        ],
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 55,
         rLeaders: 3,
@@ -202,6 +207,11 @@ const NationalApp = {
           { date: '3/3',  active: 8, leaders: 2, training: 3 }
         ],
         p: { totalGoal: 18, totalActual: 14, wirelessGoal: 12, wirelessActual: 9 },
+        prodHist: [
+          { date: '2/17', tA: 10, tG: 14, wA: 7, wG: 10 },
+          { date: '2/24', tA: 12, tG: 16, wA: 8, wG: 11 },
+          { date: '3/3',  tA: 14, tG: 18, wA: 9, wG: 12 }
+        ],
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 22,
         rLeaders: 2,
@@ -218,6 +228,11 @@ const NationalApp = {
           { date: '3/3',  active: 15, leaders: 4, training: 5 }
         ],
         p: { totalGoal: 28, totalActual: 24, wirelessGoal: 20, wirelessActual: 18 },
+        prodHist: [
+          { date: '2/17', tA: 20, tG: 24, wA: 14, wG: 17 },
+          { date: '2/24', tA: 22, tG: 26, wA: 16, wG: 19 },
+          { date: '3/3',  tA: 24, tG: 28, wA: 18, wG: 20 }
+        ],
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 66,
         rLeaders: 4,
@@ -234,6 +249,11 @@ const NationalApp = {
           { date: '3/3',  active: 6, leaders: 1, training: 3 }
         ],
         p: { totalGoal: 14, totalActual: 8, wirelessGoal: 10, wirelessActual: 5 },
+        prodHist: [
+          { date: '2/17', tA: 6, tG: 12, wA: 4, wG: 8 },
+          { date: '2/24', tA: 7, tG: 13, wA: 4, wG: 9 },
+          { date: '3/3',  tA: 8, tG: 14, wA: 5, wG: 10 }
+        ],
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 44,
         rLeaders: 1,
@@ -250,6 +270,11 @@ const NationalApp = {
           { date: '3/3',  active: 10, leaders: 2, training: 4 }
         ],
         p: { totalGoal: 20, totalActual: 16, wirelessGoal: 14, wirelessActual: 11 },
+        prodHist: [
+          { date: '2/17', tA: 12, tG: 16, wA: 8, wG: 11 },
+          { date: '2/24', tA: 14, tG: 18, wA: 10, wG: 13 },
+          { date: '3/3',  tA: 16, tG: 20, wA: 11, wG: 14 }
+        ],
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 55,
         rLeaders: 2,
@@ -266,6 +291,11 @@ const NationalApp = {
           { date: '3/3',  active: 9, leaders: 2, training: 4 }
         ],
         p: { totalGoal: 16, totalActual: 12, wirelessGoal: 11, wirelessActual: 8 },
+        prodHist: [
+          { date: '2/17', tA: 9, tG: 13, wA: 6, wG: 9 },
+          { date: '2/24', tA: 10, tG: 14, wA: 7, wG: 10 },
+          { date: '3/3',  tA: 12, tG: 16, wA: 8, wG: 11 }
+        ],
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 33,
         rLeaders: 2,
@@ -282,6 +312,11 @@ const NationalApp = {
           { date: '3/3',  active: 7, leaders: 1, training: 3 }
         ],
         p: { totalGoal: 14, totalActual: 10, wirelessGoal: 10, wirelessActual: 6 },
+        prodHist: [
+          { date: '2/17', tA: 7, tG: 12, wA: 4, wG: 8 },
+          { date: '2/24', tA: 8, tG: 13, wA: 5, wG: 9 },
+          { date: '3/3',  tA: 10, tG: 14, wA: 6, wG: 10 }
+        ],
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 22,
         rLeaders: 1,
@@ -317,6 +352,8 @@ const NationalApp = {
           wirelessGoal: p.wirelessGoal || 0,
           wirelessActual: p.wirelessActual || 0
         },
+        // Production history (week-over-week log)
+        productionHistory: d.prodHist ? d.prodHist.map(e => ({ ...e })) : [],
         // 1-on-1 Coaching: Next week goals (set during call)
         nextGoals: {
           totalUnits: g.totalUnits || 0,
@@ -597,6 +634,9 @@ const NationalApp = {
         ${this._prodCard('Wireless Lines', prod.wirelessActual, prod.wirelessGoal)}
       </div>`;
 
+    // ── Production Trend Table ──
+    this._renderProductionTrend(owner, ownerIdx);
+
     // ── Section 3: Set Goals (Next Week) ──
     const goalsEl = document.getElementById('health-goals');
     goalsEl.innerHTML = `
@@ -720,6 +760,48 @@ const NationalApp = {
     if (diff > 0) return `<span class="trend-up">+${diff}</span>`;
     if (diff < 0) return `<span class="trend-down">${diff}</span>`;
     return '';
+  },
+
+  // ── Render production week-over-week trend table ──
+  _renderProductionTrend(owner, ownerIdx) {
+    const trendEl = document.getElementById('health-prod-trend');
+    if (!trendEl) return;
+
+    const hist = owner.productionHistory || [];
+    if (!hist.length) {
+      trendEl.style.display = 'none';
+      return;
+    }
+    trendEl.style.display = '';
+
+    trendEl.innerHTML = `
+      <div class="coaching-label">Week-over-Week Production</div>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th class="num">Total Units</th>
+              <th class="num">Goal</th>
+              <th class="num">Wireless</th>
+              <th class="num">Goal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${hist.map((r, i) => {
+              const prev = i > 0 ? hist[i - 1] : null;
+              return `
+                <tr>
+                  <td class="bold">${this._esc(r.date)}</td>
+                  <td class="num">${r.tA} ${this._trendArrow(r.tA, prev?.tA)}</td>
+                  <td class="num" style="color:var(--gray-400)">${r.tG}</td>
+                  <td class="num">${r.wA} ${this._trendArrow(r.wA, prev?.wA)}</td>
+                  <td class="num" style="color:var(--gray-400)">${r.wG}</td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
   },
 
   // ── Goal input handler ──
