@@ -1007,12 +1007,8 @@ const NationalApp = {
 
     let html = '';
 
-    // Leaders info (shown on campaign level with legend)
-    if (data.showLegend) {
-      html += `<div class="rt-leaders-info"># of Leaders: <span>${leaders}</span></div>`;
-    } else {
-      html += `<div class="rt-leaders-info"># of Leaders: <span>${leaders}</span></div>`;
-    }
+    // 2nd Rounds Required gauge — scales with leader count
+    html += this._build2ndRoundsGauge(leaders);
 
     // Table
     html += `<div class="rt-wrap"><table class="rt-table"><thead>`;
@@ -1060,6 +1056,27 @@ const NationalApp = {
 
     html += `</tbody></table></div>`;
     el.innerHTML = html;
+  },
+
+  // ── 2nd Rounds Required gauge (scales with leader count) ──
+  _build2ndRoundsGauge(leaders) {
+    const tiers = [
+      { label: 'Bored Leaders',                mult: 2, color: '#e53535' },
+      { label: 'Top Leaders Interviewing Only', mult: 3, color: '#f97316' },
+      { label: 'Maintaining, Not Growing',      mult: 4, color: '#f0b429' },
+      { label: 'Leaders Busy',                  mult: 5, color: '#22c55e' },
+      { label: 'Promotion Factory',             mult: 6, color: '#00e5cc' }
+    ];
+    let h = `<table class="rt-gauge-table">`;
+    h += `<thead><tr><th colspan="2"># of Leaders: ${leaders}</th></tr></thead>`;
+    h += `<tbody>`;
+    h += `<tr class="rt-gauge-header"><td colspan="2">2ND ROUNDS REQUIRED</td></tr>`;
+    tiers.forEach(t => {
+      const val = leaders * t.mult;
+      h += `<tr><td>${this._esc(t.label)}</td><td class="rt-gauge-val" style="background:${t.color}">${val}</td></tr>`;
+    });
+    h += `</tbody></table>`;
+    return h;
   },
 
   // ── Status codes legend ──
