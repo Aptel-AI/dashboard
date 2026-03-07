@@ -27,6 +27,14 @@ const AdminApp = {
     // Check existing session
     const session = this.getSession();
     if (session) {
+      // Invalidate stale sessions that are missing the user's name
+      // (caused by a previous login bug — force re-login to capture name)
+      if (!session.name) {
+        console.warn('[Admin] Session missing name — forcing re-login');
+        localStorage.removeItem(ADMIN_CONFIG.sessionKey);
+        this.showLoginScreen();
+        return;
+      }
       this.state.currentEmail = session.email;
       this.state.currentName = session.name;
       this.state.currentRole = session.role || 'a3';

@@ -66,7 +66,15 @@ const App = {
     }
 
     // Check existing session
-    const session = Auth.getSession();
+    let session = Auth.getSession();
+
+    // Invalidate stale admin SSO sessions missing the user's name (from a previous login bug)
+    if (session && !session.name && session.source === 'admin-portal') {
+      console.warn('[Session] Admin SSO session missing name — clearing stale session');
+      Auth.clearSession();
+      session = null;
+    }
+
     if (session) {
       // Restore office config from session (persists across refresh)
       if (session.officeConfig) {
