@@ -606,14 +606,13 @@ input, select, textarea { font-family: inherit; }
 .trend-down { color: var(--red); }
 .trend-flat { color: var(--gray-400); }
 
-/* Production trend table — inline actual/goal */
-.prod-trend-table { table-layout: auto; }
+/* Production trend table — bold number centered, suffix trails right */
 .prod-trend-table th:first-child,
 .prod-trend-table td:first-child { width: 60px; white-space: nowrap; }
-.prod-trend-table th.num,
-.prod-trend-table td.num { text-align: center; white-space: nowrap; width: 45%; }
+.prod-trend-table th.num { text-align: center; }
+.prod-trend-table td.num { text-align: center; white-space: nowrap; position: relative; }
 .prod-trend-actual { font-weight: 800; font-size: 15px; color: var(--gray-800); }
-.prod-trend-suffix { font-size: 12px; white-space: nowrap; }
+.prod-trend-suffix { font-size: 12px; white-space: nowrap; display: inline-block; width: 0; overflow: visible; text-align: left; vertical-align: baseline; }
 .prod-trend-goal { font-weight: 400; color: var(--gray-400); }
 
 /* ═══════════════════════════════════════════════════════
