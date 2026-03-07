@@ -261,79 +261,79 @@ input, select, textarea { font-family: inherit; }
 }
 .search-input:focus { border-color: var(--teal); }
 
-/* Owners Grid */
+/* Owners Grid (directory layout) */
 .owners-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
 }
 
-/* Owner Card */
+/* Owner Card (compact directory style) */
 .owner-card {
   background: var(--white);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: 14px 18px;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--gray-100);
   cursor: pointer;
   transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 .owner-card:hover {
   box-shadow: var(--shadow-md);
   border-color: var(--teal);
   transform: translateY(-1px);
 }
-.owner-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
 .owner-card-name {
-  font-size: 16px; font-weight: 700; color: var(--gray-800);
+  font-size: 15px; font-weight: 700; color: var(--gray-800);
+  flex: 1;
 }
 .owner-card-arrow {
-  font-size: 18px; color: var(--gray-300);
+  font-size: 16px; color: var(--gray-300);
   transition: color var(--transition);
+  flex-shrink: 0;
 }
 .owner-card:hover .owner-card-arrow { color: var(--teal); }
 
-.owner-card-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-.owner-metric {
-  text-align: center;
-}
-.owner-metric-value {
-  font-size: 18px; font-weight: 700; color: var(--gray-800);
-}
-.owner-metric-label {
-  font-size: 10px; font-weight: 600; color: var(--gray-400);
-  text-transform: uppercase; letter-spacing: 0.3px;
-  margin-top: 2px;
-}
-.owner-card-status {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--gray-100);
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
+/* Status badge (used on owner cards and in status legend) */
 .status-badge {
   display: inline-flex;
-  padding: 2px 8px;
-  border-radius: 99px;
-  font-size: 10px; font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 10px; font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
+.status-badge.sc-22 { background: #fecaca; color: #991b1b; }
+.status-badge.sc-33 { background: #fed7aa; color: #9a3412; }
+.status-badge.sc-44 { background: #fef08a; color: #854d0e; }
+.status-badge.sc-55 { background: #bbf7d0; color: #065f46; }
+.status-badge.sc-66 { background: #bfdbfe; color: #1e40af; }
 .status-badge.green { background: var(--green-light); color: #15803d; }
 .status-badge.yellow { background: var(--yellow-light); color: #b45309; }
 .status-badge.red { background: var(--red-light); color: #dc2626; }
 .status-badge.blue { background: var(--blue-light); color: #2563eb; }
+
+/* Owner card quick stats */
+.owner-card-stats {
+  display: flex; gap: 16px; flex-shrink: 0;
+}
+.owner-card-stat {
+  text-align: center;
+}
+.owner-card-stat-value {
+  font-size: 16px; font-weight: 800; color: var(--gray-800);
+  line-height: 1;
+}
+.owner-card-stat-label {
+  font-size: 9px; font-weight: 600; color: var(--gray-400);
+  text-transform: uppercase; letter-spacing: 0.3px;
+  margin-top: 2px;
+}
 
 /* ═══════════════════════════════════════════════════════
    OWNER DETAIL
@@ -461,38 +461,139 @@ input, select, textarea { font-family: inherit; }
 .trend-flat { color: var(--gray-400); }
 
 /* ═══════════════════════════════════════════════════════
-   RECRUITING TAB
+   RECRUITING TABLE (spreadsheet-style with conditional colors)
    ═══════════════════════════════════════════════════════ */
-.funnel-overview {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 10px;
-  margin-bottom: 24px;
+.campaign-recruiting {
+  margin-top: 24px;
 }
-.funnel-step {
+.campaign-status-codes {
+  margin-top: 20px;
+  padding-bottom: 8px;
+}
+
+/* Status legend (matches Campaign Tracker) */
+.status-legend {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 10px;
+}
+.status-legend-item {
+  display: inline-flex; align-items: center;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px; font-weight: 700;
+  color: var(--gray-900);
+}
+.status-legend-item.sc-22 { background: #fecaca; }
+.status-legend-item.sc-33 { background: #fed7aa; }
+.status-legend-item.sc-44 { background: #fef08a; }
+.status-legend-item.sc-55 { background: #bbf7d0; }
+.status-legend-item.sc-66 { background: #bfdbfe; }
+
+/* Recruiting table wrapper */
+.rt-wrap {
   background: var(--white);
-  border: 1px solid var(--gray-100);
   border-radius: var(--radius);
-  padding: 14px 12px;
+  border: 1px solid var(--gray-200);
+  overflow-x: auto;
+  box-shadow: var(--shadow-sm);
+}
+.rt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 700px;
+}
+/* Header group row (Projected / Actual / Month Overview) */
+.rt-table thead tr.rt-group-row th {
+  padding: 6px 10px;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 2px solid var(--gray-300);
+  white-space: nowrap;
   text-align: center;
-  position: relative;
 }
-.funnel-step::after {
-  content: '→';
-  position: absolute;
-  right: -8px; top: 50%;
-  transform: translateY(-50%);
-  color: var(--gray-300);
-  font-size: 16px; font-weight: 700;
+.rt-group-projected {
+  background: #e8edf3; color: var(--gray-700);
+  text-align: left !important;
 }
-.funnel-step:last-child::after { display: none; }
-.funnel-step-value { font-size: 20px; font-weight: 800; color: var(--gray-800); }
-.funnel-step-label {
-  font-size: 9px; font-weight: 600; color: var(--gray-400);
-  text-transform: uppercase; letter-spacing: 0.3px; margin-top: 3px;
+.rt-group-actual {
+  background: #c8d8ea; color: var(--gray-800);
 }
-.funnel-step-rate {
-  font-size: 11px; font-weight: 700; margin-top: 4px;
+.rt-group-total {
+  background: #fef08a; color: var(--gray-800);
+}
+/* Date header row */
+.rt-table thead tr.rt-date-row th {
+  padding: 8px 10px;
+  font-size: 12px; font-weight: 700;
+  color: var(--gray-700);
+  text-align: center;
+  background: var(--gray-50);
+  border-bottom: 2px solid var(--gray-200);
+  white-space: nowrap;
+}
+.rt-table thead tr.rt-date-row th:first-child {
+  text-align: left;
+}
+/* Data cells */
+.rt-table tbody td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--gray-100);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--gray-700);
+}
+.rt-table tbody td:first-child {
+  text-align: left;
+  font-weight: 700;
+  color: var(--gray-800);
+  white-space: nowrap;
+  background: var(--gray-50);
+}
+.rt-table tbody tr:hover td { background: rgba(0,0,0,0.02); }
+.rt-table tbody tr:hover td:first-child { background: var(--gray-100); }
+.rt-table tbody tr:last-child td { border-bottom: none; }
+
+/* Projected column */
+td.rt-projected {
+  background: #f0f3f7 !important;
+  color: var(--gray-600) !important;
+  font-weight: 600 !important;
+}
+/* Total column */
+td.rt-total {
+  font-weight: 800 !important;
+  color: var(--gray-900) !important;
+  background: #fffef0 !important;
+}
+
+/* Conditional cell colors (matching spreadsheet) */
+td.cell-green  { background: #d1fae5 !important; color: #065f46 !important; }
+td.cell-yellow { background: #fef9c3 !important; color: #854d0e !important; }
+td.cell-orange { background: #ffedd5 !important; color: #9a3412 !important; }
+td.cell-red    { background: #fecaca !important; color: #991b1b !important; }
+
+/* Section divider rows in table */
+.rt-table tbody tr.rt-section-row td {
+  background: var(--gray-100);
+  font-size: 11px; font-weight: 700;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 4px 10px;
+  text-align: left;
+}
+
+/* Leaders count row at top */
+.rt-leaders-info {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 14px; font-weight: 700; color: var(--gray-700);
+  margin-bottom: 12px;
+}
+.rt-leaders-info span {
+  font-size: 22px; font-weight: 800; color: var(--gray-900);
 }
 
 /* ═══════════════════════════════════════════════════════
