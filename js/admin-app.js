@@ -481,9 +481,15 @@ const AdminApp = {
 
     // Render page content — pass role for conditional rendering
     switch (page) {
-      case 'offices':
-        AdminRender.renderOffices(this.state.offices, role);
+      case 'offices': {
+        let visibleOffices = this.state.offices;
+        if (role === 'a1' && this.state.assignedOffices) {
+          const allowed = new Set(this.state.assignedOffices.split(','));
+          visibleOffices = this.state.offices.filter(o => allowed.has(o.officeId));
+        }
+        AdminRender.renderOffices(visibleOffices, role);
         break;
+      }
       case 'owners':
         AdminRender.renderOwners(this.buildOwnerTree(), Object.keys(this.state.owners).length, role);
         break;
