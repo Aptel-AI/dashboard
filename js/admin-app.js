@@ -144,13 +144,14 @@ const AdminApp = {
       this._loginEmail = email;
       this._loginUserType = resp.userType || 'admin';
 
+      // Only set name/role if the response included them
+      // (PIN error responses from validatePin don't include name)
+      if (resp.name) this._loginName = resp.name;
+      if (resp.role) this._loginRole = resp.role;
+
       if (resp.firstLogin) {
-        this._loginName = resp.name;
-        this._loginRole = resp.role;
         this._showPinCreateStep();
       } else {
-        this._loginName = resp.name;
-        this._loginRole = resp.role;
         this._showPinStep();
       }
     } catch (err) {
@@ -217,6 +218,10 @@ const AdminApp = {
     try {
       const resp = await this._post('validatePin', { email: this._loginEmail, pin });
       if (resp.success) {
+        // Update name/role from successful PIN response (email step may not have included them)
+        if (resp.name) this._loginName = resp.name;
+        if (resp.role) this._loginRole = resp.role;
+        if (resp.userType) this._loginUserType = resp.userType;
         this._completeLogin();
       } else {
         if (error) error.textContent = resp.error || 'Incorrect PIN';
