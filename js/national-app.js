@@ -403,16 +403,6 @@ const NationalApp = {
         <div class="owner-card" onclick="NationalApp.openOwnerDetail(${idx})">
           <span class="owner-card-name">${this._esc(o.name)}</span>
           ${badgeHtml}
-          <div class="owner-card-stats">
-            <div class="owner-card-stat">
-              <div class="owner-card-stat-value">${o.health.current.active}</div>
-              <div class="owner-card-stat-label">Active</div>
-            </div>
-            <div class="owner-card-stat">
-              <div class="owner-card-stat-value">${o.health.current.productionLW}</div>
-              <div class="owner-card-stat-label">Prod</div>
-            </div>
-          </div>
           <span class="owner-card-arrow">→</span>
         </div>`;
     }).join('');

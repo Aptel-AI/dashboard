@@ -264,11 +264,11 @@ input, select, textarea { font-family: inherit; }
 /* Owners Grid (directory layout) */
 .owners-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 10px;
 }
 
-/* Owner Card (compact directory style) */
+/* Owner Card (clean directory style) */
 .owner-card {
   background: var(--white);
   border-radius: var(--radius);
@@ -280,7 +280,6 @@ input, select, textarea { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
 }
 .owner-card:hover {
   box-shadow: var(--shadow-md);
@@ -289,13 +288,13 @@ input, select, textarea { font-family: inherit; }
 }
 .owner-card-name {
   font-size: 15px; font-weight: 700; color: var(--gray-800);
-  min-width: 80px;
+  flex: 1;
+  min-width: 0;
 }
 .owner-card-arrow {
   font-size: 16px; color: var(--gray-300);
   transition: color var(--transition);
   flex-shrink: 0;
-  margin-left: auto;
 }
 .owner-card:hover .owner-card-arrow { color: var(--teal); }
 
