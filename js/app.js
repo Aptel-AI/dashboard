@@ -77,6 +77,7 @@ const App = {
         if (session.officeConfig.officeName) OFFICE_CONFIG.officeName = session.officeConfig.officeName;
         if (session.officeConfig.logoUrl) OFFICE_CONFIG.logoUrl = session.officeConfig.logoUrl;
         if (session.officeConfig.logoIconUrl) OFFICE_CONFIG.logoIconUrl = session.officeConfig.logoIconUrl;
+        if (session.officeConfig.discordWebhookUrl) OFFICE_CONFIG.discordWebhookUrl = session.officeConfig.discordWebhookUrl;
         console.log('[Session] Restored officeConfig:', session.officeConfig.officeName || session.officeConfig.officeId);
       }
       this.state.currentRole = session.role;

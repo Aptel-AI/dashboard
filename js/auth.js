@@ -98,7 +98,8 @@ const Auth = {
         apiKey: OFFICE_CONFIG.apiKey,
         officeName: OFFICE_CONFIG.officeName,
         logoUrl: OFFICE_CONFIG.logoUrl || '',
-        logoIconUrl: OFFICE_CONFIG.logoIconUrl || ''
+        logoIconUrl: OFFICE_CONFIG.logoIconUrl || '',
+        discordWebhookUrl: OFFICE_CONFIG.discordWebhookUrl || ''
       },
       loginTime: Date.now()
     };
@@ -127,7 +128,8 @@ const Auth = {
         apiKey: OFFICE_CONFIG.apiKey,
         officeName: OFFICE_CONFIG.officeName,
         logoUrl: OFFICE_CONFIG.logoUrl || '',
-        logoIconUrl: OFFICE_CONFIG.logoIconUrl || ''
+        logoIconUrl: OFFICE_CONFIG.logoIconUrl || '',
+        discordWebhookUrl: OFFICE_CONFIG.discordWebhookUrl || ''
       },
       loginTime: Date.now(),
       source: 'admin-portal',
