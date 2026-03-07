@@ -45,7 +45,7 @@ function getOrCreateSheet(name) {
         ]);
         break;
       case OWNERS_TAB:
-        sheet.appendRow(['email', 'name', 'level', 'uplineEmail', 'phone', 'notes', 'dateAdded', 'deactivated']);
+        sheet.appendRow(['email', 'name', 'level', 'uplineEmail', 'phone', 'notes', 'dateAdded', 'deactivated', 'pinHash']);
         break;
     }
   }
@@ -160,15 +160,24 @@ function doGet(e) {
         return jsonResponse(readScoped(scopeEmail));
       }
 
-      // ── SSO validation — checks if email is a valid active admin ──
+      // ── SSO validation — checks if email is a valid admin or owner ──
       case 'validateAdminAuth': {
         var authEmail = (e.parameter.email || '').trim().toLowerCase();
         if (!authEmail) return jsonResponse({ valid: false, error: 'Email required' });
         var roster = readAdminRoster();
         var admin = roster[authEmail];
-        if (!admin) return jsonResponse({ valid: false, error: 'Admin not found' });
-        if (admin.deactivated) return jsonResponse({ valid: false, error: 'Account deactivated' });
-        return jsonResponse({ valid: true, email: admin.email, name: admin.name, role: admin.role });
+        if (admin) {
+          if (admin.deactivated) return jsonResponse({ valid: false, error: 'Account deactivated' });
+          return jsonResponse({ valid: true, email: admin.email, name: admin.name, role: admin.role, userType: 'admin' });
+        }
+        // Check _Owners
+        var owners = readOwners();
+        var owner = owners[authEmail];
+        if (owner) {
+          if (owner.deactivated) return jsonResponse({ valid: false, error: 'Account deactivated' });
+          return jsonResponse({ valid: true, email: owner.email, name: owner.name, role: owner.level, userType: 'owner' });
+        }
+        return jsonResponse({ valid: false, error: 'Account not found' });
       }
 
       default:
@@ -202,49 +211,81 @@ function doPost(e) {
   try {
     switch (action) {
 
-      // ── PIN VALIDATION ──
+      // ── PIN VALIDATION (dual-source: _AdminRoster then _Owners) ──
       case 'validatePin': {
         const email = (body.email || '').trim().toLowerCase();
         const pin = (body.pin || '').toString().trim();
-        const sheet = getOrCreateSheet(ADMIN_ROSTER_TAB);
-        const found = findRowCI(sheet, 0, email);
-        if (!found) return jsonResponse({ success: false, error: 'Email not found' });
 
-        const row = found.rowData;
-        // columns: email(0), name(1), role(2), pinHash(3), dateAdded(4), deactivated(5)
-        if ((row[5] || '').toString().toUpperCase() === 'TRUE') {
-          return jsonResponse({ success: false, error: 'Account deactivated' });
+        // 1) Check _AdminRoster first
+        const adminSheet = getOrCreateSheet(ADMIN_ROSTER_TAB);
+        const adminFound = findRowCI(adminSheet, 0, email);
+        if (adminFound) {
+          const row = adminFound.rowData;
+          if ((row[5] || '').toString().toUpperCase() === 'TRUE') {
+            return jsonResponse({ success: false, error: 'Account deactivated' });
+          }
+          const storedHash = (row[3] || '').toString().trim();
+          if (!storedHash) {
+            var rawRole = (row[2] || 'a3').toString().trim();
+            var mappedRole = (rawRole === 'superadmin') ? 'a3' : rawRole;
+            return jsonResponse({ success: true, firstLogin: true, name: row[1], role: mappedRole, userType: 'admin' });
+          }
+          const inputHash = hashPin(pin);
+          if (inputHash === storedHash) {
+            var rawRole2 = (row[2] || 'a3').toString().trim();
+            var mappedRole2 = (rawRole2 === 'superadmin') ? 'a3' : rawRole2;
+            return jsonResponse({ success: true, firstLogin: false, name: row[1], role: mappedRole2, userType: 'admin' });
+          } else {
+            return jsonResponse({ success: false, error: 'Incorrect PIN' });
+          }
         }
 
-        const storedHash = (row[3] || '').toString().trim();
-        if (!storedHash) {
-          // No PIN set — first login
-          var rawRole = (row[2] || 'a3').toString().trim();
-          var mappedRole = (rawRole === 'superadmin') ? 'a3' : rawRole;
-          return jsonResponse({ success: true, firstLogin: true, name: row[1], role: mappedRole });
+        // 2) Check _Owners tab
+        const ownerSheet = getOrCreateSheet(OWNERS_TAB);
+        const ownerFound = findRowCI(ownerSheet, 0, email);
+        if (ownerFound) {
+          const oRow = ownerFound.rowData;
+          if ((oRow[7] || '').toString().toUpperCase() === 'TRUE') {
+            return jsonResponse({ success: false, error: 'Account deactivated' });
+          }
+          const oStoredHash = (oRow[8] || '').toString().trim(); // pinHash = col 8
+          if (!oStoredHash) {
+            return jsonResponse({ success: true, firstLogin: true, name: oRow[1], role: (oRow[2] || 'o1').toString().trim(), userType: 'owner' });
+          }
+          const oInputHash = hashPin(pin);
+          if (oInputHash === oStoredHash) {
+            return jsonResponse({ success: true, firstLogin: false, name: oRow[1], role: (oRow[2] || 'o1').toString().trim(), userType: 'owner' });
+          } else {
+            return jsonResponse({ success: false, error: 'Incorrect PIN' });
+          }
         }
 
-        const inputHash = hashPin(pin);
-        if (inputHash === storedHash) {
-          var rawRole2 = (row[2] || 'a3').toString().trim();
-          var mappedRole2 = (rawRole2 === 'superadmin') ? 'a3' : rawRole2;
-          return jsonResponse({ success: true, firstLogin: false, name: row[1], role: mappedRole2 });
-        } else {
-          return jsonResponse({ success: false, error: 'Incorrect PIN' });
-        }
+        return jsonResponse({ success: false, error: 'Email not found' });
       }
 
-      // ── CREATE PIN ──
+      // ── CREATE PIN (dual-source: _AdminRoster then _Owners) ──
       case 'createPin': {
         const email = (body.email || '').trim().toLowerCase();
         const pin = (body.pin || '').toString().trim();
-        const sheet = getOrCreateSheet(ADMIN_ROSTER_TAB);
-        const found = findRowCI(sheet, 0, email);
-        if (!found) return jsonResponse({ success: false, error: 'Email not found' });
-
         const hashed = hashPin(pin);
-        sheet.getRange(found.rowIndex, 4).setValue(hashed); // pinHash = col 4
-        return jsonResponse({ success: true });
+
+        // Check _AdminRoster first
+        const adminSheet2 = getOrCreateSheet(ADMIN_ROSTER_TAB);
+        const adminFound2 = findRowCI(adminSheet2, 0, email);
+        if (adminFound2) {
+          adminSheet2.getRange(adminFound2.rowIndex, 4).setValue(hashed); // pinHash = col 4
+          return jsonResponse({ success: true });
+        }
+
+        // Check _Owners
+        const ownerSheet2 = getOrCreateSheet(OWNERS_TAB);
+        const ownerFound2 = findRowCI(ownerSheet2, 0, email);
+        if (ownerFound2) {
+          ownerSheet2.getRange(ownerFound2.rowIndex, 9).setValue(hashed); // pinHash = col 9 (index 8)
+          return jsonResponse({ success: true });
+        }
+
+        return jsonResponse({ success: false, error: 'Email not found' });
       }
 
       // ── OFFICE CRUD ──
@@ -261,7 +302,7 @@ function doPost(e) {
           body.status || 'setup',
           body.ownerEmail || '',
           body.ownerName || '',
-          body.ownerLevel || 'lvl1',
+          body.ownerLevel || 'o1',
           body.logoUrl || '',
           body.logoIconUrl || '',
           body.brandColors || '',
@@ -343,7 +384,7 @@ function doPost(e) {
         sheet.appendRow([
           email,
           body.name || '',
-          body.level || 'lvl1',
+          body.level || 'o1',
           (body.uplineEmail || '').trim().toLowerCase(),
           body.phone || '',
           body.notes || '',
@@ -427,12 +468,13 @@ function readOwners() {
     owners[email] = {
       email: email,
       name: (data[i][1] || '').toString().trim(),
-      level: (data[i][2] || 'lvl1').toString().trim(),
+      level: (data[i][2] || 'o1').toString().trim(),
       uplineEmail: (data[i][3] || '').toString().trim().toLowerCase(),
       phone: (data[i][4] || '').toString().trim(),
       notes: (data[i][5] || '').toString().trim(),
       dateAdded: (data[i][6] || '').toString(),
-      deactivated: (data[i][7] || '').toString().toUpperCase() === 'TRUE'
+      deactivated: (data[i][7] || '').toString().toUpperCase() === 'TRUE',
+      hasPinSet: !!(data[i][8] || '').toString().trim()
     };
   }
   return owners;
@@ -456,7 +498,7 @@ function readOffices() {
       status: (data[i][6] || 'setup').toString().trim(),
       ownerEmail: (data[i][7] || '').toString().trim().toLowerCase(),
       ownerName: (data[i][8] || '').toString().trim(),
-      ownerLevel: (data[i][9] || 'lvl1').toString().trim(),
+      ownerLevel: (data[i][9] || 'o1').toString().trim(),
       logoUrl: (data[i][10] || '').toString().trim(),
       logoIconUrl: (data[i][11] || '').toString().trim(),
       brandColors: (data[i][12] || '').toString().trim(),
@@ -536,7 +578,39 @@ function readOfficesBasicScoped(adminEmail) {
 function readScoped(email) {
   var roster = readAdminRoster();
   var admin = roster[email];
-  if (!admin) return { error: 'Admin not found' };
+
+  // If not in _AdminRoster, check _Owners tab
+  if (!admin) {
+    var allOwners = readOwners();
+    var owner = allOwners[email];
+    if (!owner) return { error: 'Account not found' };
+    if (owner.deactivated) return { error: 'Account deactivated' };
+
+    var allOffices = readOffices();
+    var ownerRole = owner.level || 'o1';
+
+    // Owner sees only offices where they are the owner
+    var ownerOffices = allOffices.filter(function(o) {
+      return (o.ownerEmail || '').toLowerCase() === email;
+    });
+
+    // For o2+ owners, also include offices owned by their downline
+    if (ownerRole === 'o2' || ownerRole === 'o3' || ownerRole === 'o4') {
+      var downline = getDownlineEmails(email, allOwners);
+      ownerOffices = allOffices.filter(function(o) {
+        var oe = (o.ownerEmail || '').toLowerCase();
+        return oe === email || downline[oe];
+      });
+    }
+
+    return {
+      offices: ownerOffices,
+      owners: {},
+      adminRoster: {},
+      role: ownerRole,
+      userType: 'owner'
+    };
+  }
 
   var allOffices = readOffices();
   var allOwners = readOwners();
@@ -547,7 +621,8 @@ function readScoped(email) {
       adminRoster: roster,
       offices: allOffices,
       owners: allOwners,
-      role: 'a3'
+      role: 'a3',
+      userType: 'admin'
     };
   }
 
@@ -589,6 +664,7 @@ function readScoped(email) {
       offices: scopedOffices,
       owners: scopedOwners,
       role: 'a2',
+      userType: 'admin',
       assignedOwner: ownerEmail
     };
   }
@@ -618,7 +694,8 @@ function readScoped(email) {
       adminRoster: scopedAdmins1,
       offices: scopedOffices1,
       owners: {},
-      role: 'a1'
+      role: 'a1',
+      userType: 'admin'
     };
   }
 

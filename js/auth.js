@@ -99,8 +99,10 @@ const Auth = {
   // Create session from admin portal SSO token (bypasses PIN login)
   createAdminSSOSession(adminAuth) {
     // Map admin portal roles to office dashboard roles
-    const roleMap = { a1: 'admin', a2: 'admin', a3: 'superadmin' };
-    const officeRole = roleMap[adminAuth.role] || 'admin';
+    // Admins: a1/a2 → admin, a3 → superadmin
+    // Owners: o1/o2/o3/o4 → owner
+    const roleMap = { a1: 'admin', a2: 'admin', a3: 'superadmin', o1: 'owner', o2: 'owner', o3: 'owner', o4: 'owner' };
+    const officeRole = roleMap[adminAuth.role] || (adminAuth.userType === 'owner' ? 'owner' : 'admin');
 
     const session = {
       email: adminAuth.email,
@@ -111,6 +113,7 @@ const Auth = {
       loginTime: Date.now(),
       source: 'admin-portal',
       adminRole: adminAuth.role,
+      userType: adminAuth.userType || 'admin',
       assignedOffices: adminAuth.assignedOffices || '',
       assignedOwner: adminAuth.assignedOwner || ''
     };

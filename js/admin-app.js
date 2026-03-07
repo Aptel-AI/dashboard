@@ -10,6 +10,7 @@ const AdminApp = {
     currentEmail: '',
     currentName: '',
     currentRole: 'a3',
+    userType: 'admin',  // 'admin' or 'owner'
     assignedOwner: '',
     assignedOffices: '',
     owners: {},
@@ -29,6 +30,7 @@ const AdminApp = {
       this.state.currentEmail = session.email;
       this.state.currentName = session.name;
       this.state.currentRole = session.role || 'a3';
+      this.state.userType = session.userType || 'admin';
       await this.loadData();
       return;
     }
@@ -54,8 +56,8 @@ const AdminApp = {
     } catch (_) { return null; }
   },
 
-  saveSession(email, name, role) {
-    const session = { email, name, role, loginTime: Date.now() };
+  saveSession(email, name, role, userType) {
+    const session = { email, name, role, userType: userType || 'admin', loginTime: Date.now() };
     localStorage.setItem(ADMIN_CONFIG.sessionKey, JSON.stringify(session));
     return session;
   },
@@ -140,6 +142,7 @@ const AdminApp = {
       }
 
       this._loginEmail = email;
+      this._loginUserType = resp.userType || 'admin';
 
       if (resp.firstLogin) {
         this._loginName = resp.name;
@@ -301,10 +304,12 @@ const AdminApp = {
   },
 
   async _completeLogin() {
-    this.saveSession(this._loginEmail, this._loginName, this._loginRole);
+    const userType = this._loginUserType || 'admin';
+    this.saveSession(this._loginEmail, this._loginName, this._loginRole, userType);
     this.state.currentEmail = this._loginEmail;
     this.state.currentName = this._loginName;
     this.state.currentRole = this._loginRole || 'a3';
+    this.state.userType = userType;
 
     const loginScreen = document.getElementById('login-screen');
     if (loginScreen) loginScreen.style.display = 'none';
@@ -317,6 +322,7 @@ const AdminApp = {
     this.state.currentEmail = '';
     this.state.currentName = '';
     this.state.currentRole = 'a3';
+    this.state.userType = 'admin';
     this.state.assignedOwner = '';
     this.state.assignedOffices = '';
     this.state.adminRoster = {};
@@ -353,9 +359,12 @@ const AdminApp = {
       // Update role + scope from server response (authoritative)
       if (data.role) {
         this.state.currentRole = data.role;
-        // Update session with server-confirmed role
-        this.saveSession(this.state.currentEmail, this.state.currentName, data.role);
       }
+      if (data.userType) {
+        this.state.userType = data.userType;
+      }
+      // Update session with server-confirmed role + userType
+      this.saveSession(this.state.currentEmail, this.state.currentName, this.state.currentRole, this.state.userType);
       if (data.assignedOwner !== undefined) this.state.assignedOwner = data.assignedOwner;
       if (data.assignedOffices !== undefined) this.state.assignedOffices = data.assignedOffices;
 
@@ -390,8 +399,13 @@ const AdminApp = {
     const roleEl = document.getElementById('sidebar-user-role');
     if (nameEl) nameEl.textContent = this.state.currentName || this.state.currentEmail;
 
-    const roleCfg = ADMIN_CONFIG.adminRoles[this.state.currentRole];
-    if (roleEl) roleEl.textContent = roleCfg ? roleCfg.label : 'Admin';
+    if (this.state.userType === 'owner') {
+      const ownerCfg = ADMIN_CONFIG.ownerLevels[this.state.currentRole];
+      if (roleEl) roleEl.textContent = ownerCfg ? ownerCfg.label : 'Owner';
+    } else {
+      const roleCfg = ADMIN_CONFIG.adminRoles[this.state.currentRole];
+      if (roleEl) roleEl.textContent = roleCfg ? roleCfg.label : 'Admin';
+    }
 
     // Apply RBAC sidebar visibility
     this._applyRBACSidebar();
@@ -406,6 +420,7 @@ const AdminApp = {
 
   _applyRBACSidebar() {
     const role = this.state.currentRole;
+    const userType = this.state.userType;
     const links = {
       offices: document.querySelector('.sidebar-link[data-page="offices"]'),
       owners: document.querySelector('.sidebar-link[data-page="owners"]'),
@@ -413,11 +428,19 @@ const AdminApp = {
       settings: document.querySelector('.sidebar-link[data-page="settings"]')
     };
 
-    // a1: Offices + People only
-    // a2: Offices + Owners + People
-    // a3: All 4 tabs
-    if (links.owners) links.owners.style.display = (role === 'a1') ? 'none' : '';
-    if (links.settings) links.settings.style.display = (role === 'a3') ? '' : 'none';
+    if (userType === 'owner') {
+      // Owners: Offices only
+      if (links.owners) links.owners.style.display = 'none';
+      if (links.people) links.people.style.display = 'none';
+      if (links.settings) links.settings.style.display = 'none';
+    } else {
+      // a1: Offices + People only
+      // a2: Offices + Owners + People
+      // a3: All 4 tabs
+      if (links.owners) links.owners.style.display = (role === 'a1') ? 'none' : '';
+      if (links.people) links.people.style.display = '';
+      if (links.settings) links.settings.style.display = (role === 'a3') ? '' : 'none';
+    }
   },
 
   _roleRank() {
@@ -461,10 +484,16 @@ const AdminApp = {
 
   navTo(page) {
     const role = this.state.currentRole;
+    const userType = this.state.userType;
 
-    // RBAC guards — redirect to allowed page if unauthorized
-    if (page === 'owners' && role === 'a1') page = 'offices';
-    if (page === 'settings' && role !== 'a3') page = 'offices';
+    // RBAC guards — owners can only see offices
+    if (userType === 'owner' && page !== 'offices') page = 'offices';
+
+    // Admin RBAC guards
+    if (userType === 'admin') {
+      if (page === 'owners' && role === 'a1') page = 'offices';
+      if (page === 'settings' && role !== 'a3') page = 'offices';
+    }
 
     this.state.currentPage = page;
 
@@ -483,11 +512,14 @@ const AdminApp = {
     switch (page) {
       case 'offices': {
         let visibleOffices = this.state.offices;
-        if (role === 'a1' && this.state.assignedOffices) {
+        if (userType === 'owner') {
+          // Server already scopes offices for owners, but double-check client-side
+          // (owner sees their own offices + downline offices if o2+)
+        } else if (role === 'a1' && this.state.assignedOffices) {
           const allowed = new Set(this.state.assignedOffices.split(','));
           visibleOffices = this.state.offices.filter(o => allowed.has(o.officeId));
         }
-        AdminRender.renderOffices(visibleOffices, role);
+        AdminRender.renderOffices(visibleOffices, role, userType);
         break;
       }
       case 'owners':
@@ -535,9 +567,19 @@ const AdminApp = {
     const sheetId = document.getElementById('office-sheet-id')?.value?.trim();
     const appsScriptUrl = document.getElementById('office-script-url')?.value?.trim();
     const apiKey = document.getElementById('office-api-key')?.value?.trim();
-    const ownerEmail = document.getElementById('office-owner-email')?.value?.trim();
-    const ownerName = document.getElementById('office-owner-name')?.value?.trim();
-    const ownerLevel = document.getElementById('office-owner-level')?.value;
+
+    // Owner comes from dropdown linked to _Owners tab
+    const ownerSelect = document.getElementById('office-owner-select');
+    const selectedOwnerEmail = ownerSelect?.value || '';
+    let ownerEmail = selectedOwnerEmail;
+    let ownerName = '';
+    let ownerLevel = 'o1';
+    if (selectedOwnerEmail && this.state.owners[selectedOwnerEmail]) {
+      const ownerData = this.state.owners[selectedOwnerEmail];
+      ownerName = ownerData.name;
+      ownerLevel = ownerData.level;
+    }
+
     const logoUrl = document.getElementById('office-logo-url')?.value?.trim();
     const logoIconUrl = document.getElementById('office-logo-icon-url')?.value?.trim();
     const status = document.getElementById('office-status')?.value;
@@ -628,6 +670,7 @@ const AdminApp = {
       email: this.state.currentEmail,
       name: this.state.currentName,
       role: this.state.currentRole,
+      userType: this.state.userType,
       source: 'admin-portal',
       timestamp: Date.now(),
       assignedOffices: this.state.assignedOffices,

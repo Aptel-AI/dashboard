@@ -30,12 +30,12 @@ const ADMIN_CONFIG = {
     'a3': { label: 'Super Admin', rank: 3, description: 'Full platform access' }
   },
 
-  // Owner levels — hierarchy for office owners
+  // Owner levels — hierarchy for office owners (o1-o4)
   ownerLevels: {
-    'lvl1': { label: 'Owner',                rank: 1 },
-    'lvl2': { label: 'Promoting Owner',      rank: 2 },
-    'lvl3': { label: 'Regional Consultant',  rank: 3 },
-    'lvl4': { label: 'National Consultant',  rank: 4 }
+    'o1': { label: 'Owner',                rank: 1 },
+    'o2': { label: 'Promoting Owner',      rank: 2 },
+    'o3': { label: 'Regional Consultant',  rank: 3 },
+    'o4': { label: 'National Consultant',  rank: 4 }
   },
 
   // Template types available for offices

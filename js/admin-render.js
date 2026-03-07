@@ -8,11 +8,12 @@ const AdminRender = {
   // OFFICES PAGE
   // ═══════════════════════════════════════════════════════
 
-  renderOffices(offices, role) {
+  renderOffices(offices, role, userType) {
     const grid = document.getElementById('offices-grid');
     if (!grid) return;
 
-    const isA3 = role === 'a3';
+    const isA3 = role === 'a3' && userType !== 'owner';
+    const isOwner = userType === 'owner';
     let html = '';
 
     // Office cards
@@ -40,6 +41,7 @@ const AdminRender = {
                 <span class="dot"></span> ${statusLabel}
               </span>
             </div>
+            ${isOwner ? '' : `
             <div class="office-card-detail">
               <span class="label">Owner</span>
               <span>${this._esc(office.ownerName || office.ownerEmail || '—')}</span>
@@ -48,17 +50,18 @@ const AdminRender = {
               <span class="label">Role</span>
               <span>${this._ownerLevelLabel(office.ownerLevel)}</span>
             </div>
+            `}
           </div>
           <div class="office-card-actions" onclick="event.stopPropagation()">
             ${isA3 ? `<button class="btn btn-secondary btn-sm" onclick="AdminApp.showEditOfficeModal('${office.officeId}')">Edit</button>` : ''}
-            <button class="btn btn-secondary btn-sm" onclick="AdminApp.openOffice('${office.officeId}')">Open Dashboard</button>
+            <button class="btn btn-${isOwner ? 'primary' : 'secondary'} btn-sm" onclick="AdminApp.openOffice('${office.officeId}')">Open Dashboard</button>
             ${isA3 ? `<button class="btn btn-danger btn-sm" onclick="AdminApp.deleteOffice('${office.officeId}')">Delete</button>` : ''}
           </div>
         </div>
       `;
     });
 
-    // Add Office card — a3 only
+    // Add Office card — a3 only (not owners)
     if (isA3) {
       html += `
         <div class="add-card" onclick="AdminApp.showAddOfficeModal()">
@@ -205,9 +208,7 @@ const AdminRender = {
     const sheetIdInput = document.getElementById('office-sheet-id');
     const scriptUrlInput = document.getElementById('office-script-url');
     const apiKeyInput = document.getElementById('office-api-key');
-    const ownerEmailInput = document.getElementById('office-owner-email');
-    const ownerNameInput = document.getElementById('office-owner-name');
-    const ownerLevelSelect = document.getElementById('office-owner-level');
+    const ownerSelect = document.getElementById('office-owner-select');
     const logoUrlInput = document.getElementById('office-logo-url');
     const logoIconUrlInput = document.getElementById('office-logo-icon-url');
     const statusSelect = document.getElementById('office-status');
@@ -245,18 +246,21 @@ const AdminRender = {
     if (sheetIdInput) sheetIdInput.value = office ? office.sheetId : '';
     if (scriptUrlInput) scriptUrlInput.value = office ? office.appsScriptUrl : '';
     if (apiKeyInput) apiKeyInput.value = office ? office.apiKey : '';
-    if (ownerEmailInput) ownerEmailInput.value = office ? office.ownerEmail : '';
-    if (ownerNameInput) ownerNameInput.value = office ? office.ownerName : '';
-    if (ownerLevelSelect) {
-      ownerLevelSelect.innerHTML = '';
-      Object.entries(ADMIN_CONFIG.ownerLevels).forEach(([key, lvl]) => {
+
+    // Populate owner dropdown from _Owners tab data
+    if (ownerSelect) {
+      ownerSelect.innerHTML = '<option value="">(No owner assigned)</option>';
+      const activeOwners = Object.values(AdminApp.state.owners).filter(o => !o.deactivated);
+      activeOwners.sort((a, b) => a.name.localeCompare(b.name));
+      activeOwners.forEach(owner => {
         const opt = document.createElement('option');
-        opt.value = key;
-        opt.textContent = lvl.label;
-        if (office && office.ownerLevel === key) opt.selected = true;
-        ownerLevelSelect.appendChild(opt);
+        opt.value = owner.email;
+        opt.textContent = `${owner.name || owner.email} (${this._ownerLevelLabel(owner.level)})`;
+        if (office && (office.ownerEmail || '').toLowerCase() === owner.email) opt.selected = true;
+        ownerSelect.appendChild(opt);
       });
     }
+
     if (logoUrlInput) logoUrlInput.value = office ? office.logoUrl : '';
     if (logoIconUrlInput) logoIconUrlInput.value = office ? office.logoIconUrl : '';
     if (statusSelect) statusSelect.value = office ? office.status : 'setup';
@@ -507,6 +511,20 @@ const AdminRender = {
 
     if (phoneInput) phoneInput.value = owner ? owner.phone : '';
     if (notesInput) notesInput.value = owner ? owner.notes : '';
+
+    // Show PIN status for existing owners
+    const pinStatusEl = document.getElementById('owner-pin-status');
+    if (pinStatusEl) {
+      if (owner) {
+        const pinSet = owner.hasPinSet;
+        pinStatusEl.innerHTML = `<span style="font-size:13px;color:${pinSet ? 'var(--green)' : 'var(--gray-400)'}">
+          ${pinSet ? '&#10003; PIN set — can log in' : '&#9679; No PIN — hasn\'t logged in yet'}
+        </span>`;
+        pinStatusEl.style.display = 'block';
+      } else {
+        pinStatusEl.style.display = 'none';
+      }
+    }
   },
 
 

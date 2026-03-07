@@ -183,18 +183,11 @@
     </div>
 
     <div class="form-group">
-      <label for="office-owner-email">Owner Email</label>
-      <input id="office-owner-email" type="email" placeholder="owner@company.com">
-    </div>
-
-    <div class="form-group">
-      <label for="office-owner-name">Owner Name</label>
-      <input id="office-owner-name" type="text" placeholder="Owner's display name">
-    </div>
-
-    <div class="form-group">
-      <label for="office-owner-level">Owner Level</label>
-      <select id="office-owner-level"></select>
+      <label for="office-owner-select">Office Owner</label>
+      <select id="office-owner-select">
+        <!-- Populated dynamically from _Owners tab -->
+      </select>
+      <div class="hint">Select from the Owners tab. Add new owners in the Owners page first.</div>
     </div>
 
     <div class="form-group">
@@ -313,6 +306,8 @@
       <label for="owner-notes">Notes</label>
       <textarea id="owner-notes" rows="3" placeholder="(optional)" style="width:100%;padding:10px 14px;border:1px solid var(--gray-200);border-radius:var(--radius);font-family:inherit;font-size:14px;resize:vertical"></textarea>
     </div>
+
+    <div id="owner-pin-status" style="display:none;padding:8px 0"></div>
 
     <div id="owner-modal-error" class="login-error" style="text-align:left"></div>
 

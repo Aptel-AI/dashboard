@@ -1326,6 +1326,7 @@ function doPost(e) {
       case 'createOfficeTabs':     result = createOfficeTabs(body, ss); break;
       // One-time migration: old tabs → new per-office tabs
       case 'migrateFromLegacy':    result = migrateFromLegacy(ss, officeId); break;
+      case 'migrateFromExternal': result = migrateFromExternal(body, ss); break;
       default: result = { error: 'unknown action: ' + body.action };
     }
     return jsonResponse(result);
@@ -2219,6 +2220,226 @@ function migrateFromLegacy(ss, officeId) {
   });
 
   // ── Step 3: Summary ──
+  var salesFinal = ss.getSheetByName(salesTabName);
+  var rosterFinal = ss.getSheetByName(officeTab(TAB.ROSTER, officeId));
+
+  var summary = {
+    success: true,
+    officeId: officeId,
+    salesRows: salesFinal ? salesFinal.getLastRow() - 1 : 0,
+    rosterRows: rosterFinal ? rosterFinal.getLastRow() - 1 : 0,
+    log: log
+  };
+
+  log.push('[Migration] Complete! Sales: ' + summary.salesRows + ', Roster: ' + summary.rosterRows);
+  Logger.log(log.join('\n'));
+
+  return summary;
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// migrateFromExternal — Import sales data from a DIFFERENT Google Sheet
+// ═══════════════════════════════════════════════════════════════
+//
+// Called via doPost: action='migrateFromExternal'
+// Required body params:
+//   sourceSheetId  — Google Sheet ID of the external source (e.g. Ignite)
+//   officeId       — target office ID (e.g. 'off_002')
+// Optional body params:
+//   sourceTabName  — name of Order Log tab in source (default 'Order Log')
+//
+// Maps external 38-column Ignite format → new 30-column _Sales schema.
+// Creates all 7 per-office tabs in the target campaign sheet.
+// Copies _Roster and _Teams data if they exist in source.
+
+function migrateFromExternal(body, ss) {
+  var sourceSheetId = body.sourceSheetId;
+  var officeId = body.officeId;
+  var sourceTabName = body.sourceTabName || 'Order Log';
+
+  if (!sourceSheetId) return { error: 'Missing sourceSheetId' };
+  if (!officeId) return { error: 'Missing officeId' };
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var log = [];
+  log.push('[Migration] External migration: source=' + sourceSheetId + ', target officeId=' + officeId);
+
+  // Open source spreadsheet
+  var sourceSS;
+  try {
+    sourceSS = SpreadsheetApp.openById(sourceSheetId);
+  } catch (e) {
+    return { error: 'Cannot open source sheet: ' + e.message };
+  }
+
+  // ── Step 1: Migrate Order Log → _Sales_{officeId} ──
+  var sourceOL = sourceSS.getSheetByName(sourceTabName);
+  if (!sourceOL) return { error: 'Source tab "' + sourceTabName + '" not found' };
+
+  var salesTabName = officeTab(TAB.SALES, officeId);
+  var salesSheet = getOrCreateSheet(ss, salesTabName, TAB.SALES);
+
+  var sourceData = sourceOL.getDataRange().getValues();
+  var sourceRowCount = sourceData.length - 1;
+  log.push('[Migration] Source Order Log: ' + sourceRowCount + ' data rows');
+
+  if (sourceRowCount > 0) {
+    // Ignite source column indices (0-based, 38 columns A–AL)
+    var IGN = {
+      PRODUCTION_POST: 0,
+      TIMESTAMP: 1,
+      EMAIL: 2,
+      DATE_OF_SALE: 3,
+      REP_NAME: 4,
+      TRAINEE: 5,           // "Did you train someone?" Yes/No
+      TRAINEE_NAME: 6,
+      CAMPAIGN: 7,           // "Which Campaign?" e.g. "AT&T: B2B", "Ooma"
+      DSI: 8,
+      ACCOUNT_NOTES: 9,
+      ACCOUNT_TYPE: 10,      // "Type of Account" Consumer/Business
+      AIR_SOLD: 11,          // "Was Internet Air Sold?" Yes/No
+      WIRELESS_SOLD: 12,     // "Were Wireless Lines Sold?" Yes/No
+      NEW_PHONES: 13,        // Quantity of New Phones
+      BYODS: 14,             // Quantity of BYODs
+      FIBER_SOLD: 15,        // "Was Fiber Optic Internet Sold?" Yes/No
+      FIBER_PACKAGE: 16,     // "Which Package Was Sold?"
+      INSTALL_DATE: 17,
+      VOIP_SOLD: 18,         // "Were VoIP Lines Sold?" Yes/No
+      VOIP_QTY: 19,          // Quantity Sold (VoIP)
+      DTV_SOLD: 20,          // "Was DIRECTV Sold?" Yes/No
+      DTV_PACKAGE: 21,       // Package Sold (DTV)
+      CLIENT_NAME: 22,
+      OOMA_PACKAGE: 23,      // Which Ooma package?
+      // 24-29: computed/display columns (not used)
+      FIBER_COUNTER: 30,     // 0/1
+      AIR_COUNTER: 31,       // 0/1
+      DTV_COUNTER: 32,       // 0/1
+      YES_COUNTER: 33,       // total yeses
+      NUM_LINES: 34,         // # of wireless lines
+      VOIP_COUNTER: 35,      // VoIP qty (may equal VOIP_QTY)
+      UNITS: 36,             // total units
+      UNITS_TODAY: 37        // units for today (not migrated)
+    };
+
+    var newRows = [];
+    for (var i = 1; i < sourceData.length; i++) {
+      var src = sourceData[i];
+      var email = String(src[IGN.EMAIL] || '').trim();
+      if (!email) continue;  // skip blank rows
+
+      // Normalize campaign: "AT&T: B2B" / "AT&T B2B" → "attb2b", "Ooma" → "ooma"
+      var rawCampaign = String(src[IGN.CAMPAIGN] || '').trim().toLowerCase();
+      var campaign = 'attb2b';
+      if (rawCampaign.indexOf('ooma') >= 0) campaign = 'ooma';
+
+      var newPhones = Number(src[IGN.NEW_PHONES]) || 0;
+      var byods = Number(src[IGN.BYODS]) || 0;
+      var cell = newPhones + byods;
+
+      // Use counter columns for binary flags (0/1)
+      var air = Number(src[IGN.AIR_COUNTER]) || 0;
+      var fiber = Number(src[IGN.FIBER_COUNTER]) || 0;
+      var dtv = Number(src[IGN.DTV_COUNTER]) || 0;
+      var voipQty = Number(src[IGN.VOIP_COUNTER]) || Number(src[IGN.VOIP_QTY]) || 0;
+
+      newRows.push([
+        src[IGN.TIMESTAMP] || '',                                  // 0  Timestamp
+        email.toLowerCase(),                                        // 1  Email
+        String(src[IGN.REP_NAME] || '').trim(),                    // 2  Rep Name
+        src[IGN.DATE_OF_SALE] || '',                               // 3  Date of Sale
+        campaign,                                                   // 4  Campaign
+        String(src[IGN.DSI] || '').trim(),                         // 5  DSI
+        String(src[IGN.ACCOUNT_TYPE] || '').trim(),                // 6  Account Type
+        String(src[IGN.CLIENT_NAME] || '').trim(),                 // 7  Client Name
+        String(src[IGN.TRAINEE] || '').trim(),                     // 8  Trainee
+        String(src[IGN.TRAINEE_NAME] || '').trim(),                // 9  Trainee Name
+        air,                                                        // 10 Air
+        newPhones,                                                  // 11 New Phones
+        byods,                                                      // 12 BYODs
+        cell,                                                       // 13 Cell
+        fiber,                                                      // 14 Fiber
+        String(src[IGN.FIBER_PACKAGE] || '').trim(),               // 15 Fiber Package
+        src[IGN.INSTALL_DATE] || '',                                // 16 Install Date
+        voipQty,                                                    // 17 VoIP Qty
+        dtv,                                                        // 18 DTV
+        String(src[IGN.DTV_PACKAGE] || '').trim(),                 // 19 DTV Package
+        String(src[IGN.OOMA_PACKAGE] || '').trim(),                // 20 Ooma Package
+        String(src[IGN.ACCOUNT_NOTES] || '').trim(),               // 21 Account Notes
+        '',                                                         // 22 Activation Support
+        '',                                                         // 23 Team Emoji
+        Number(src[IGN.YES_COUNTER]) || 0,                         // 24 Yeses
+        Number(src[IGN.UNITS]) || 0,                               // 25 Units
+        'Pending',                                                  // 26 Status
+        '',                                                         // 27 Notes
+        '',                                                         // 28 Paid Out
+        '[]'                                                        // 29 Tickets
+      ]);
+    }
+
+    if (newRows.length > 0) {
+      // Clear any existing data in target (keep header), then write
+      if (salesSheet.getLastRow() > 1) {
+        salesSheet.getRange(2, 1, salesSheet.getLastRow() - 1, 30).clearContent();
+      }
+      salesSheet.getRange(2, 1, newRows.length, 30).setValues(newRows);
+      log.push('[Migration] Wrote ' + newRows.length + ' orders to ' + salesTabName);
+    } else {
+      log.push('[Migration] No valid rows found in source Order Log');
+    }
+  }
+
+  // ── Step 2: Copy _Roster → _Roster_{officeId} ──
+  var sourceRoster = sourceSS.getSheetByName('_Roster');
+  if (sourceRoster) {
+    var rosterTabName = officeTab(TAB.ROSTER, officeId);
+    var rosterSheet = getOrCreateSheet(ss, rosterTabName, TAB.ROSTER);
+
+    var rosterData = sourceRoster.getDataRange().getValues();
+    if (rosterData.length > 1) {
+      var rosterRows = rosterData.slice(1);
+      var rosterCols = rosterRows[0].length;
+      if (rosterSheet.getLastRow() > 1) {
+        rosterSheet.getRange(2, 1, rosterSheet.getLastRow() - 1, rosterCols).clearContent();
+      }
+      rosterSheet.getRange(2, 1, rosterRows.length, rosterCols).setValues(rosterRows);
+      log.push('[Migration] Copied ' + rosterRows.length + ' roster rows to ' + rosterTabName);
+    } else {
+      log.push('[Migration] Source _Roster has no data rows');
+    }
+  } else {
+    log.push('[Migration] No _Roster tab in source — creating empty ' + officeTab(TAB.ROSTER, officeId));
+    getOrCreateSheet(ss, officeTab(TAB.ROSTER, officeId), TAB.ROSTER);
+  }
+
+  // ── Step 3: Copy _Teams if exists ──
+  var sourceTeams = sourceSS.getSheetByName('_Teams');
+  if (sourceTeams) {
+    var teamsTabName = officeTab(TAB.TEAMS, officeId);
+    var teamsSheet = getOrCreateSheet(ss, teamsTabName, TAB.TEAMS);
+
+    var teamsData = sourceTeams.getDataRange().getValues();
+    if (teamsData.length > 1) {
+      var teamsRows = teamsData.slice(1);
+      var teamsCols = teamsRows[0].length;
+      if (teamsSheet.getLastRow() > 1) {
+        teamsSheet.getRange(2, 1, teamsSheet.getLastRow() - 1, teamsCols).clearContent();
+      }
+      teamsSheet.getRange(2, 1, teamsRows.length, teamsCols).setValues(teamsRows);
+      log.push('[Migration] Copied ' + teamsRows.length + ' teams to ' + teamsTabName);
+    }
+  } else {
+    log.push('[Migration] No _Teams tab in source — creating empty ' + officeTab(TAB.TEAMS, officeId));
+    getOrCreateSheet(ss, officeTab(TAB.TEAMS, officeId), TAB.TEAMS);
+  }
+
+  // ── Step 4: Create remaining empty tabs ──
+  [TAB.TEAM_CUSTOM, TAB.OVERRIDES, TAB.UNLOCKS, TAB.SETTINGS].forEach(function(base) {
+    getOrCreateSheet(ss, officeTab(base, officeId), base);
+    log.push('[Migration] Ensured tab: ' + officeTab(base, officeId));
+  });
+
+  // ── Step 5: Summary ──
   var salesFinal = ss.getSheetByName(salesTabName);
   var rosterFinal = ss.getSheetByName(officeTab(TAB.ROSTER, officeId));
 
