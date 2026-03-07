@@ -2257,6 +2257,7 @@ function migrateFromExternal(body, ss) {
   var sourceSheetId = body.sourceSheetId;
   var officeId = body.officeId;
   var sourceTabName = body.sourceTabName || 'Order Log';
+  var salesOnly = body.salesOnly || false;  // if true, skip roster/teams (preserve existing)
 
   if (!sourceSheetId) return { error: 'Missing sourceSheetId' };
   if (!officeId) return { error: 'Missing officeId' };
@@ -2389,48 +2390,56 @@ function migrateFromExternal(body, ss) {
     }
   }
 
-  // ── Step 2: Copy _Roster → _Roster_{officeId} ──
-  var sourceRoster = sourceSS.getSheetByName('_Roster');
-  if (sourceRoster) {
-    var rosterTabName = officeTab(TAB.ROSTER, officeId);
-    var rosterSheet = getOrCreateSheet(ss, rosterTabName, TAB.ROSTER);
+  // ── Step 2: Copy _Roster → _Roster_{officeId} (skip if salesOnly) ──
+  if (!salesOnly) {
+    var sourceRoster = sourceSS.getSheetByName('_Roster');
+    if (sourceRoster) {
+      var rosterTabName = officeTab(TAB.ROSTER, officeId);
+      var rosterSheet = getOrCreateSheet(ss, rosterTabName, TAB.ROSTER);
 
-    var rosterData = sourceRoster.getDataRange().getValues();
-    if (rosterData.length > 1) {
-      var rosterRows = rosterData.slice(1);
-      var rosterCols = rosterRows[0].length;
-      if (rosterSheet.getLastRow() > 1) {
-        rosterSheet.getRange(2, 1, rosterSheet.getLastRow() - 1, rosterCols).clearContent();
+      var rosterData = sourceRoster.getDataRange().getValues();
+      if (rosterData.length > 1) {
+        var rosterRows = rosterData.slice(1);
+        var rosterCols = rosterRows[0].length;
+        if (rosterSheet.getLastRow() > 1) {
+          rosterSheet.getRange(2, 1, rosterSheet.getLastRow() - 1, rosterCols).clearContent();
+        }
+        rosterSheet.getRange(2, 1, rosterRows.length, rosterCols).setValues(rosterRows);
+        log.push('[Migration] Copied ' + rosterRows.length + ' roster rows to ' + rosterTabName);
+      } else {
+        log.push('[Migration] Source _Roster has no data rows');
       }
-      rosterSheet.getRange(2, 1, rosterRows.length, rosterCols).setValues(rosterRows);
-      log.push('[Migration] Copied ' + rosterRows.length + ' roster rows to ' + rosterTabName);
     } else {
-      log.push('[Migration] Source _Roster has no data rows');
+      log.push('[Migration] No _Roster tab in source — creating empty ' + officeTab(TAB.ROSTER, officeId));
+      getOrCreateSheet(ss, officeTab(TAB.ROSTER, officeId), TAB.ROSTER);
     }
   } else {
-    log.push('[Migration] No _Roster tab in source — creating empty ' + officeTab(TAB.ROSTER, officeId));
-    getOrCreateSheet(ss, officeTab(TAB.ROSTER, officeId), TAB.ROSTER);
+    log.push('[Migration] salesOnly=true — skipping roster (preserving existing)');
   }
 
-  // ── Step 3: Copy _Teams if exists ──
-  var sourceTeams = sourceSS.getSheetByName('_Teams');
-  if (sourceTeams) {
-    var teamsTabName = officeTab(TAB.TEAMS, officeId);
-    var teamsSheet = getOrCreateSheet(ss, teamsTabName, TAB.TEAMS);
+  // ── Step 3: Copy _Teams if exists (skip if salesOnly) ──
+  if (!salesOnly) {
+    var sourceTeams = sourceSS.getSheetByName('_Teams');
+    if (sourceTeams) {
+      var teamsTabName = officeTab(TAB.TEAMS, officeId);
+      var teamsSheet = getOrCreateSheet(ss, teamsTabName, TAB.TEAMS);
 
-    var teamsData = sourceTeams.getDataRange().getValues();
-    if (teamsData.length > 1) {
-      var teamsRows = teamsData.slice(1);
-      var teamsCols = teamsRows[0].length;
-      if (teamsSheet.getLastRow() > 1) {
-        teamsSheet.getRange(2, 1, teamsSheet.getLastRow() - 1, teamsCols).clearContent();
+      var teamsData = sourceTeams.getDataRange().getValues();
+      if (teamsData.length > 1) {
+        var teamsRows = teamsData.slice(1);
+        var teamsCols = teamsRows[0].length;
+        if (teamsSheet.getLastRow() > 1) {
+          teamsSheet.getRange(2, 1, teamsSheet.getLastRow() - 1, teamsCols).clearContent();
+        }
+        teamsSheet.getRange(2, 1, teamsRows.length, teamsCols).setValues(teamsRows);
+        log.push('[Migration] Copied ' + teamsRows.length + ' teams to ' + teamsTabName);
       }
-      teamsSheet.getRange(2, 1, teamsRows.length, teamsCols).setValues(teamsRows);
-      log.push('[Migration] Copied ' + teamsRows.length + ' teams to ' + teamsTabName);
+    } else {
+      log.push('[Migration] No _Teams tab in source — creating empty ' + officeTab(TAB.TEAMS, officeId));
+      getOrCreateSheet(ss, officeTab(TAB.TEAMS, officeId), TAB.TEAMS);
     }
   } else {
-    log.push('[Migration] No _Teams tab in source — creating empty ' + officeTab(TAB.TEAMS, officeId));
-    getOrCreateSheet(ss, officeTab(TAB.TEAMS, officeId), TAB.TEAMS);
+    log.push('[Migration] salesOnly=true — skipping teams (preserving existing)');
   }
 
   // ── Step 4: Create remaining empty tabs ──

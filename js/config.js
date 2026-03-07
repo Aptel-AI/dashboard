@@ -134,6 +134,7 @@ const WEEK_PERIODS = new Set([7, 8, 9, 10, 11]);
       if (cfg.officeName) OFFICE_CONFIG.officeName = cfg.officeName;
       if (cfg.logoUrl) OFFICE_CONFIG.logoUrl = cfg.logoUrl;
       if (cfg.logoIconUrl) OFFICE_CONFIG.logoIconUrl = cfg.logoIconUrl;
+      if (cfg.discordWebhookUrl) OFFICE_CONFIG.discordWebhookUrl = cfg.discordWebhookUrl;
       console.log('[Multi-Office] Config overridden for:', cfg.officeName || 'Unknown office', '| officeId:', cfg.officeId || 'default');
     } catch(e) {
       // Not valid base64 JSON — treat as plain office ID (e.g. "off_002")

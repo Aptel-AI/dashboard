@@ -125,6 +125,7 @@ const App = {
         OFFICE_CONFIG.officeName = oc.name;
         if (oc.logoUrl) OFFICE_CONFIG.logoUrl = oc.logoUrl;
         if (oc.logoIconUrl) OFFICE_CONFIG.logoIconUrl = oc.logoIconUrl;
+        if (oc.discordWebhookUrl) OFFICE_CONFIG.discordWebhookUrl = oc.discordWebhookUrl;
         console.log('[Multi-Office] Resolved to:', oc.name);
       } else {
         console.warn('[Multi-Office] Office not found:', officeId, '— using defaults');

@@ -41,7 +41,7 @@ function getOrCreateSheet(name) {
         sheet.appendRow([
           'officeId', 'name', 'templateType', 'sheetId', 'appsScriptUrl',
           'apiKey', 'status', 'ownerEmail', 'ownerName', 'ownerLevel',
-          'logoUrl', 'logoIconUrl', 'brandColors', 'createdDate'
+          'logoUrl', 'logoIconUrl', 'brandColors', 'createdDate', 'discordWebhookUrl'
         ]);
         break;
       case OWNERS_TAB:
@@ -204,7 +204,8 @@ function doGet(e) {
                 appsScriptUrl: o.appsScriptUrl,
                 apiKey: o.apiKey,
                 logoUrl: o.logoUrl || '',
-                logoIconUrl: o.logoIconUrl || ''
+                logoIconUrl: o.logoIconUrl || '',
+                discordWebhookUrl: o.discordWebhookUrl || ''
               }
             });
           }
@@ -534,7 +535,8 @@ function readOffices() {
       logoUrl: (data[i][10] || '').toString().trim(),
       logoIconUrl: (data[i][11] || '').toString().trim(),
       brandColors: (data[i][12] || '').toString().trim(),
-      createdDate: (data[i][13] || '').toString()
+      createdDate: (data[i][13] || '').toString(),
+      discordWebhookUrl: (data[i][14] || '').toString().trim()
     });
   }
   return offices;

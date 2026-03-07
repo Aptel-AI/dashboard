@@ -574,7 +574,7 @@ const PostSale = {
   },
 
   // ── Submission ──
-  _WEBHOOK_URL: 'https://hook.us2.make.com/rqxy9beu6ybplh8axdq4p6euuv4mc8jj',
+  _DEFAULT_WEBHOOK_URL: 'https://hook.us2.make.com/rqxy9beu6ybplh8axdq4p6euuv4mc8jj',
 
   async submit() {
     this._collectCurrentStep();
@@ -643,15 +643,25 @@ const PostSale = {
       const emoji = this._getTeamEmoji();
       if (emoji && units > 0) msg += emoji.repeat(Math.min(units, 20));
 
-      const webhookBody = JSON.stringify({ message: msg.trim() });
+      const finalMsg = msg.trim();
+
+      // Per-office webhook URL (from _Offices tab), fallback to default Make.com webhook
+      const webhookUrl = OFFICE_CONFIG.discordWebhookUrl || this._DEFAULT_WEBHOOK_URL;
+
+      // Direct Discord webhooks use { content }, Make.com uses { message }
+      const isDiscordDirect = webhookUrl.includes('discord.com/api/webhooks');
+      const webhookBody = isDiscordDirect
+        ? JSON.stringify({ content: finalMsg })
+        : JSON.stringify({ message: finalMsg });
+
       const opts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: webhookBody };
-      fetch(this._WEBHOOK_URL, opts)
+      fetch(webhookUrl, opts)
         .then(r => { if (!r.ok) console.warn('[PostSale] Discord webhook HTTP', r.status); })
         .catch(err => {
           console.warn('[PostSale] Discord webhook failed, retrying…', err.message);
           // Retry once after 2s
           setTimeout(() => {
-            fetch(this._WEBHOOK_URL, opts)
+            fetch(webhookUrl, opts)
               .then(r => { if (!r.ok) console.warn('[PostSale] Retry HTTP', r.status); })
               .catch(e2 => console.warn('[PostSale] Retry failed:', e2.message));
           }, 2000);
