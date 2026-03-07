@@ -180,6 +180,11 @@ const NationalApp = {
     const demo = {
       'Jay T': {
         h: { active: 12, leaders: 3, training: 4 },
+        hcHist: [
+          { date: '2/17', active: 9, leaders: 2, training: 3 },
+          { date: '2/24', active: 11, leaders: 3, training: 5 },
+          { date: '3/3',  active: 12, leaders: 3, training: 4 }
+        ],
         p: { totalGoal: 22, totalActual: 18, wirelessGoal: 15, wirelessActual: 12 },
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 55,
@@ -191,6 +196,11 @@ const NationalApp = {
       },
       'Mason': {
         h: { active: 8, leaders: 2, training: 3 },
+        hcHist: [
+          { date: '2/17', active: 6, leaders: 1, training: 2 },
+          { date: '2/24', active: 7, leaders: 2, training: 3 },
+          { date: '3/3',  active: 8, leaders: 2, training: 3 }
+        ],
         p: { totalGoal: 18, totalActual: 14, wirelessGoal: 12, wirelessActual: 9 },
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 22,
@@ -202,6 +212,11 @@ const NationalApp = {
       },
       'Steven Sykes': {
         h: { active: 15, leaders: 4, training: 5 },
+        hcHist: [
+          { date: '2/17', active: 12, leaders: 3, training: 4 },
+          { date: '2/24', active: 14, leaders: 4, training: 6 },
+          { date: '3/3',  active: 15, leaders: 4, training: 5 }
+        ],
         p: { totalGoal: 28, totalActual: 24, wirelessGoal: 20, wirelessActual: 18 },
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 66,
@@ -213,6 +228,11 @@ const NationalApp = {
       },
       'Olin Salter': {
         h: { active: 6, leaders: 1, training: 3 },
+        hcHist: [
+          { date: '2/17', active: 5, leaders: 1, training: 2 },
+          { date: '2/24', active: 5, leaders: 1, training: 2 },
+          { date: '3/3',  active: 6, leaders: 1, training: 3 }
+        ],
         p: { totalGoal: 14, totalActual: 8, wirelessGoal: 10, wirelessActual: 5 },
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 44,
@@ -224,6 +244,11 @@ const NationalApp = {
       },
       'Eric Martinez': {
         h: { active: 10, leaders: 2, training: 4 },
+        hcHist: [
+          { date: '2/17', active: 8, leaders: 2, training: 3 },
+          { date: '2/24', active: 9, leaders: 2, training: 4 },
+          { date: '3/3',  active: 10, leaders: 2, training: 4 }
+        ],
         p: { totalGoal: 20, totalActual: 16, wirelessGoal: 14, wirelessActual: 11 },
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 55,
@@ -235,6 +260,11 @@ const NationalApp = {
       },
       'Natalia Gwarda': {
         h: { active: 9, leaders: 2, training: 4 },
+        hcHist: [
+          { date: '2/17', active: 7, leaders: 1, training: 3 },
+          { date: '2/24', active: 8, leaders: 2, training: 4 },
+          { date: '3/3',  active: 9, leaders: 2, training: 4 }
+        ],
         p: { totalGoal: 16, totalActual: 12, wirelessGoal: 11, wirelessActual: 8 },
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 33,
@@ -246,6 +276,11 @@ const NationalApp = {
       },
       'Nigel Gilbert': {
         h: { active: 7, leaders: 1, training: 3 },
+        hcHist: [
+          { date: '2/17', active: 6, leaders: 1, training: 2 },
+          { date: '2/24', active: 6, leaders: 1, training: 3 },
+          { date: '3/3',  active: 7, leaders: 1, training: 3 }
+        ],
         p: { totalGoal: 14, totalActual: 10, wirelessGoal: 10, wirelessActual: 6 },
         g: { totalUnits: 0, wirelessUnits: 0 },
         sc: 22,
@@ -273,6 +308,8 @@ const NationalApp = {
           leaders: h.leaders || 0,
           training: h.training || 0
         },
+        // Headcount history (week-over-week log, newest last)
+        headcountHistory: d.hcHist ? d.hcHist.map(e => ({ ...e })) : [],
         // 1-on-1 Coaching: Production Review (goal set last week vs actual from Tableau)
         production: {
           totalGoal: p.totalGoal || 0,
@@ -524,12 +561,12 @@ const NationalApp = {
       <div class="hc-grid">
         <div class="hc-field">
           <label class="hc-field-label">Active Reps</label>
-          <input type="number" class="hc-input" value="${hc.active}" min="0"
+          <input type="number" class="hc-input" id="hc-active-${ownerIdx}" value="${hc.active}" min="0"
             onchange="NationalApp._updateHeadcount(${ownerIdx}, 'active', this.value)">
         </div>
         <div class="hc-field">
           <label class="hc-field-label">Leaders</label>
-          <input type="number" class="hc-input" value="${hc.leaders}" min="0"
+          <input type="number" class="hc-input" id="hc-leaders-${ownerIdx}" value="${hc.leaders}" min="0"
             onchange="NationalApp._updateHeadcount(${ownerIdx}, 'leaders', this.value)">
         </div>
         <div class="hc-field hc-field-calc">
@@ -539,10 +576,18 @@ const NationalApp = {
         </div>
         <div class="hc-field">
           <label class="hc-field-label">In Training</label>
-          <input type="number" class="hc-input" value="${hc.training}" min="0"
+          <input type="number" class="hc-input" id="hc-training-${ownerIdx}" value="${hc.training}" min="0"
             onchange="NationalApp._updateHeadcount(${ownerIdx}, 'training', this.value)">
         </div>
+      </div>
+      <div class="hc-submit-row">
+        <button class="hc-submit-btn" id="hc-submit-${ownerIdx}"
+          onclick="NationalApp._submitHeadcount(${ownerIdx})">Submit Headcount</button>
+        <span class="hc-submit-note" id="hc-submit-note-${ownerIdx}"></span>
       </div>`;
+
+    // ── Headcount Trend Table ──
+    this._renderHeadcountTrend(owner, ownerIdx);
 
     // ── Section 2: Production Review (Goal vs Actual) ──
     const totalDelta = prod.totalActual - prod.totalGoal;
@@ -612,6 +657,87 @@ const NationalApp = {
     const dist = owner.headcount.active - owner.headcount.leaders;
     const distEl = document.getElementById('hc-dist-' + ownerIdx);
     if (distEl) distEl.textContent = dist;
+  },
+
+  // ── Submit headcount — logs a new dated row ──
+  _submitHeadcount(ownerIdx) {
+    const owner = this.state.owners[ownerIdx];
+    if (!owner) return;
+
+    const hc = owner.headcount;
+    const now = new Date();
+    const dateStr = (now.getMonth() + 1) + '/' + now.getDate();
+
+    // Push new entry
+    owner.headcountHistory.push({
+      date: dateStr,
+      active: hc.active,
+      leaders: hc.leaders,
+      training: hc.training
+    });
+
+    // Re-render the trend table
+    this._renderHeadcountTrend(owner, ownerIdx);
+
+    // Show confirmation
+    const note = document.getElementById('hc-submit-note-' + ownerIdx);
+    if (note) {
+      note.textContent = 'Submitted ' + dateStr;
+      note.classList.add('show');
+      setTimeout(() => note.classList.remove('show'), 3000);
+    }
+  },
+
+  // ── Render headcount week-over-week trend table ──
+  _renderHeadcountTrend(owner, ownerIdx) {
+    const trendEl = document.getElementById('health-hc-trend');
+    if (!trendEl) return;
+
+    const hist = owner.headcountHistory || [];
+    if (!hist.length) {
+      trendEl.style.display = 'none';
+      return;
+    }
+    trendEl.style.display = '';
+
+    trendEl.innerHTML = `
+      <div class="coaching-label">Week-over-Week Headcount</div>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th class="num">Active</th>
+              <th class="num">Leaders</th>
+              <th class="num">Dist</th>
+              <th class="num">Training</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${hist.map((r, i) => {
+              const dist = r.active - r.leaders;
+              const prev = i > 0 ? hist[i - 1] : null;
+              return `
+                <tr>
+                  <td class="bold">${this._esc(r.date)}</td>
+                  <td class="num">${r.active} ${this._trendArrow(r.active, prev?.active)}</td>
+                  <td class="num">${r.leaders} ${this._trendArrow(r.leaders, prev?.leaders)}</td>
+                  <td class="num">${dist} ${this._trendArrow(dist, prev ? prev.active - prev.leaders : null)}</td>
+                  <td class="num">${r.training} ${this._trendArrow(r.training, prev?.training)}</td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  },
+
+  // ── Trend arrow helper ──
+  _trendArrow(current, previous) {
+    if (previous === null || previous === undefined) return '';
+    const diff = current - previous;
+    if (diff > 0) return `<span class="trend-up">+${diff}</span>`;
+    if (diff < 0) return `<span class="trend-down">${diff}</span>`;
+    return '';
   },
 
   // ── Goal input handler ──
