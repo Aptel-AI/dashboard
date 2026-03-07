@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aptel National</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="references/logos/aptel-symbol-black.png" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" href="references/logos/aptel-symbol-white.png" media="(prefers-color-scheme: dark)">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/national.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     LOGIN SCREEN
+     ═══════════════════════════════════════════════════════ -->
+<div id="login-screen" class="login-screen" style="display:none">
+  <div class="login-card">
+    <div class="login-logo-wrap"><img src="references/logos/aptel-symbol-black.png" alt="Aptel"></div>
+    <div class="login-step-title">National Dashboard</div>
+    <div class="login-step-subtitle">Sign in to review your campaign</div>
+
+    <div id="login-email-wrap">
+      <input id="login-email" class="login-input" type="email" placeholder="Enter your email" autocomplete="email">
+    </div>
+
+    <div id="login-pin-wrap" style="display:none">
+      <input id="login-pin" class="login-input login-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Enter your PIN" autocomplete="off">
+    </div>
+
+    <div id="login-pin-create-wrap" style="display:none">
+      <input id="login-pin-new" class="login-input login-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Create a 4-6 digit PIN" autocomplete="off">
+      <input id="login-pin-confirm" class="login-input login-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Confirm your PIN" autocomplete="off">
+    </div>
+
+    <button id="login-btn" class="login-btn">Continue</button>
+    <div id="login-error" class="login-error"></div>
+    <div id="login-back-link" style="display:none">&larr; Use a different email</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     LOADING SCREEN
+     ═══════════════════════════════════════════════════════ -->
+<div id="loading-screen" style="display:none">
+  <img src="references/logos/aptel-full-black.png" alt="Aptel" style="height:40px;width:auto;opacity:0.85">
+  <div class="loading-spinner"></div>
+  <div id="loading-text" style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#708090">Loading campaign data...</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MAIN DASHBOARD
+     ═══════════════════════════════════════════════════════ -->
+<div id="dashboard" class="dashboard-layout" style="display:none">
+
+  <!-- TOP BAR -->
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <img src="references/logos/aptel-full-black.png" alt="Aptel" class="top-bar-logo">
+      <span class="top-bar-divider"></span>
+      <span class="top-bar-title">National Dashboard</span>
+    </div>
+    <div class="top-bar-center">
+      <div class="campaign-selector">
+        <select id="campaign-select" onchange="NationalApp.switchCampaign(this.value)">
+          <option value="att-b2b">AT&T B2B</option>
+        </select>
+      </div>
+    </div>
+    <div class="top-bar-right">
+      <span id="user-name" class="top-bar-user">—</span>
+      <button class="btn-logout" onclick="NationalApp.logout()">Sign Out</button>
+    </div>
+  </header>
+
+  <!-- CAMPAIGN OVERVIEW -->
+  <section class="campaign-overview">
+    <div class="overview-header">
+      <h1 id="campaign-title">AT&T B2B Campaign</h1>
+      <p id="campaign-subtitle">Week-over-week owner review</p>
+      <div class="overview-date" id="overview-date"></div>
+    </div>
+
+    <!-- CAMPAIGN-LEVEL KPI CARDS -->
+    <div class="kpi-row" id="campaign-kpis">
+      <div class="kpi-card">
+        <div class="kpi-label">Active Headcount</div>
+        <div class="kpi-value" id="kpi-headcount">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">1st Rounds Booked</div>
+        <div class="kpi-value" id="kpi-1st-booked">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">New Starts Scheduled</div>
+        <div class="kpi-value" id="kpi-starts">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Start Retention</div>
+        <div class="kpi-value" id="kpi-retention">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Production</div>
+        <div class="kpi-value" id="kpi-production">—</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OWNERS LIST -->
+  <section class="owners-section">
+    <div class="section-header">
+      <h2>Owners</h2>
+      <div class="section-actions">
+        <input type="text" id="owner-search" class="search-input" placeholder="Search owners..." oninput="NationalApp.filterOwners(this.value)">
+      </div>
+    </div>
+
+    <div id="owners-list" class="owners-grid">
+      <!-- Populated dynamically -->
+    </div>
+  </section>
+
+  <!-- OWNER DETAIL (shown when an owner card is clicked) -->
+  <section id="owner-detail" class="owner-detail" style="display:none">
+    <div class="detail-header">
+      <button class="btn-back" onclick="NationalApp.closeOwnerDetail()">&larr; All Owners</button>
+      <h2 id="detail-owner-name">—</h2>
+      <span class="detail-badge" id="detail-owner-badge"></span>
+    </div>
+
+    <!-- TAB NAV -->
+    <div class="detail-tabs">
+      <button class="detail-tab active" data-tab="health" onclick="NationalApp.switchDetailTab('health')">Office Health</button>
+      <button class="detail-tab" data-tab="recruiting" onclick="NationalApp.switchDetailTab('recruiting')">Recruiting</button>
+      <button class="detail-tab" data-tab="sales" onclick="NationalApp.switchDetailTab('sales')">Sales</button>
+      <button class="detail-tab" data-tab="audit" onclick="NationalApp.switchDetailTab('audit')">Online Presence</button>
+    </div>
+
+    <!-- HEALTH TAB -->
+    <div id="tab-health" class="detail-tab-content">
+      <div class="health-kpis" id="health-kpis">
+        <!-- KPI cards for this owner's office health -->
+      </div>
+      <div class="health-chart" id="health-trend">
+        <!-- Week-over-week trend table (Section 1 of Campaign Tracker) -->
+      </div>
+      <div class="health-status" id="health-status">
+        <!-- Leader status codes (color-coded) -->
+      </div>
+    </div>
+
+    <!-- RECRUITING TAB -->
+    <div id="tab-recruiting" class="detail-tab-content" style="display:none">
+      <div class="funnel-overview" id="recruiting-funnel">
+        <!-- Recruiting pipeline visualization -->
+      </div>
+      <div class="recruiting-weekly" id="recruiting-weekly">
+        <!-- Week-over-week recruiting table (Section 2 of Campaign Tracker) -->
+      </div>
+      <div class="recruiting-reps" id="recruiting-reps">
+        <!-- Per-rep breakdown from All Campaigns Stats Tracker -->
+      </div>
+    </div>
+
+    <!-- SALES TAB -->
+    <div id="tab-sales" class="detail-tab-content" style="display:none">
+      <div class="sales-summary" id="sales-summary">
+        <!-- Sales KPIs from Tableau data -->
+      </div>
+      <div class="sales-reps" id="sales-reps-table">
+        <!-- Per-rep sales table (Section 3 of Campaign Tracker) -->
+      </div>
+    </div>
+
+    <!-- AUDIT TAB -->
+    <div id="tab-audit" class="detail-tab-content" style="display:none">
+      <div class="audit-grades" id="audit-grades">
+        <!-- Report card: Reviews, Website, Social Media, SEO grades -->
+      </div>
+      <div class="audit-details" id="audit-details">
+        <!-- Detailed metrics from Performance Audit sheet -->
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCRIPTS
+     ═══════════════════════════════════════════════════════ -->
+<script src="js/national-config.js"></script>
+<script src="js/sheets-api.js"></script>
+<script src="js/national-app.js"></script>
+
+</body>
+</html>
