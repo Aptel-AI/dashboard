@@ -320,6 +320,25 @@ const App = {
       headerLogo.alt = OFFICE_CONFIG.officeName || 'Office';
     }
 
+    // Set browser tab title + favicon to match the office
+    if (OFFICE_CONFIG.officeName) {
+      document.title = OFFICE_CONFIG.officeName;
+    }
+    if (OFFICE_CONFIG.logoIconUrl) {
+      const favicon = document.querySelector('link[rel="icon"]');
+      if (favicon) {
+        favicon.href = OFFICE_CONFIG.logoIconUrl;
+      } else {
+        const link = document.createElement('link');
+        link.rel = 'icon';
+        link.type = 'image/png';
+        link.href = OFFICE_CONFIG.logoIconUrl;
+        document.head.appendChild(link);
+      }
+      // Remove the media-based alternates so our dynamic one takes priority
+      document.querySelectorAll('link[rel="icon"][media]').forEach(el => el.remove());
+    }
+
     this.updateNav();
     Render.renderAll(this.state.people, this.state.teams);
     this._loadOfficeSwitcher();
