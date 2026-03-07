@@ -194,21 +194,32 @@ const NationalApp = {
     const ownerNames = sheetData.owners;
     const allWeeks = sheetData.weeks || [];
 
-    // Limit to 4 most recent weeks, reverse for left-to-right chronological order
-    const weeks = allWeeks.slice(0, 4).reverse();
+    // Campaign table: 4 most recent weeks, left-to-right chronological
+    const campaignWeeks = allWeeks.slice(0, 4).reverse();
+    const campaignLabels = campaignWeeks.map(w => w.tabName);
 
-    // Week column labels (oldest → newest, left to right)
-    const weekLabels = weeks.map(w => w.tabName);
+    // Owner detail: ALL weeks, left-to-right chronological
+    const allWeeksChron = [...allWeeks].reverse();
+    const allLabels = allWeeksChron.map(w => w.tabName);
 
     this.state.owners = ownerNames.map(name => {
-      // Build recruiting actuals: 12 rows × N weeks
-      // Each row's values array = [week0val, week1val, ...]
-      const actuals = Array.from({ length: 12 }, () => []);
-      for (let wi = 0; wi < weeks.length; wi++) {
-        const weekData = weeks[wi].data || {};
+      // Campaign-level actuals (4 weeks) for aggregation
+      const actuals4 = Array.from({ length: 12 }, () => []);
+      for (let wi = 0; wi < campaignWeeks.length; wi++) {
+        const weekData = campaignWeeks[wi].data || {};
         const ownerVals = weekData[name] || new Array(12).fill(0);
         for (let ri = 0; ri < 12; ri++) {
-          actuals[ri].push(ownerVals[ri] || 0);
+          actuals4[ri].push(ownerVals[ri] || 0);
+        }
+      }
+
+      // Full history actuals (all weeks) for owner detail tab
+      const actualsFull = Array.from({ length: 12 }, () => []);
+      for (let wi = 0; wi < allWeeksChron.length; wi++) {
+        const weekData = allWeeksChron[wi].data || {};
+        const ownerVals = weekData[name] || new Array(12).fill(0);
+        for (let ri = 0; ri < 12; ri++) {
+          actualsFull[ri].push(ownerVals[ri] || 0);
         }
       }
 
@@ -222,9 +233,14 @@ const NationalApp = {
         productionHistory: [],
         nextGoals: { totalUnits: 0, wirelessUnits: 0 },
         recruiting: {
-          leaders: 0,          // Stays at 0 until Ken inputs during headcount step
-          weeks: weekLabels,
-          rows: this._buildRows(0, actuals)
+          leaders: 0,
+          weeks: campaignLabels,
+          rows: this._buildRows(0, actuals4)
+        },
+        recruitingFull: {
+          leaders: 0,
+          weeks: allLabels,
+          rows: this._buildRows(0, actualsFull)
         },
         sales: {
           summary: { totalSales: 0, newInternet: 0, upgrades: 0, videoSales: 0, abpMix: '—', gigMix: '—' },
@@ -237,8 +253,8 @@ const NationalApp = {
       };
     });
 
-    // Campaign-level totals + aggregate recruiting
-    this._buildCampaignAggregates(weekLabels);
+    // Campaign-level totals + aggregate recruiting (4 weeks only)
+    this._buildCampaignAggregates(campaignLabels);
   },
 
   // ── Build campaign-level totals and aggregate recruiting table ──
@@ -1053,7 +1069,7 @@ const NationalApp = {
   // ══════════════════════════════════════════════════
 
   renderRecruitingTab(owner) {
-    const r = owner.recruiting;
+    const r = owner.recruitingFull || owner.recruiting;
     if (!r || !r.rows || !r.rows.length) {
       const el = document.getElementById('owner-recruiting-table');
       if (el) el.innerHTML = `
