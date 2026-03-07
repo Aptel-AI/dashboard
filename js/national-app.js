@@ -795,8 +795,8 @@ const NationalApp = {
               return `
                 <tr>
                   <td class="bold">${this._esc(r.date)}</td>
-                  <td class="num"><span class="prod-trend-actual">${r.tA}</span><span class="prod-trend-goal"> of ${r.tG}</span> ${this._trendArrow(r.tA, prev?.tA)}</td>
-                  <td class="num"><span class="prod-trend-actual">${r.wA}</span><span class="prod-trend-goal"> of ${r.wG}</span> ${this._trendArrow(r.wA, prev?.wA)}</td>
+                  <td class="num"><div class="prod-trend-cell"><span class="prod-trend-actual">${r.tA}</span><span class="prod-trend-suffix"><span class="prod-trend-goal"> of ${r.tG}</span> ${this._trendArrow(r.tA, prev?.tA)}</span></div></td>
+                  <td class="num"><div class="prod-trend-cell"><span class="prod-trend-actual">${r.wA}</span><span class="prod-trend-suffix"><span class="prod-trend-goal"> of ${r.wG}</span> ${this._trendArrow(r.wA, prev?.wA)}</span></div></td>
                 </tr>`;
             }).join('')}
           </tbody>
