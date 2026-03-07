@@ -1069,16 +1069,62 @@ const NationalApp = {
   // ══════════════════════════════════════════════════
 
   renderRecruitingTab(owner) {
-    const r = owner.recruitingFull || owner.recruiting;
+    const r = owner.recruiting;
     if (!r || !r.rows || !r.rows.length) {
       const el = document.getElementById('owner-recruiting-table');
       if (el) el.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-text">Recruiting data will populate from Campaign Tracker Section 2.</div>
         </div>`;
+      const wowEl = document.getElementById('owner-recruiting-wow');
+      if (wowEl) wowEl.innerHTML = '';
       return;
     }
+    // Projected table (4 most recent weeks)
     this._renderRecruitingTable(r, 'owner-recruiting-table');
+    // Week-over-week raw data (all weeks)
+    this._renderRecruitingWoW(owner);
+  },
+
+  // ── Week-over-week raw recruiting data (stacked under projected table) ──
+  _renderRecruitingWoW(owner) {
+    const el = document.getElementById('owner-recruiting-wow');
+    if (!el) return;
+
+    const full = owner.recruitingFull || owner.recruiting;
+    if (!full || !full.weeks || !full.weeks.length) {
+      el.innerHTML = '';
+      return;
+    }
+
+    const weeks = full.weeks;
+    const rows = full.rows || [];
+    const labels = this.RECRUITING_LABELS;
+
+    // Build one table row per week, columns = recruiting metrics
+    let html = `<div class="coaching-label">Week-over-Week Recruiting</div>
+      <div class="data-table-wrap"><table class="data-table">
+        <thead><tr>
+          <th>Week</th>
+          ${labels.map(l => `<th class="num">${this._esc(l.label)}</th>`).join('')}
+        </tr></thead>
+        <tbody>`;
+
+    weeks.forEach((weekLabel, wi) => {
+      html += `<tr>`;
+      html += `<td class="bold">${this._esc(weekLabel)}</td>`;
+      labels.forEach((def, ri) => {
+        const val = rows[ri]?.values?.[wi] ?? 0;
+        const prev = wi > 0 ? (rows[ri]?.values?.[wi - 1] ?? null) : null;
+        const display = def.isRate ? val + '%' : val;
+        const arrow = prev !== null ? this._trendArrow(val, prev) : '';
+        html += `<td class="num">${display} ${arrow}</td>`;
+      });
+      html += `</tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+    el.innerHTML = html;
   },
 
   // ══════════════════════════════════════════════════
