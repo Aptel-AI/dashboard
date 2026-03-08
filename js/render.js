@@ -258,11 +258,11 @@ const Render = {
   },
 
   // ── PODIUMS ──
-  makePodium(id, items, getU, getY, getRole) {
+  makePodium(id, items, getU, getY, getRole, sortFn) {
     const wrap = document.getElementById(id);
     if (!wrap) return;
     wrap.innerHTML = '';
-    const sorted = [...items].sort((a, b) => {
+    const sorted = sortFn ? sortFn(items) : [...items].sort((a, b) => {
       let diff = getU(b) - getU(a);
       if (diff !== 0) return diff;
       diff = getY(b) - getY(a);
@@ -811,7 +811,7 @@ const Render = {
   renderAll(people, teams) {
     const salesPeople = people.filter(p => !Roster.deactivated.has(p.name) && !this._isExcludedFromLeaderboard(p));
     this.renderHeroStats(salesPeople);
-    this.makePodium('podium', salesPeople, p => this.twUnits(p), p => this.twYeses(p), p => p.role);
+    this.makePodium('podium', salesPeople, p => this.twUnits(p), p => this.twYeses(p), p => p.role, items => this._sortByPerformance(items));
     this.makePodium('team-podium', teams, t => t.units, t => t.y, t => t.emoji || '⚡');
     this.renderMainTable(people);
     this.renderTeamGrid(teams);
