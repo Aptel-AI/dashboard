@@ -715,18 +715,60 @@ function readScoped(email) {
     });
 
     // For o2+ owners, also include offices owned by their downline
+    var downline = {};
     if (ownerRole === 'o2' || ownerRole === 'o3' || ownerRole === 'o4') {
-      var downline = getDownlineEmails(email, allOwners);
+      downline = getDownlineEmails(email, allOwners);
       ownerOffices = allOffices.filter(function(o) {
         var oe = (o.ownerEmail || '').toLowerCase();
         return oe === email || downline[oe];
       });
     }
 
+    // Build set of owner's office IDs for admin filtering
+    var ownerOfficeIds = {};
+    for (var oi = 0; oi < ownerOffices.length; oi++) {
+      ownerOfficeIds[ownerOffices[oi].officeId] = true;
+    }
+
+    // Return admins eligible for the owner's offices:
+    // a3 (all offices), a2 assigned to this owner or downline, a1 assigned to owner's offices
+    var scopedAdmins = {};
+    var rosterKeys = Object.keys(roster);
+    for (var ri = 0; ri < rosterKeys.length; ri++) {
+      var a = roster[rosterKeys[ri]];
+      if (a.deactivated) continue;
+      // a3 — super admins see all offices
+      if (a.role === 'a3') { scopedAdmins[rosterKeys[ri]] = a; continue; }
+      // a2 — assigned to this owner or someone in their downline
+      if (a.role === 'a2') {
+        var ao = (a.assignedOwner || '').toLowerCase();
+        if (ao === email || downline[ao]) { scopedAdmins[rosterKeys[ri]] = a; }
+        continue;
+      }
+      // a1 — assigned to one of the owner's offices
+      if (a.role === 'a1') {
+        var assignedIds = (a.assignedOffices || '').split(',');
+        for (var ai = 0; ai < assignedIds.length; ai++) {
+          if (ownerOfficeIds[assignedIds[ai].trim()]) {
+            scopedAdmins[rosterKeys[ri]] = a;
+            break;
+          }
+        }
+      }
+    }
+
+    // Scoped owners: self + downline
+    var scopedOwners = {};
+    scopedOwners[email] = owner;
+    var ownerKeys = Object.keys(allOwners);
+    for (var di = 0; di < ownerKeys.length; di++) {
+      if (downline[ownerKeys[di]]) scopedOwners[ownerKeys[di]] = allOwners[ownerKeys[di]];
+    }
+
     return {
       offices: ownerOffices,
-      owners: {},
-      adminRoster: {},
+      owners: scopedOwners,
+      adminRoster: scopedAdmins,
       role: ownerRole,
       userType: 'owner'
     };
