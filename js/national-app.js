@@ -1477,11 +1477,13 @@ const NationalApp = {
     // Blog
     const blog = b.blog;
     const hasBlog = blog && blog.url;
+    // Guard: if threeMonthCount is a huge number (epoch leak), show 0
+    const blogCount3 = (blog?.threeMonthCount > 10000) ? 0 : (blog?.threeMonthCount || 0);
     const blogHtml = hasBlog ? `
       <div class="biz-section">
         <div class="biz-section-title">📝 Blog</div>
         <div class="biz-metrics-row">
-          ${this._metricPill('3-Mo Count', blog.threeMonthCount)}
+          ${this._metricPill('3-Mo Count', blogCount3)}
           ${this._metricPill('This Month', blog.currentMonth)}
           ${this._metricPill('On Queue', blog.onQueue)}
         </div>
@@ -1496,12 +1498,14 @@ const NationalApp = {
         <span class="biz-seo-badge ${seoPass ? 'seo-pass' : 'seo-fail'}">${seoPass ? '✓ Passing' : '✗ Needs Work'}</span>
       </div>` : '';
 
-    // Status
+    // Status (filter out #REF! and similar spreadsheet errors)
     const st = b.serviceStatus;
-    const statusHtml = (st?.status || st?.full || st?.lite) ? `
+    const rawStatus = st?.status || (st?.full ? 'Full' : st?.lite ? 'Lite' : '');
+    const cleanStatus = rawStatus.startsWith('#') ? '' : rawStatus;
+    const statusHtml = cleanStatus ? `
       <div class="biz-section biz-section-inline">
         <span class="biz-section-title">Status</span>
-        <span class="biz-status-text">${e(st.status || (st.full ? 'Full' : st.lite ? 'Lite' : ''))}</span>
+        <span class="biz-status-text">${e(cleanStatus)}</span>
       </div>` : '';
 
     return `

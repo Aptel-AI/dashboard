@@ -1022,7 +1022,21 @@ function readOnlinePresence() {
     businesses.push(biz);
   }
 
-  return { businesses: businesses, tabName: sheet.getName() };
+  // ── Deduplicate: keep only the most recent audit per client+business ──
+  // Cam audits the same businesses monthly, creating duplicate rows.
+  // Key on clientName|businessName, keep the row closest to the end of the sheet
+  // (rows are in chronological order, newest audits at the bottom).
+  var deduped = {};
+  for (var d = 0; d < businesses.length; d++) {
+    var bKey = (businesses[d].clientName + '|' + businesses[d].businessName).toLowerCase();
+    deduped[bKey] = businesses[d];  // later rows overwrite earlier ones
+  }
+  var uniqueBiz = [];
+  for (var key in deduped) {
+    if (deduped.hasOwnProperty(key)) uniqueBiz.push(deduped[key]);
+  }
+
+  return { businesses: uniqueBiz, tabName: sheet.getName() };
 }
 
 // ── Find ALL exact occurrences of a header text ──
@@ -1038,7 +1052,11 @@ function _findAllExact(headers, text) {
 function _str(v) {
   if (v === null || v === undefined) return '';
   if (v instanceof Date) return formatDate(v);
-  return String(v).trim();
+  var s = String(v).trim();
+  // Filter out spreadsheet formula errors
+  if (s.charAt(0) === '#' && (s.indexOf('REF') >= 0 || s.indexOf('N/A') >= 0 ||
+      s.indexOf('VALUE') >= 0 || s.indexOf('DIV') >= 0 || s.indexOf('ERROR') >= 0)) return '';
+  return s;
 }
 
 // ── Number or null (for ratings where 0 means "no rating") ──
@@ -1109,6 +1127,7 @@ function findNthRetention(headers, n) {
 
 function num(v) {
   if (v === null || v === undefined || v === '') return 0;
+  if (v instanceof Date) return 0;  // Don't cast Date objects to epoch
   var n = Number(v);
   return isNaN(n) ? 0 : n;
 }
