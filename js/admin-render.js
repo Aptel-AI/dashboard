@@ -52,6 +52,13 @@ const AdminRender = {
             </div>
             `}
           </div>
+          <div class="office-card-url" onclick="event.stopPropagation()">
+            <span class="label">Rep Login URL</span>
+            <div class="url-copy-row">
+              <input type="text" readonly class="url-input" value="${this._buildRepUrl(office.officeId)}" onclick="this.select()">
+              <button class="btn btn-secondary btn-sm copy-url-btn" onclick="AdminRender._copyUrl(this)" title="Copy URL">📋</button>
+            </div>
+          </div>
           <div class="office-card-actions" onclick="event.stopPropagation()">
             ${isA3 ? `<button class="btn btn-secondary btn-sm" onclick="AdminApp.showEditOfficeModal('${office.officeId}')">Edit</button>` : ''}
             <button class="btn btn-${isOwner ? 'primary' : 'secondary'} btn-sm" onclick="AdminApp.openOffice('${office.officeId}')">Open Dashboard</button>
@@ -616,6 +623,26 @@ const AdminRender = {
     const safe = this._esc(str);
     if (str.length <= len) return safe;
     return this._esc(str.slice(0, len)) + '&hellip;';
+  },
+
+  _buildRepUrl(officeId) {
+    const base = 'https://aptel-ai.github.io/dashboard/';
+    if (!officeId || officeId === 'off_001') return base;
+    return base + '?office=' + encodeURIComponent(officeId);
+  },
+
+  _copyUrl(btn) {
+    const input = btn.parentElement.querySelector('.url-input');
+    if (!input) return;
+    navigator.clipboard.writeText(input.value).then(() => {
+      btn.textContent = '✅';
+      setTimeout(() => { btn.textContent = '📋'; }, 1500);
+    }).catch(() => {
+      input.select();
+      document.execCommand('copy');
+      btn.textContent = '✅';
+      setTimeout(() => { btn.textContent = '📋'; }, 1500);
+    });
   },
 
   _formatDate(dateStr) {
