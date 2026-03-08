@@ -302,15 +302,18 @@ const PostSale = {
     let inner = '';
     switch (key) {
       case 'air':
-        inner = `
-          <div class="wizard-field">
-            <label class="wizard-label">Booked for Activation Support?</label>
-            <div class="toggle-group" id="ps-activation-toggle">
-              <button class="toggle-btn ${d.activationSupport ? 'active' : ''}" onclick="PostSale.setField('activationSupport',true)">Yes</button>
-              <button class="toggle-btn ${!d.activationSupport ? 'active' : ''}" onclick="PostSale.setField('activationSupport',false)">No</button>
-            </div>
-            <div class="wizard-error" id="ps-activation-error">You must book the activation support appointment to proceed</div>
-          </div>`;
+        // Activation Support is Elevate-only (off_001)
+        if (OFFICE_CONFIG.officeId === 'off_001') {
+          inner = `
+            <div class="wizard-field">
+              <label class="wizard-label">Booked for Activation Support?</label>
+              <div class="toggle-group" id="ps-activation-toggle">
+                <button class="toggle-btn ${d.activationSupport ? 'active' : ''}" onclick="PostSale.setField('activationSupport',true)">Yes</button>
+                <button class="toggle-btn ${!d.activationSupport ? 'active' : ''}" onclick="PostSale.setField('activationSupport',false)">No</button>
+              </div>
+              <div class="wizard-error" id="ps-activation-error">You must book the activation support appointment to proceed</div>
+            </div>`;
+        }
         break;
       case 'wireless':
         inner = `
@@ -573,8 +576,8 @@ const PostSale = {
     }
     if (errEl) errEl.style.display = 'none';
 
-    // Air: activation support must be Yes
-    if (prods.air.on && !d.activationSupport) {
+    // Air: activation support must be Yes (Elevate only)
+    if (OFFICE_CONFIG.officeId === 'off_001' && prods.air.on && !d.activationSupport) {
       valid = false;
       const actErr = document.getElementById('ps-activation-error');
       if (actErr) actErr.style.display = 'block';
