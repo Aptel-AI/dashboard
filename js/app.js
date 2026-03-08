@@ -321,11 +321,16 @@ const App = {
     Roster.initFromApi(apiData);
     TeamsManager.init(this.state.teamsData);
 
-    // Apply dynamic office logo
-    const headerLogo = document.getElementById('header-office-logo');
-    if (headerLogo && OFFICE_CONFIG.logoUrl) {
-      headerLogo.src = OFFICE_CONFIG.logoUrl;
-      headerLogo.alt = OFFICE_CONFIG.officeName || 'Office';
+    // Apply dynamic office icon + name in header
+    const headerIcon = document.getElementById('header-office-icon');
+    if (headerIcon) {
+      // Prefer the symbol/icon logo for the header (works for any aspect ratio)
+      headerIcon.src = OFFICE_CONFIG.logoIconUrl || OFFICE_CONFIG.logoUrl || 'references/logos/aptel-symbol-black.png';
+      headerIcon.alt = OFFICE_CONFIG.officeName || 'Office';
+    }
+    const headerName = document.getElementById('header-office-name');
+    if (headerName && OFFICE_CONFIG.officeName) {
+      headerName.textContent = OFFICE_CONFIG.officeName;
     }
 
     // Set browser tab title + favicon to match the office
