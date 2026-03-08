@@ -372,6 +372,7 @@ function doPost(e) {
         if (body.logoUrl !== undefined) sheet.getRange(row, 11).setValue(body.logoUrl);
         if (body.logoIconUrl !== undefined) sheet.getRange(row, 12).setValue(body.logoIconUrl);
         if (body.brandColors !== undefined) sheet.getRange(row, 13).setValue(body.brandColors);
+        if (body.discordWebhookUrl !== undefined) sheet.getRange(row, 15).setValue(body.discordWebhookUrl);
         if (body.headerLogoStyle !== undefined) sheet.getRange(row, 16).setValue(body.headerLogoStyle);
         if (body.payrollManagerEmail !== undefined) sheet.getRange(row, 17).setValue(body.payrollManagerEmail);
         if (body.payrollMode !== undefined) sheet.getRange(row, 18).setValue(body.payrollMode);

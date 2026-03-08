@@ -285,6 +285,10 @@ const AdminRender = {
       });
     }
 
+    // Discord webhook
+    const discordInput = document.getElementById('office-discord-webhook');
+    if (discordInput) discordInput.value = office ? (office.discordWebhookUrl || '') : '';
+
     if (logoUrlInput) logoUrlInput.value = office ? office.logoUrl : '';
     if (logoIconUrlInput) logoIconUrlInput.value = office ? office.logoIconUrl : '';
     const headerLogoStyleSelect = document.getElementById('office-header-logo-style');

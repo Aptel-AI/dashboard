@@ -595,6 +595,7 @@ const AdminApp = {
 
     const payrollManagerEmail = document.getElementById('office-payroll-manager')?.value || '';
     const payrollMode = document.getElementById('office-payroll-mode')?.value || 'commission-split';
+    const discordWebhookUrl = document.getElementById('office-discord-webhook')?.value?.trim() || '';
     const logoUrl = document.getElementById('office-logo-url')?.value?.trim();
     const logoIconUrl = document.getElementById('office-logo-icon-url')?.value?.trim();
     const headerLogoStyle = document.getElementById('office-header-logo-style')?.value || 'icon';
@@ -607,7 +608,7 @@ const AdminApp = {
     if (saveBtn) { saveBtn.textContent = 'Saving...'; saveBtn.disabled = true; }
 
     try {
-      const payload = { name, templateType, sheetId, appsScriptUrl, apiKey, ownerEmail, ownerName, ownerLevel, payrollManagerEmail, payrollMode, logoUrl, logoIconUrl, headerLogoStyle, status };
+      const payload = { name, templateType, sheetId, appsScriptUrl, apiKey, ownerEmail, ownerName, ownerLevel, payrollManagerEmail, payrollMode, discordWebhookUrl, logoUrl, logoIconUrl, headerLogoStyle, status };
 
       if (this.state.editingOfficeId) {
         payload.officeId = this.state.editingOfficeId;
