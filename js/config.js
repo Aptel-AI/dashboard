@@ -49,6 +49,7 @@ const OFFICE_CONFIG = {
   // ── Logos ──
   logoUrl: "references/logos/elevate-logo-full-standard-blue.png",
   logoIconUrl: "references/logos/aptel-symbol-black.png",
+  headerLogoStyle: "full",  // 'full' = full logo image, 'icon' = icon + text name
 
   // ── Team emojis for customization ──
   // Large pool — UI shows a random subset with a reroll button
@@ -134,6 +135,7 @@ const WEEK_PERIODS = new Set([7, 8, 9, 10, 11]);
       if (cfg.officeName) OFFICE_CONFIG.officeName = cfg.officeName;
       if (cfg.logoUrl) OFFICE_CONFIG.logoUrl = cfg.logoUrl;
       if (cfg.logoIconUrl) OFFICE_CONFIG.logoIconUrl = cfg.logoIconUrl;
+      if (cfg.headerLogoStyle) OFFICE_CONFIG.headerLogoStyle = cfg.headerLogoStyle;
       if (cfg.discordWebhookUrl) OFFICE_CONFIG.discordWebhookUrl = cfg.discordWebhookUrl;
       console.log('[Multi-Office] Config overridden for:', cfg.officeName || 'Unknown office', '| officeId:', cfg.officeId || 'default');
     } catch(e) {

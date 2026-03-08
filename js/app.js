@@ -85,6 +85,7 @@ const App = {
         if (session.officeConfig.officeName) OFFICE_CONFIG.officeName = session.officeConfig.officeName;
         if (session.officeConfig.logoUrl) OFFICE_CONFIG.logoUrl = session.officeConfig.logoUrl;
         if (session.officeConfig.logoIconUrl) OFFICE_CONFIG.logoIconUrl = session.officeConfig.logoIconUrl;
+        if (session.officeConfig.headerLogoStyle) OFFICE_CONFIG.headerLogoStyle = session.officeConfig.headerLogoStyle;
         if (session.officeConfig.discordWebhookUrl) OFFICE_CONFIG.discordWebhookUrl = session.officeConfig.discordWebhookUrl;
         console.log('[Session] Restored officeConfig:', session.officeConfig.officeName || session.officeConfig.officeId);
       }
@@ -142,6 +143,7 @@ const App = {
         OFFICE_CONFIG.officeName = oc.name;
         if (oc.logoUrl) OFFICE_CONFIG.logoUrl = oc.logoUrl;
         if (oc.logoIconUrl) OFFICE_CONFIG.logoIconUrl = oc.logoIconUrl;
+        if (oc.headerLogoStyle) OFFICE_CONFIG.headerLogoStyle = oc.headerLogoStyle;
         if (oc.discordWebhookUrl) OFFICE_CONFIG.discordWebhookUrl = oc.discordWebhookUrl;
         console.log('[Multi-Office] Resolved to:', oc.name);
       } else {
@@ -321,16 +323,28 @@ const App = {
     Roster.initFromApi(apiData);
     TeamsManager.init(this.state.teamsData);
 
-    // Apply dynamic office icon + name in header
+    // Apply dynamic office branding in header
+    const style = OFFICE_CONFIG.headerLogoStyle || 'icon';
     const headerIcon = document.getElementById('header-office-icon');
-    if (headerIcon) {
-      // Prefer the symbol/icon logo for the header (works for any aspect ratio)
-      headerIcon.src = OFFICE_CONFIG.logoIconUrl || OFFICE_CONFIG.logoUrl || 'references/logos/aptel-symbol-black.png';
-      headerIcon.alt = OFFICE_CONFIG.officeName || 'Office';
-    }
     const headerName = document.getElementById('header-office-name');
-    if (headerName && OFFICE_CONFIG.officeName) {
-      headerName.textContent = OFFICE_CONFIG.officeName;
+
+    if (style === 'full') {
+      // Full logo mode — show the wide horizontal logo, hide name text
+      if (headerIcon) {
+        headerIcon.src = OFFICE_CONFIG.logoUrl || OFFICE_CONFIG.logoIconUrl || 'references/logos/aptel-full-black.png';
+        headerIcon.alt = OFFICE_CONFIG.officeName || 'Office';
+        headerIcon.classList.add('header-logo-full');
+      }
+      if (headerName) headerName.style.display = 'none';
+    } else {
+      // Icon + text mode — small symbol icon + office name as text
+      if (headerIcon) {
+        headerIcon.src = OFFICE_CONFIG.logoIconUrl || OFFICE_CONFIG.logoUrl || 'references/logos/aptel-symbol-black.png';
+        headerIcon.alt = OFFICE_CONFIG.officeName || 'Office';
+      }
+      if (headerName && OFFICE_CONFIG.officeName) {
+        headerName.textContent = OFFICE_CONFIG.officeName;
+      }
     }
 
     // Set browser tab title + favicon to match the office

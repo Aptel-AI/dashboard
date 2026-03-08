@@ -263,6 +263,8 @@ const AdminRender = {
 
     if (logoUrlInput) logoUrlInput.value = office ? office.logoUrl : '';
     if (logoIconUrlInput) logoIconUrlInput.value = office ? office.logoIconUrl : '';
+    const headerLogoStyleSelect = document.getElementById('office-header-logo-style');
+    if (headerLogoStyleSelect) headerLogoStyleSelect.value = office ? (office.headerLogoStyle || 'icon') : 'icon';
     if (statusSelect) statusSelect.value = office ? office.status : 'setup';
   },
 

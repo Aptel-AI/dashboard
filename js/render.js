@@ -397,8 +397,10 @@ const Render = {
       <div style="max-width:1300px;margin:0 auto;padding:0 24px">
         <div class="header-top">
           <div class="logo-area">
-            <img src="${OFFICE_CONFIG.logoIconUrl || OFFICE_CONFIG.logoUrl}" alt="${OFFICE_CONFIG.officeName || 'Office'}" class="header-office-icon">
-            <span class="header-office-name">${OFFICE_CONFIG.officeName || ''}</span>
+            ${OFFICE_CONFIG.headerLogoStyle === 'full'
+              ? `<img src="${OFFICE_CONFIG.logoUrl || OFFICE_CONFIG.logoIconUrl}" alt="${OFFICE_CONFIG.officeName || 'Office'}" class="header-office-icon header-logo-full">`
+              : `<img src="${OFFICE_CONFIG.logoIconUrl || OFFICE_CONFIG.logoUrl}" alt="${OFFICE_CONFIG.officeName || 'Office'}" class="header-office-icon">
+                 <span class="header-office-name">${OFFICE_CONFIG.officeName || ''}</span>`}
             <div class="header-label-group">
               <span class="week-label">Weekly Leaderboard</span>
               <div class="live-badge"><span class="live-dot"></span>Live</div>

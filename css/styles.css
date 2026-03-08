@@ -122,6 +122,13 @@ header {
   flex-shrink: 0;
 }
 
+/* Full-logo mode: wide horizontal logo instead of small icon */
+.header-office-icon.header-logo-full {
+  width: auto;
+  height: 44px;
+  max-width: 200px;
+}
+
 .header-office-name {
   font-family: var(--font-heading);
   font-size: 17px;

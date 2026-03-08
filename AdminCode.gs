@@ -41,7 +41,8 @@ function getOrCreateSheet(name) {
         sheet.appendRow([
           'officeId', 'name', 'templateType', 'sheetId', 'appsScriptUrl',
           'apiKey', 'status', 'ownerEmail', 'ownerName', 'ownerLevel',
-          'logoUrl', 'logoIconUrl', 'brandColors', 'createdDate', 'discordWebhookUrl'
+          'logoUrl', 'logoIconUrl', 'brandColors', 'createdDate', 'discordWebhookUrl',
+          'headerLogoStyle'
         ]);
         break;
       case OWNERS_TAB:
@@ -205,7 +206,8 @@ function doGet(e) {
                 apiKey: o.apiKey,
                 logoUrl: o.logoUrl || '',
                 logoIconUrl: o.logoIconUrl || '',
-                discordWebhookUrl: o.discordWebhookUrl || ''
+                discordWebhookUrl: o.discordWebhookUrl || '',
+                headerLogoStyle: o.headerLogoStyle || 'icon'
               }
             });
           }
@@ -362,6 +364,7 @@ function doPost(e) {
         if (body.logoUrl !== undefined) sheet.getRange(row, 11).setValue(body.logoUrl);
         if (body.logoIconUrl !== undefined) sheet.getRange(row, 12).setValue(body.logoIconUrl);
         if (body.brandColors !== undefined) sheet.getRange(row, 13).setValue(body.brandColors);
+        if (body.headerLogoStyle !== undefined) sheet.getRange(row, 16).setValue(body.headerLogoStyle);
         return jsonResponse({ success: true });
       }
 
@@ -536,7 +539,8 @@ function readOffices() {
       logoIconUrl: (data[i][11] || '').toString().trim(),
       brandColors: (data[i][12] || '').toString().trim(),
       createdDate: (data[i][13] || '').toString(),
-      discordWebhookUrl: (data[i][14] || '').toString().trim()
+      discordWebhookUrl: (data[i][14] || '').toString().trim(),
+      headerLogoStyle: (data[i][15] || '').toString().trim() || 'icon'
     });
   }
   return offices;

@@ -595,6 +595,7 @@ const AdminApp = {
 
     const logoUrl = document.getElementById('office-logo-url')?.value?.trim();
     const logoIconUrl = document.getElementById('office-logo-icon-url')?.value?.trim();
+    const headerLogoStyle = document.getElementById('office-header-logo-style')?.value || 'icon';
     const status = document.getElementById('office-status')?.value;
     const error = document.getElementById('office-modal-error');
 
@@ -604,7 +605,7 @@ const AdminApp = {
     if (saveBtn) { saveBtn.textContent = 'Saving...'; saveBtn.disabled = true; }
 
     try {
-      const payload = { name, templateType, sheetId, appsScriptUrl, apiKey, ownerEmail, ownerName, ownerLevel, logoUrl, logoIconUrl, status };
+      const payload = { name, templateType, sheetId, appsScriptUrl, apiKey, ownerEmail, ownerName, ownerLevel, logoUrl, logoIconUrl, headerLogoStyle, status };
 
       if (this.state.editingOfficeId) {
         payload.officeId = this.state.editingOfficeId;
@@ -673,7 +674,8 @@ const AdminApp = {
       apiKey: office.apiKey,
       officeName: office.name,
       logoUrl: office.logoUrl || '',
-      logoIconUrl: office.logoIconUrl || ''
+      logoIconUrl: office.logoIconUrl || '',
+      headerLogoStyle: office.headerLogoStyle || 'icon'
     };
 
     const encoded = btoa(JSON.stringify(config));
