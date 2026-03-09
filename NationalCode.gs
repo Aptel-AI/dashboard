@@ -702,54 +702,7 @@ function readNationalRecruiting(weekCount) {
     }
   }
 
-  // Collect column mapping debug info for all campaigns/tabs
-  var _colMapDebug = {};
-  for (var t2 = 0; t2 < tabs.length; t2++) {
-    var dbgData = tabs[t2].sheet.getDataRange().getValues();
-    var dbgSecs = _findCampaignSections(dbgData);
-    for (var ds = 0; ds < dbgSecs.length; ds++) {
-      var dsec = dbgSecs[ds];
-      var dk = _campaignSlug(dsec.label);
-      var dh = dsec.headers;
-      var nonEmpty = [];
-      for (var dhi = 0; dhi < dh.length; dhi++) {
-        if (dh[dhi]) nonEmpty.push(dhi + ':' + dh[dhi]);
-      }
-      var dns1 = _findNthPattern(dh, 'new start', 1);
-      var dns2 = _findNthPattern(dh, 'new start', 2);
-      if (dns1 < 0) dns1 = _findNthPattern(dh, 'ns ', 1);
-      if (dns2 < 0) dns2 = _findNthPattern(dh, 'ns ', 2);
-      var dr2_1 = _findNthPattern(dh, '2nd r', 1);
-      var dr2_2 = _findNthPattern(dh, '2nd r', 2);
-      if (dr2_1 < 0) dr2_1 = _findNthPattern(dh, '2nds ', 1);
-      if (dr2_2 < 0) dr2_2 = _findNthPattern(dh, '2nds ', 2);
-      var dconv = findCol(dh, ['conversion', '% call list booked', 'turned to 2nd']);
-      var drete2 = _findNthPattern(dh, 'rete', 2);
-      var drete3 = _findNthPattern(dh, 'rete', 3);
-      // Positional fallback (same as _parseOwnerRecruiting)
-      if (dconv >= 0 && dr2_1 < 0) dr2_1 = dconv + 1;
-      if (dconv >= 0 && dr2_2 < 0) dr2_2 = dconv + 2;
-      if (dconv >= 0 && drete2 < 0) drete2 = dconv + 3;
-      if (drete2 >= 0 && dns1 < 0) dns1 = drete2 + 1;
-      if (drete2 >= 0 && dns2 < 0) dns2 = drete2 + 2;
-      if (drete2 >= 0 && drete3 < 0) drete3 = drete2 + 3;
-      var dcm = {
-        '1stR_1': _findNthPattern(dh, '1st r', 1),
-        '1stR_2': _findNthPattern(dh, '1st r', 2),
-        '2ndR_1': dr2_1,
-        '2ndR_2': dr2_2,
-        'ns_1':   dns1,
-        'ns_2':   dns2,
-        'rete_1': _findNthPattern(dh, 'rete', 1),
-        'rete_2': drete2,
-        'rete_3': drete3
-      };
-      var debugKey = dk + '|' + tabs[t2].name;
-      _colMapDebug[debugKey] = { headers: nonEmpty.join(' | '), colMap: dcm };
-    }
-  }
-
-  return { campaigns: campaigns, _colMapDebug: _colMapDebug };
+  return { campaigns: campaigns };
 }
 
 // ── Detect campaign section headers ──
@@ -866,20 +819,6 @@ function _parseOwnerRecruiting(data, section, campaignKey, tabName) {
     ns2,                                                      // 10: New Starts Showed
     rete3                                                     // 11: New Start Retention
   ];
-
-  // Debug: log when any mapped column is -1 (except 0,1 which are always -1)
-  var labels = ['AppliesRcvd','SentToList','1stBooked','1stShowed','Rete1','Conversion','2ndBooked','2ndShowed','Rete2','NSBooked','NSShowed','Rete3'];
-  var missing = [];
-  for (var mi = 2; mi < 12; mi++) {
-    if (colMap[mi] < 0) missing.push(labels[mi]);
-  }
-  if (missing.length > 0) {
-    var nonEmpty = [];
-    for (var hi = 0; hi < headers.length; hi++) {
-      if (headers[hi]) nonEmpty.push(hi + ':' + headers[hi]);
-    }
-    Logger.log('COLMAP MISS [' + (campaignKey||'?') + '] tab=' + (tabName||'?') + ' missing=' + missing.join(',') + ' headers=' + nonEmpty.join(' | '));
-  }
 
   var result = {};
 
