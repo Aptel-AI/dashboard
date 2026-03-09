@@ -714,17 +714,17 @@ function readNationalRecruiting(weekCount) {
       // Get parsed result and column mapping for this section
       var parsedData = _parseOwnerRecruiting(dbgData, dsec);
       var parsedCount = Object.keys(parsedData).length;
-      // Show the actual headers and which columns mapped
-      var sectionHeaders = dsec.headers.filter(function(h) { return h && h.length > 0; });
-      var colMap = [
-        findCol(dsec.headers, ['1st rounds booked', '1st round booked']),
-        findCol(dsec.headers, ['1st rounds showed', '1st round showed']),
-        findCol(dsec.headers, ['2nd rounds booked', '2nd round booked']),
-        findCol(dsec.headers, ['2nd rounds showed', '2nd round showed']),
-        findCol(dsec.headers, ['new start scheduled', 'new starts scheduled']),
-        findCol(dsec.headers, ['new starts showed']),
-        findCol(dsec.headers, ['conversion', '% call list booked'])
-      ];
+      // Show the actual headers with their indices
+      var headerMap = {};
+      for (var hi = 0; hi < dsec.headers.length; hi++) {
+        if (dsec.headers[hi]) headerMap[hi] = dsec.headers[hi];
+      }
+      // Grab raw data from first data row to check alignment
+      var firstDataRow = dsec.startRow < dbgData.length ? dbgData[dsec.startRow] : [];
+      var rawFirstRow = {};
+      for (var ri2 = 0; ri2 < Math.min(firstDataRow.length, 15); ri2++) {
+        rawFirstRow['col' + ri2] = firstDataRow[ri2];
+      }
       _debugSections.push({
         label: dsec.label,
         slug: _campaignSlug(dsec.label),
@@ -733,16 +733,8 @@ function readNationalRecruiting(weekCount) {
         endRow: dsec.endRow,
         totalRows: dsec.endRow - dsec.startRow + 1,
         parsedOwnerCount: parsedCount,
-        headers: sectionHeaders,
-        colMap: {
-          '1stBooked': colMap[0],
-          '1stShowed': colMap[1],
-          '2ndBooked': colMap[2],
-          '2ndShowed': colMap[3],
-          'newStartSched': colMap[4],
-          'newStartShowed': colMap[5],
-          'conversion': colMap[6]
-        },
+        headerMap: headerMap,
+        rawFirstDataRow: rawFirstRow,
         firstRow: rowNames[0],
         lastRow: rowNames[rowNames.length - 1]
       });
@@ -838,6 +830,16 @@ function _parseOwnerRecruiting(data, section) {
 
     // Skip the last row if it's the sum row (always the final row in the section)
     if (i === section.endRow) continue;
+
+    // Debug: log raw row for first owner to diagnose column alignment
+    if (Object.keys(result).length === 0) {
+      Logger.log('DEBUG first owner row: ' + ownerName);
+      Logger.log('DEBUG row length: ' + row.length);
+      for (var d = 0; d < Math.min(row.length, 15); d++) {
+        Logger.log('  col[' + d + '] = ' + JSON.stringify(row[d]));
+      }
+      Logger.log('DEBUG colMap: ' + JSON.stringify(colMap));
+    }
 
     var values = [];
     for (var m = 0; m < 12; m++) {
