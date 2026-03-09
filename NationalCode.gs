@@ -700,7 +700,30 @@ function readNationalRecruiting(weekCount) {
     }
   }
 
-  return { campaigns: campaigns };
+  // Debug: section boundaries for first tab only
+  var _debugSections = [];
+  if (tabs.length > 0) {
+    var dbgData = tabs[0].sheet.getDataRange().getValues();
+    var dbgSecs = _findCampaignSections(dbgData);
+    for (var ds = 0; ds < dbgSecs.length; ds++) {
+      var dsec = dbgSecs[ds];
+      var rowNames = [];
+      for (var dr = dsec.startRow; dr <= dsec.endRow; dr++) {
+        rowNames.push({ row: dr, colA: String(dbgData[dr][0] || '').trim() });
+      }
+      _debugSections.push({
+        label: dsec.label,
+        slug: _campaignSlug(dsec.label),
+        headerRow: dsec.headerRow,
+        startRow: dsec.startRow,
+        endRow: dsec.endRow,
+        parsedUpTo: dsec.endRow - 1,
+        rows: rowNames
+      });
+    }
+  }
+
+  return { campaigns: campaigns, _debugSections: _debugSections };
 }
 
 // ── Detect campaign section headers ──

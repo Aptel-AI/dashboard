@@ -210,6 +210,11 @@ const NationalApp = {
     const result = await resp.json();
     if (result.error) throw new Error(result.error);
 
+    // Debug: log section boundaries
+    if (result._debugSections) {
+      console.log('[NationalApp] Section debug:', JSON.stringify(result._debugSections, null, 2));
+    }
+
     // Extract the campaign-specific data
     const campaignData = result.campaigns && result.campaigns[campaignKey];
     if (!campaignData) return null;
