@@ -832,8 +832,9 @@ const PostSale = {
     const roster = App.state?.roster || {};
     const session = Auth.getSession();
     const myEmail = (session?.email || '').toLowerCase();
+    const LEADER_RANKS = new Set(['l1', 'jd', 'manager', 'owner']);
     return Object.entries(roster)
-      .filter(([email, r]) => !r.deactivated && email !== myEmail)
+      .filter(([email, r]) => !r.deactivated && email !== myEmail && LEADER_RANKS.has(r.rank))
       .sort((a, b) => (a[1].name || a[0]).localeCompare(b[1].name || b[0]))
       .map(([email, r]) =>
         `<option value="${email}" ${email === selectedEmail ? 'selected' : ''}>${this._esc(r.name || email)}</option>`)
