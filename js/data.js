@@ -1031,6 +1031,10 @@ const DataPipeline = {
     // Color priority: Red > Yellow > Green (worst wins per bucket)
     const COLOR_RANK = { red: 3, yellow: 2, green: 1 };
 
+    // Collect per-bucket (pct, color) pairs from Churn Rate rows to learn thresholds
+    // thresholdSamples[bucketIdx] = [ { pct, color }, ... ]
+    const thresholdSamples = cols.map(() => []);
+
     // Result: byRep[name] = { activated:[5], disco:[5], hasData:[5], colors:[5] }
     const byRep = {};
     churnReport.forEach(row => {
@@ -1058,15 +1062,36 @@ const DataPipeline = {
           rd.hasData[i] = true;
         } else if (metricType === 'Disconnect count (SPE/SP)') {
           rd.disco[i] += parseInt(val) || 0;
-        } else if (metricType === 'Churn Rate' && rowColor) {
-          // Per-bucket color from Churn Rate row, worst color wins
-          const cur = rd.colors[i];
-          const curRank = COLOR_RANK[cur.toLowerCase()] || 0;
-          const newRank = COLOR_RANK[rowColor.toLowerCase()] || 0;
-          if (newRank > curRank) rd.colors[i] = rowColor;
+        } else if (metricType === 'Churn Rate') {
+          if (rowColor) {
+            // Per-bucket color from Churn Rate row, worst color wins
+            const cur = rd.colors[i];
+            const curRank = COLOR_RANK[cur.toLowerCase()] || 0;
+            const newRank = COLOR_RANK[rowColor.toLowerCase()] || 0;
+            if (newRank > curRank) rd.colors[i] = rowColor;
+          }
+          // Collect threshold sample: pct value + color for this bucket
+          const pctVal = parseFloat(val);
+          if (!isNaN(pctVal) && rowColor) {
+            thresholdSamples[i].push({ pct: pctVal, color: rowColor.toLowerCase() });
+          }
         }
       });
     });
+
+    // Derive per-bucket color thresholds from collected samples
+    // For each bucket, find the max green pct and min red pct
+    this._churnThresholds = cols.map((col, i) => {
+      const samples = thresholdSamples[i];
+      let maxGreen = 0, minRed = Infinity;
+      samples.forEach(s => {
+        if (s.color === 'green' && s.pct > maxGreen) maxGreen = s.pct;
+        if (s.color === 'red' && s.pct < minRed) minRed = s.pct;
+      });
+      if (minRed === Infinity) minRed = maxGreen + 1; // fallback
+      return { greenMax: maxGreen, redMin: minRed };
+    });
+    console.log('[Churn] Derived thresholds per bucket:', this._churnThresholds);
 
     const repNames = Object.keys(byRep);
     console.log('[Churn] Aggregated', repNames.length, 'reps from report:', repNames.slice(0, 5));
@@ -1097,7 +1122,7 @@ const DataPipeline = {
   // Enrich team metrics by aggregating member churn data
   enrichTeamsWithChurn(teams) {
     if (!teams) return;
-    const COLOR_RANK = { green: 1, yellow: 2, red: 3 };
+    const thresholds = this._churnThresholds || [];
 
     teams.forEach(team => {
       if (!team.metrics || !team.members || team.members.length === 0) return;
@@ -1108,19 +1133,17 @@ const DataPipeline = {
           const tb = team.metrics.churnBuckets[i];
           tb.activated += bucket.activated;
           tb.disco += bucket.disco;
-          // Aggregate color: worst color wins across members
-          const curRank = COLOR_RANK[(tb.color || '').toLowerCase()] || 0;
-          const newRank = COLOR_RANK[(bucket.color || '').toLowerCase()] || 0;
-          if (newRank > curRank) tb.color = bucket.color;
         });
       });
 
-      // Recalculate team-level percentages and derive color from pct if no color set
-      team.metrics.churnBuckets.forEach(tb => {
+      // Recalculate team-level percentages and derive color from Tableau thresholds
+      team.metrics.churnBuckets.forEach((tb, i) => {
         if (tb.activated > 0) {
           tb.pct = parseFloat((tb.disco / tb.activated * 100).toFixed(1));
-          // If no color from member data, derive from percentage thresholds
-          if (!tb.color) {
+          const t = thresholds[i];
+          if (t) {
+            tb.color = tb.pct <= t.greenMax ? 'Green' : (tb.pct >= t.redMin ? 'Red' : 'Yellow');
+          } else {
             tb.color = tb.pct <= 2.5 ? 'Green' : (tb.pct >= 5 ? 'Red' : 'Yellow');
           }
         }
