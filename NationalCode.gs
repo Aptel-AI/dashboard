@@ -836,6 +836,9 @@ function _parseOwnerRecruiting(data, section) {
     var ownerName = String(row[0] || '').trim();
     if (!ownerName) continue;
 
+    // Skip the last row if it's the sum row (always the final row in the section)
+    if (i === section.endRow) continue;
+
     var values = [];
     for (var m = 0; m < 12; m++) {
       var ci = colMap[m];
