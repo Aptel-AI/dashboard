@@ -15,7 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="css/national.css?v=28">
+  <link rel="stylesheet" href="css/national.css?v=29">
 </head>
 <body>
 
@@ -73,6 +73,7 @@
         <select id="campaign-select" onchange="NationalApp.switchCampaign(this.value)">
           <option value="att-b2b">AT&T B2B</option>
         </select>
+        <button id="btn-import-nlr" class="btn-import-nlr" onclick="NationalApp.importNLRHeadcount()" title="Sync headcount/production from NLR report">⟳ Sync HC</button>
       </div>
     </div>
     <div class="top-bar-right">
@@ -223,7 +224,7 @@
      ═══════════════════════════════════════════════════════ -->
 <script src="js/national-config.js?v=13"></script>
 <script src="js/sheets-api.js?v=10"></script>
-<script src="js/national-app.js?v=40"></script>
+<script src="js/national-app.js?v=41"></script>
 
 </body>
 </html>

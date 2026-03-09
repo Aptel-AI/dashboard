@@ -64,9 +64,9 @@ function doGet(e) {
       return jsonResp(readOnlinePresence());
     }
 
-    // ── NLR B2B headcount/production data ──
-    if (action === 'nlrHeadcount') {
-      return jsonResp(readNLRHeadcount());
+    // ── B2B headcount/production data (local copy in _B2B_Headcount tab) ──
+    if (action === 'b2bHeadcount') {
+      return jsonResp(readLocalHeadcount());
     }
 
     if (owner) {
@@ -111,6 +111,9 @@ function doPost(e) {
         break;
       case 'unclaimCompany':
         result = unclaimCompany(body.ownerName, body.companyName);
+        break;
+      case 'importNLRHeadcount':
+        result = importNLRHeadcount();
         break;
       default:
         result = { error: 'unknown action: ' + body.action };
@@ -1296,11 +1299,21 @@ function readNLRHeadcount() {
     if (colMap.dates < 0 && colMap.active < 0) continue;
 
     // Walk ALL rows, collecting trend history + tracking last good row
+    // ONLY include rows where column A is a real date (skip text like "Owner (Owner>Rep>Zip)")
     var trend = [];
     var lastGood = null;
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
-      // Check if row has any data (active or production LW populated)
+
+      // Date gate: column A must be a Date object or a parseable date string
+      var dateCell = colMap.dates >= 0 ? row[colMap.dates] : null;
+      if (!dateCell) continue;
+      if (!(dateCell instanceof Date)) {
+        var parsed = new Date(dateCell);
+        if (isNaN(parsed.getTime())) continue;  // Not a date — skip row
+      }
+
+      // Check if row has any numeric data
       var hasActive = colMap.active >= 0 && row[colMap.active] !== '' && row[colMap.active] !== null;
       var hasProd   = colMap.productionLW >= 0 && row[colMap.productionLW] !== '' && row[colMap.productionLW] !== null;
       if (!hasActive && !hasProd) continue;
@@ -1324,6 +1337,119 @@ function readNLRHeadcount() {
         trend: trend
       };
     }
+  }
+
+  return { owners: owners };
+}
+
+// ══════════════════════════════════════════════════
+// IMPORT NLR HEADCOUNT → LOCAL _B2B_Headcount TAB
+// Reads NLR data once, writes it into Ken's national sheet
+// so we're no longer dependent on the NLR spreadsheet.
+// Tab format: Owner | Date | Active | Leaders | Dist | Training | ProductionLW | ProductionGoals
+// ══════════════════════════════════════════════════
+
+function importNLRHeadcount() {
+  // 1. Read from NLR
+  var nlrResult = readNLRHeadcount();
+  if (nlrResult.error) return nlrResult;
+  var nlrOwners = nlrResult.owners || {};
+  if (!Object.keys(nlrOwners).length) return { error: 'No owner data found in NLR sheet' };
+
+  // 2. Open Ken's national sheet
+  var ss;
+  try {
+    ss = SpreadsheetApp.openById(SHEETS.NATIONAL);
+  } catch (err) {
+    return { error: 'Cannot open national sheet: ' + err.message };
+  }
+
+  // 3. Get or create _B2B_Headcount tab
+  var TAB_NAME = '_B2B_Headcount';
+  var sheet = ss.getSheetByName(TAB_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(TAB_NAME);
+    sheet.appendRow(['Owner', 'Date', 'Active', 'Leaders', 'Dist', 'Training', 'ProductionLW', 'ProductionGoals']);
+  } else {
+    // Clear existing data (keep header)
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, 8).clearContent();
+    }
+  }
+
+  // 4. Build rows: one row per owner per date
+  var rows = [];
+  var ownerNames = Object.keys(nlrOwners).sort();
+  for (var o = 0; o < ownerNames.length; o++) {
+    var name = ownerNames[o];
+    var ownerData = nlrOwners[name];
+    var trend = ownerData.trend || [];
+    for (var t = 0; t < trend.length; t++) {
+      var entry = trend[t];
+      rows.push([
+        name,
+        entry.date,
+        entry.active,
+        entry.leaders,
+        entry.dist,
+        entry.training,
+        entry.productionLW,
+        entry.productionGoals
+      ]);
+    }
+  }
+
+  // 5. Write all rows at once
+  if (rows.length) {
+    sheet.getRange(2, 1, rows.length, 8).setValues(rows);
+  }
+
+  return { success: true, ownersImported: ownerNames.length, rowsWritten: rows.length };
+}
+
+// ══════════════════════════════════════════════════
+// READ LOCAL HEADCOUNT from _B2B_Headcount tab
+// Returns same shape as readNLRHeadcount():
+// { owners: { "Name": { current: {...}, trend: [{...}] } } }
+// ══════════════════════════════════════════════════
+
+function readLocalHeadcount() {
+  var ss;
+  try {
+    ss = SpreadsheetApp.openById(SHEETS.NATIONAL);
+  } catch (err) {
+    return { error: 'Cannot open national sheet: ' + err.message, owners: {} };
+  }
+
+  var sheet = ss.getSheetByName('_B2B_Headcount');
+  if (!sheet) return { owners: {} };
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { owners: {} };
+
+  // Header row 0: Owner | Date | Active | Leaders | Dist | Training | ProductionLW | ProductionGoals
+  var owners = {};
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var name = String(row[0] || '').trim();
+    if (!name) continue;
+
+    var entry = {
+      date:            String(row[1] || ''),
+      active:          num(row[2]),
+      leaders:         num(row[3]),
+      dist:            num(row[4]),
+      training:        num(row[5]),
+      productionLW:    num(row[6]),
+      productionGoals: num(row[7])
+    };
+
+    if (!owners[name]) {
+      owners[name] = { current: entry, trend: [] };
+    }
+    owners[name].trend.push(entry);
+    owners[name].current = entry; // Last row wins as "current"
   }
 
   return { owners: owners };

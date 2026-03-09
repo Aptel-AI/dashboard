@@ -200,15 +200,15 @@ const NationalApp = {
       this._mapAuditToOwners(auditData.businesses, camMapping);
     }
 
-    // Step 4: Enrich B2B owners with headcount/production from NLR's report
+    // Step 4: Enrich B2B owners with headcount/production from local _B2B_Headcount tab
     if (campaignKey === 'att-b2b' && NATIONAL_CONFIG.appsScriptUrl) {
       try {
-        const nlrData = await this._fetchNLRHeadcount();
-        if (nlrData && nlrData.owners) {
-          this._enrichOwnersWithNLR(nlrData.owners);
+        const hcData = await this._fetchB2BHeadcount();
+        if (hcData && hcData.owners && Object.keys(hcData.owners).length) {
+          this._enrichOwnersWithNLR(hcData.owners);
         }
       } catch (err) {
-        console.warn('[NationalApp] NLR headcount fetch failed:', err.message);
+        console.warn('[NationalApp] B2B headcount fetch failed:', err.message);
       }
     }
   },
@@ -304,16 +304,45 @@ const NationalApp = {
     return result;
   },
 
-  // ── Fetch NLR B2B headcount/production data ──
-  async _fetchNLRHeadcount() {
+  // ── Fetch B2B headcount/production from local _B2B_Headcount tab ──
+  async _fetchB2BHeadcount() {
     const url = NATIONAL_CONFIG.appsScriptUrl +
       '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
-      '&action=nlrHeadcount' +
+      '&action=b2bHeadcount' +
       '&_t=' + Date.now();
     const resp = await fetch(url);
     const result = await resp.json();
     if (result.error) throw new Error(result.error);
     return result;
+  },
+
+  // ── Import NLR headcount data into local sheet (one-time sync) ──
+  async importNLRHeadcount() {
+    const btn = document.getElementById('btn-import-nlr');
+    if (btn) { btn.disabled = true; btn.textContent = 'Importing...'; }
+
+    try {
+      const resp = await fetch(NATIONAL_CONFIG.appsScriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          key: NATIONAL_CONFIG.apiKey,
+          action: 'importNLRHeadcount'
+        })
+      });
+      const result = await resp.json();
+      if (result.error) throw new Error(result.error);
+
+      console.log('[NationalApp] NLR import complete:', result);
+      if (btn) { btn.textContent = `Imported ${result.ownersImported} owners (${result.rowsWritten} rows)`; }
+
+      // Reload to pick up the freshly imported data
+      await this.loadCampaignData(this.state.campaign);
+      this.renderDashboard();
+    } catch (err) {
+      console.error('[NationalApp] NLR import failed:', err);
+      if (btn) { btn.disabled = false; btn.textContent = 'Import Failed — Retry'; }
+    }
   },
 
   // ── Enrich B2B owners with NLR headcount/production data ──
