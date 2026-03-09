@@ -179,7 +179,7 @@ const PostSale = {
 
       <div class="wizard-field">
         <label class="wizard-label">Date of Sale</label>
-        <input type="date" class="wizard-input" id="ps-date" value="${d.dateOfSale}">
+        <input type="date" class="wizard-input" id="ps-date" value="${d.dateOfSale}" max="${new Date().toISOString().split('T')[0]}">
       </div>
 
       ${this._campaign === 'attb2b' ? `
@@ -527,6 +527,9 @@ const PostSale = {
 
     if (!d.dateOfSale) {
       valid = false;
+    } else if (d.dateOfSale > new Date().toISOString().split('T')[0]) {
+      valid = false;
+      alert('Sale date cannot be in the future.');
     }
 
     if (this._campaign === 'attb2b') {
