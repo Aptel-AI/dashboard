@@ -1011,11 +1011,19 @@ const DataPipeline = {
       return;
     }
 
-    // Dynamically match bucket columns: look for keys containing '0-30', '30 Day', '60 Day', etc.
-    const BUCKET_PATTERNS = ['0-30', '30 Day', '60 Day', '90 Day', '120 Day'];
-    const cols = BUCKET_PATTERNS.map(pat => {
-      const lp = pat.toLowerCase();
-      return sampleKeys.find(k => k.toLowerCase().includes(lp)) || pat;
+    // Match bucket columns by exact match first, then substring.
+    // Order matters: '0-30 Day' must not steal '30 Day', so use exact-first strategy.
+    const BUCKET_NAMES = ['0-30 Day', '30 Day', '60 Day', '90 Day', '120 Day'];
+    const usedKeys = new Set();
+    const cols = BUCKET_NAMES.map(name => {
+      // Exact match (case-insensitive)
+      let found = sampleKeys.find(k => k.toLowerCase() === name.toLowerCase() && !usedKeys.has(k));
+      if (!found) {
+        // Substring fallback — but skip already-used keys
+        found = sampleKeys.find(k => k.toLowerCase().includes(name.toLowerCase()) && !usedKeys.has(k));
+      }
+      if (found) usedKeys.add(found);
+      return found || name;
     });
     console.log('[Churn] Bucket columns:', cols);
 
