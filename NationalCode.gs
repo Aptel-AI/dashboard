@@ -859,11 +859,13 @@ function _campaignSlug(label) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .trim();
-  // Known mappings — check B2B first (more specific), then fall back to residential
+  // Known mappings — check most specific first
   var hasATT = lower.indexOf('at&t') >= 0 || lower.indexOf('att') >= 0 || lower.indexOf('at-t') >= 0;
   var hasB2B = lower.indexOf('b2b') >= 0;
+  var hasOOF = lower.indexOf('oof') >= 0 || lower.indexOf('nds') >= 0;
   if (hasATT && hasB2B) return 'att-b2b';
-  if (hasATT && !hasB2B) return 'att-res';
+  if (hasATT && hasOOF) return 'att-nds';
+  if (hasATT) return 'att-res';
   return s || 'unknown';
 }
 
