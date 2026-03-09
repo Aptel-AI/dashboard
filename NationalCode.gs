@@ -700,62 +700,7 @@ function readNationalRecruiting(weekCount) {
     }
   }
 
-  // Debug: section boundaries + parsed data for first tab only
-  var _debugSections = [];
-  if (tabs.length > 0) {
-    var dbgData = tabs[0].sheet.getDataRange().getValues();
-    var dbgSecs = _findCampaignSections(dbgData);
-    for (var ds = 0; ds < dbgSecs.length; ds++) {
-      var dsec = dbgSecs[ds];
-      var rowNames = [];
-      for (var dr = dsec.startRow; dr <= dsec.endRow; dr++) {
-        rowNames.push({ row: dr, colA: String(dbgData[dr][0] || '').trim() });
-      }
-      // Get parsed result and column mapping for this section
-      var parsedData = _parseOwnerRecruiting(dbgData, dsec);
-      var parsedCount = Object.keys(parsedData).length;
-      // Show the actual headers with their indices
-      var headerMap = {};
-      for (var hi = 0; hi < dsec.headers.length; hi++) {
-        if (dsec.headers[hi]) headerMap[hi] = dsec.headers[hi];
-      }
-      // Grab raw data from first data row to check alignment
-      var firstDataRow = dsec.startRow < dbgData.length ? dbgData[dsec.startRow] : [];
-      var rawFirstRow = {};
-      for (var ri2 = 0; ri2 < Math.min(firstDataRow.length, 25); ri2++) {
-        rawFirstRow['col' + ri2] = firstDataRow[ri2];
-      }
-      // Resolve colMap with updated patterns to show what parser will use
-      var resolvedColMap = {
-        '1stBooked': findCol(dsec.headers, ['1st rounds booked', '1st round booked', '1st rds booked']),
-        '1stShowed': findCol(dsec.headers, ['1st rounds showed', '1st round showed', '1st rds showed']),
-        'turnedTo2nd': findCol(dsec.headers, ['conversion', '% call list booked', 'turned to 2nd']),
-        'rete1': _findNthPattern(dsec.headers, 'rete', 1),
-        '2ndBooked': findCol(dsec.headers, ['2nd rounds booked', '2nd round booked', '2nd rds booked']),
-        '2ndShowed': findCol(dsec.headers, ['2nd rounds showed', '2nd round showed', '2nd rds showed']),
-        'rete2': _findNthPattern(dsec.headers, 'rete', 2),
-        'newStartSched': findCol(dsec.headers, ['new start scheduled', 'new starts scheduled', 'new start booked', 'new starts booked']),
-        'newStartShowed': findCol(dsec.headers, ['new starts showed', 'new start showed']),
-        'rete3': _findNthPattern(dsec.headers, 'rete', 3)
-      };
-      _debugSections.push({
-        label: dsec.label,
-        slug: _campaignSlug(dsec.label),
-        headerRow: dsec.headerRow,
-        startRow: dsec.startRow,
-        endRow: dsec.endRow,
-        totalRows: dsec.endRow - dsec.startRow + 1,
-        parsedOwnerCount: parsedCount,
-        headerMap: headerMap,
-        resolvedColMap: resolvedColMap,
-        rawFirstDataRow: rawFirstRow,
-        firstRow: rowNames[0],
-        lastRow: rowNames[rowNames.length - 1]
-      });
-    }
-  }
-
-  return { campaigns: campaigns, _debugSections: _debugSections };
+  return { campaigns: campaigns };
 }
 
 // ── Detect campaign section headers ──
@@ -820,19 +765,19 @@ function _parseOwnerRecruiting(data, section) {
   var headers = section.headers;
 
   // Map columns to the 12 RECRUITING_LABELS positions
-  // Supports both full ("1st rounds booked") and abbreviated ("1st rds booked") headers
+  // Uses Nth-pattern matching for columns that repeat (retention) or vary in abbreviation (new start)
   var colMap = [
     -1,                                                       // 0: Applies Received (not in sheet → 0)
     -1,                                                       // 1: Sent to List (not in sheet → 0)
-    findCol(headers, ['1st rounds booked', '1st round booked', '1st rds booked']),  // 2: 1st Rounds Booked
-    findCol(headers, ['1st rounds showed', '1st round showed', '1st rds showed']),  // 3: 1st Rounds Showed
-    _findNthPattern(headers, 'rete', 1),                      // 4: 1st Retention (matches "retention" or "rete...")
-    findCol(headers, ['conversion', '% call list booked', 'turned to 2nd']),  // 5: % Call List Booked / Conversion
-    findCol(headers, ['2nd rounds booked', '2nd round booked', '2nd rds booked']),  // 6: 2nd Rounds Booked
-    findCol(headers, ['2nd rounds showed', '2nd round showed', '2nd rds showed']),  // 7: 2nd Rounds Showed
+    _findNthPattern(headers, '1st r', 1),                     // 2: 1st Rounds Booked (1st occurrence of "1st r...")
+    _findNthPattern(headers, '1st r', 2),                     // 3: 1st Rounds Showed (2nd occurrence of "1st r...")
+    _findNthPattern(headers, 'rete', 1),                      // 4: 1st Retention
+    findCol(headers, ['conversion', '% call list booked', 'turned to 2nd']),  // 5: Conversion
+    _findNthPattern(headers, '2nd r', 1),                     // 6: 2nd Rounds Booked (1st occurrence of "2nd r...")
+    _findNthPattern(headers, '2nd r', 2),                     // 7: 2nd Rounds Showed (2nd occurrence of "2nd r...")
     _findNthPattern(headers, 'rete', 2),                      // 8: 2nd Retention
-    findCol(headers, ['new start scheduled', 'new starts scheduled', 'new start booked', 'new starts booked']),  // 9: New Starts Booked
-    findCol(headers, ['new starts showed', 'new start showed']),  // 10: New Starts Showed
+    _findNthPattern(headers, 'new start', 1),                 // 9: New Starts Booked/Scheduled (1st "new start...")
+    _findNthPattern(headers, 'new start', 2),                 // 10: New Starts Showed (2nd "new start...")
     _findNthPattern(headers, 'rete', 3)                       // 11: New Start Retention
   ];
 
@@ -845,16 +790,6 @@ function _parseOwnerRecruiting(data, section) {
 
     // Skip the last row if it's the sum row (always the final row in the section)
     if (i === section.endRow) continue;
-
-    // Debug: log raw row for first owner to diagnose column alignment
-    if (Object.keys(result).length === 0) {
-      Logger.log('DEBUG first owner row: ' + ownerName);
-      Logger.log('DEBUG row length: ' + row.length);
-      for (var d = 0; d < Math.min(row.length, 15); d++) {
-        Logger.log('  col[' + d + '] = ' + JSON.stringify(row[d]));
-      }
-      Logger.log('DEBUG colMap: ' + JSON.stringify(colMap));
-    }
 
     var values = [];
     for (var m = 0; m < 12; m++) {

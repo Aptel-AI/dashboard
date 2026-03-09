@@ -130,8 +130,10 @@ const NationalApp = {
   // ══════════════════════════════════════════════════
 
   async loadCampaignData(campaignKey) {
-    const cfg = NATIONAL_CONFIG.campaigns[campaignKey];
-    if (!cfg) throw new Error('Unknown campaign: ' + campaignKey);
+    // Config entry may be dynamically created by _populateCampaignSelector
+    if (!NATIONAL_CONFIG.campaigns[campaignKey]) {
+      NATIONAL_CONFIG.campaigns[campaignKey] = { label: campaignKey, weeksToPull: 6 };
+    }
 
     // Step 1: Try to load owner list + recruiting actuals from national sheet
     let sheetData = null;
@@ -199,8 +201,15 @@ const NationalApp = {
     }
   },
 
-  // ── Fetch recruiting data from Ken's national sheet via NationalCode.gs ──
+  // ── Fetch ALL recruiting data from Ken's national sheet via NationalCode.gs ──
+  // Returns the full campaigns dict. Caches in this._allCampaignsData.
   async _fetchRecruitingFromSheet(campaignKey) {
+    // If we have cached data, return the specific campaign
+    if (this._allCampaignsData && this._allCampaignsData[campaignKey]) {
+      const cd = this._allCampaignsData[campaignKey];
+      return { owners: cd.owners || [], weeks: cd.weeks || [], label: cd.label || '' };
+    }
+
     const weeks = NATIONAL_CONFIG.campaigns[campaignKey]?.weeksToPull || 6;
     const url = NATIONAL_CONFIG.appsScriptUrl +
       '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
@@ -210,9 +219,11 @@ const NationalApp = {
     const result = await resp.json();
     if (result.error) throw new Error(result.error);
 
-    // Debug: log section boundaries
-    if (result._debugSections) {
-      console.log('[NationalApp] Section debug:', JSON.stringify(result._debugSections, null, 2));
+    // Cache ALL campaigns data
+    if (result.campaigns) {
+      this._allCampaignsData = result.campaigns;
+      // Dynamically populate campaign selector and config
+      this._populateCampaignSelector(result.campaigns);
     }
 
     // Extract the campaign-specific data
@@ -224,6 +235,31 @@ const NationalApp = {
       weeks: campaignData.weeks || [],
       label: campaignData.label || ''
     };
+  },
+
+  // ── Dynamically populate campaign selector dropdown from backend data ──
+  _populateCampaignSelector(campaigns) {
+    const select = document.getElementById('campaign-select');
+    if (!select) return;
+
+    const keys = Object.keys(campaigns);
+    select.innerHTML = '';
+    keys.forEach(key => {
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = campaigns[key].label || key;
+      select.appendChild(opt);
+
+      // Ensure config has an entry for this campaign (so loadCampaignData doesn't throw)
+      if (!NATIONAL_CONFIG.campaigns[key]) {
+        NATIONAL_CONFIG.campaigns[key] = {
+          label: campaigns[key].label || key,
+          sectionHeader: campaigns[key].label || key,
+          weeksToPull: 6
+        };
+      }
+    });
+    select.value = this.state.campaign;
   },
 
   // ── Fetch owner → Cam company mapping from _OwnerCamMapping tab ──
@@ -789,6 +825,7 @@ const NationalApp = {
     this.state.selectedOwner = null;
     this._showLoading('Switching campaign...');
     try {
+      // loadCampaignData will use cached _allCampaignsData if available
       await this.loadCampaignData(campaignKey);
     } catch (err) {
       console.error('Failed to load campaign:', err);
@@ -835,8 +872,13 @@ const NationalApp = {
       const result = await resp.json();
       if (result.error) throw new Error(result.error);
 
+      // Clear cached data so next load fetches fresh
+      this._allCampaignsData = null;
+
       // Update state with fresh data returned by the import
       if (result.recruiting && result.recruiting.campaigns) {
+        this._allCampaignsData = result.recruiting.campaigns; // re-cache with fresh data
+        this._populateCampaignSelector(result.recruiting.campaigns);
         const campaignKey = this.state.campaign;
         const campaignData = result.recruiting.campaigns[campaignKey];
         if (campaignData) {
