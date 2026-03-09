@@ -623,11 +623,11 @@ function enrichWithWeeklyRecruiting(ss, owners, cfg) {
 
 // Known header patterns that identify a campaign section header row
 var RECRUITING_HEADER_PATTERNS = [
-  '1st rounds booked', '1st round booked',
-  '1st rounds showed', '1st round showed',
-  '2nd rounds booked', '2nd round booked',
-  'retention', 'conversion',
-  'new start scheduled', 'new starts scheduled'
+  '1st rounds booked', '1st round booked', '1st rds booked',
+  '1st rounds showed', '1st round showed', '1st rds showed',
+  '2nd rounds booked', '2nd round booked', '2nd rds booked',
+  'retention', 'conversion', 'turned to 2nd',
+  'new start scheduled', 'new starts scheduled', 'new start'
 ];
 
 function readNationalRecruiting(weekCount) {
@@ -806,19 +806,20 @@ function _parseOwnerRecruiting(data, section) {
   var headers = section.headers;
 
   // Map columns to the 12 RECRUITING_LABELS positions
+  // Supports both full ("1st rounds booked") and abbreviated ("1st rds booked") headers
   var colMap = [
     -1,                                                       // 0: Applies Received (not in sheet → 0)
     -1,                                                       // 1: Sent to List (not in sheet → 0)
-    findCol(headers, ['1st rounds booked', '1st round booked']),  // 2: 1st Rounds Booked
-    findCol(headers, ['1st rounds showed', '1st round showed']),  // 3: 1st Rounds Showed
-    _findNthPattern(headers, 'retention', 1),                 // 4: 1st Retention
-    findCol(headers, ['conversion', '% call list booked']),   // 5: % Call List Booked / Conversion
-    findCol(headers, ['2nd rounds booked', '2nd round booked']),  // 6: 2nd Rounds Booked
-    findCol(headers, ['2nd rounds showed', '2nd round showed']),  // 7: 2nd Rounds Showed
-    _findNthPattern(headers, 'retention', 2),                 // 8: 2nd Retention
-    findCol(headers, ['new start scheduled', 'new starts scheduled']),  // 9: New Starts Booked
-    findCol(headers, ['new starts showed']),                   // 10: New Starts Showed
-    _findNthPattern(headers, 'retention', 3)                  // 11: New Start Retention
+    findCol(headers, ['1st rounds booked', '1st round booked', '1st rds booked']),  // 2: 1st Rounds Booked
+    findCol(headers, ['1st rounds showed', '1st round showed', '1st rds showed']),  // 3: 1st Rounds Showed
+    _findNthPattern(headers, 'rete', 1),                      // 4: 1st Retention (matches "retention" or "rete...")
+    findCol(headers, ['conversion', '% call list booked', 'turned to 2nd']),  // 5: % Call List Booked / Conversion
+    findCol(headers, ['2nd rounds booked', '2nd round booked', '2nd rds booked']),  // 6: 2nd Rounds Booked
+    findCol(headers, ['2nd rounds showed', '2nd round showed', '2nd rds showed']),  // 7: 2nd Rounds Showed
+    _findNthPattern(headers, 'rete', 2),                      // 8: 2nd Retention
+    findCol(headers, ['new start scheduled', 'new starts scheduled', 'new start booked', 'new starts booked']),  // 9: New Starts Booked
+    findCol(headers, ['new starts showed', 'new start showed']),  // 10: New Starts Showed
+    _findNthPattern(headers, 'rete', 3)                       // 11: New Start Retention
   ];
 
   var result = {};
