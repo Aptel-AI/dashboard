@@ -1081,17 +1081,26 @@ const DataPipeline = {
 
     // Derive per-bucket color thresholds from collected samples
     // For each bucket, find the max green pct and min red pct
+    // Churn Rate values from Tableau may be decimals (0.05 = 5%) or percentages (5.0 = 5%)
+    // Detect scale: if all values < 1, they're decimals; multiply by 100 to match our pct format
+    const allPcts = thresholdSamples.flat().map(s => s.pct);
+    const isDecimal = allPcts.length > 0 && allPcts.every(v => v < 1);
+    const scale = isDecimal ? 100 : 1;
+    console.log('[Churn] Threshold scale detection:', isDecimal ? 'decimal (×100)' : 'percentage', '| sample values:', allPcts.slice(0, 5));
+
     this._churnThresholds = cols.map((col, i) => {
       const samples = thresholdSamples[i];
-      let maxGreen = 0, minRed = Infinity;
+      let maxGreen = -Infinity, minRed = Infinity;
       samples.forEach(s => {
-        if (s.color === 'green' && s.pct > maxGreen) maxGreen = s.pct;
-        if (s.color === 'red' && s.pct < minRed) minRed = s.pct;
+        const pct = s.pct * scale;
+        if (s.color === 'green' && pct > maxGreen) maxGreen = pct;
+        if (s.color === 'red' && pct < minRed) minRed = pct;
       });
-      if (minRed === Infinity) minRed = maxGreen + 1; // fallback
+      if (maxGreen === -Infinity) maxGreen = 0;
+      if (minRed === Infinity) minRed = maxGreen + 1;
       return { greenMax: maxGreen, redMin: minRed };
     });
-    console.log('[Churn] Derived thresholds per bucket:', this._churnThresholds);
+    console.log('[Churn] Derived thresholds per bucket:', JSON.stringify(this._churnThresholds));
 
     const repNames = Object.keys(byRep);
     console.log('[Churn] Aggregated', repNames.length, 'reps from report:', repNames.slice(0, 5));
