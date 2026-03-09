@@ -336,6 +336,10 @@ const App = {
     DataPipeline.enrichTeamsWithTableau(this.state.teams, this.state.tableauByRep);
 
     // Enrich churn buckets from _TableauChurnReport
+    console.log('[Churn DEBUG] apiData.churnReport:', apiData.churnReport ? apiData.churnReport.length + ' rows' : 'MISSING');
+    if (apiData.churnReport && apiData.churnReport.length > 0) {
+      console.log('[Churn DEBUG] First row:', JSON.stringify(apiData.churnReport[0]));
+    }
     DataPipeline.enrichWithChurnReport(this.state.people, apiData.churnReport);
     DataPipeline.enrichTeamsWithChurn(this.state.teams);
 
