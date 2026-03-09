@@ -13,7 +13,8 @@ const SHEETS = {
   RECRUITING_DAILY:   '1ytTGen_AlzfDPW3HGYU1JKNLz1kfHrrhAFCVnmRS3fg',  // Recruiting Scoreboard Daily
   CAMPAIGN_TRACKER:   '1HvWJYox3JXvxmza63YBWAqKPtUGPFuaV-s-BOfbWGKM',  // ATT Campaign Tracker
   PERFORMANCE_AUDIT:  '15WCMzKnqvyyRMx2ae4tC1a12_-aoSRDh3McOuRAKuHk',  // Performance Audit
-  NATIONAL:           '1eGkwjQRD9RV4n-JR_TTlgE6VY858WZID8cAF8soYSYM'  // Ken's national recruiting sheet
+  NATIONAL:           '1eGkwjQRD9RV4n-JR_TTlgE6VY858WZID8cAF8soYSYM', // Ken's national recruiting sheet
+  NLR_B2B:            '1sxauFjNjq4_rRYM2PAl5cyOyHF3Hg4OkO-t_hLKDJB8'  // NLR's AT&T B2B 1-on-1's report
 };
 
 // Campaign configs
@@ -61,6 +62,11 @@ function doGet(e) {
     // ── Online presence / audit data from Cam's sheet ──
     if (action === 'onlinePresence') {
       return jsonResp(readOnlinePresence());
+    }
+
+    // ── NLR B2B headcount/production data ──
+    if (action === 'nlrHeadcount') {
+      return jsonResp(readNLRHeadcount());
     }
 
     if (owner) {
@@ -1227,6 +1233,92 @@ function readOnlinePresence() {
   var allCompanyNames = Object.keys(companySet).sort();
 
   return { businesses: uniqueBiz, allCompanyNames: allCompanyNames, tabName: sheet.getName(), _debug: _debug };
+}
+
+// ══════════════════════════════════════════════════
+// READ NLR B2B HEADCOUNT / PRODUCTION
+// Each owner has a tab in NLR's spreadsheet.
+// Row 1 = headers: Dates | Active | Leaders | Dist | Training | ...
+//                  Personal Production | Production LW | Production Goals
+// Data rows below with the last non-empty row being the "current" snapshot.
+// Returns { owners: { "TabName": { active, leaders, dist, training, productionLW, productionGoals }, ... } }
+// ══════════════════════════════════════════════════
+
+function readNLRHeadcount() {
+  if (!SHEETS.NLR_B2B) return { owners: {} };
+
+  var ss;
+  try {
+    ss = SpreadsheetApp.openById(SHEETS.NLR_B2B);
+  } catch (err) {
+    return { error: 'Cannot open NLR B2B sheet: ' + err.message, owners: {} };
+  }
+
+  // Tabs to skip (non-owner tabs)
+  var SKIP_TABS = {
+    'input - sales qual metrics': true,
+    'input - comm per rep and total dd': true,
+    'input - market metrics': true,
+    'sheet2': true
+  };
+
+  var allSheets = ss.getSheets();
+  var owners = {};
+
+  for (var t = 0; t < allSheets.length; t++) {
+    var sheet = allSheets[t];
+    var tabName = sheet.getName().trim();
+
+    // Skip non-owner tabs
+    if (SKIP_TABS[tabName.toLowerCase()]) continue;
+
+    // Read data — only need first ~30 rows (headcount section is at top)
+    var lastRow = Math.min(sheet.getLastRow(), 30);
+    if (lastRow < 2) continue;
+    var data = sheet.getRange(1, 1, lastRow, 10).getValues();
+
+    // Row 0 = headers
+    var headers = data[0].map(function(h) { return String(h).toLowerCase().trim(); });
+
+    var colMap = {
+      dates:          findCol(headers, ['dates', 'date']),
+      active:         findCol(headers, ['active']),
+      leaders:        findCol(headers, ['leaders']),
+      dist:           findCol(headers, ['dist']),
+      training:       findCol(headers, ['training']),
+      productionLW:   findCol(headers, ['production lw', 'production']),
+      productionGoals:findCol(headers, ['production goals', 'goals'])
+    };
+
+    // Must have at least dates + active columns to be a valid owner tab
+    if (colMap.dates < 0 && colMap.active < 0) continue;
+
+    // Walk rows, keep the last non-empty row as "current"
+    var lastGood = null;
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      // Check if row has any data (active or production LW populated)
+      var hasActive = colMap.active >= 0 && row[colMap.active] !== '' && row[colMap.active] !== null;
+      var hasProd   = colMap.productionLW >= 0 && row[colMap.productionLW] !== '' && row[colMap.productionLW] !== null;
+      if (!hasActive && !hasProd) continue;
+
+      lastGood = {
+        date:            colMap.dates >= 0 ? formatDate(row[colMap.dates]) : '',
+        active:          colMap.active >= 0 ? num(row[colMap.active]) : 0,
+        leaders:         colMap.leaders >= 0 ? num(row[colMap.leaders]) : 0,
+        dist:            colMap.dist >= 0 ? num(row[colMap.dist]) : 0,
+        training:        colMap.training >= 0 ? num(row[colMap.training]) : 0,
+        productionLW:    colMap.productionLW >= 0 ? num(row[colMap.productionLW]) : 0,
+        productionGoals: colMap.productionGoals >= 0 ? num(row[colMap.productionGoals]) : 0
+      };
+    }
+
+    if (lastGood) {
+      owners[tabName] = lastGood;
+    }
+  }
+
+  return { owners: owners };
 }
 
 // ── Find ALL exact occurrences of a header text ──

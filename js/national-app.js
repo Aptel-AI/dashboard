@@ -199,6 +199,18 @@ const NationalApp = {
       this._cachedAuditBusinesses = auditData.businesses; // Cache for re-mapping after claim/unclaim
       this._mapAuditToOwners(auditData.businesses, camMapping);
     }
+
+    // Step 4: Enrich B2B owners with headcount/production from NLR's report
+    if (campaignKey === 'att-b2b' && NATIONAL_CONFIG.appsScriptUrl) {
+      try {
+        const nlrData = await this._fetchNLRHeadcount();
+        if (nlrData && nlrData.owners) {
+          this._enrichOwnersWithNLR(nlrData.owners);
+        }
+      } catch (err) {
+        console.warn('[NationalApp] NLR headcount fetch failed:', err.message);
+      }
+    }
   },
 
   // ── Fetch ALL recruiting data from Ken's national sheet via NationalCode.gs ──
@@ -290,6 +302,70 @@ const NationalApp = {
     const result = await resp.json();
     if (result.error) throw new Error(result.error);
     return result;
+  },
+
+  // ── Fetch NLR B2B headcount/production data ──
+  async _fetchNLRHeadcount() {
+    const url = NATIONAL_CONFIG.appsScriptUrl +
+      '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
+      '&action=nlrHeadcount' +
+      '&_t=' + Date.now();
+    const resp = await fetch(url);
+    const result = await resp.json();
+    if (result.error) throw new Error(result.error);
+    return result;
+  },
+
+  // ── Enrich B2B owners with NLR headcount/production data ──
+  // Uses fuzzy name matching: NLR tabs have full names (e.g., "Alex Badawi"),
+  // while recruiting data may have short names (e.g., "Jay T", "Mason").
+  // Match by: exact match → starts-with → contains (case-insensitive).
+  _enrichOwnersWithNLR(nlrOwners) {
+    // Build lowercase lookup of NLR tab names
+    const nlrKeys = Object.keys(nlrOwners);
+    const nlrLower = {};
+    for (const key of nlrKeys) {
+      nlrLower[key.toLowerCase()] = key;
+    }
+
+    let matched = 0;
+    for (const owner of this.state.owners) {
+      const ownerLc = owner.name.toLowerCase().trim();
+
+      // Try exact match first
+      let nlrKey = nlrLower[ownerLc];
+
+      // Try starts-with: NLR "Justin Wood" starts with recruiting "Justin"
+      if (!nlrKey) {
+        for (const lc in nlrLower) {
+          if (lc.startsWith(ownerLc) || ownerLc.startsWith(lc)) {
+            nlrKey = nlrLower[lc];
+            break;
+          }
+        }
+      }
+
+      // Try contains: recruiting "Nigel Gil" contained in NLR "Nigel Gilbert"
+      if (!nlrKey) {
+        for (const lc in nlrLower) {
+          if (lc.indexOf(ownerLc) >= 0 || ownerLc.indexOf(lc) >= 0) {
+            nlrKey = nlrLower[lc];
+            break;
+          }
+        }
+      }
+
+      if (!nlrKey) continue;
+
+      const nlr = nlrOwners[nlrKey];
+      owner.headcount.active = nlr.active || 0;
+      owner.headcount.leaders = nlr.leaders || 0;
+      owner.headcount.training = nlr.training || 0;
+      owner.production.totalActual = nlr.productionLW || 0;
+      owner.production.totalGoal = nlr.productionGoals || 0;
+      matched++;
+    }
+    console.log('[NationalApp] NLR headcount enrichment: matched', matched, 'of', this.state.owners.length, 'owners');
   },
 
   // ── Map online presence businesses to owners ──
