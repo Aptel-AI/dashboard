@@ -142,14 +142,25 @@ const NationalApp = {
       }
     }
 
-    // Step 1b: Fetch online presence data from Cam's Performance Audit sheet
+    // Step 1b: Fetch online presence data and owner→Cam company mapping in parallel
     let auditData = null;
+    let camMapping = null;
     if (NATIONAL_CONFIG.appsScriptUrl) {
-      try {
-        auditData = await this._fetchOnlinePresence();
+      const [auditResult, mappingResult] = await Promise.allSettled([
+        this._fetchOnlinePresence(),
+        this._fetchOwnerCamMapping()
+      ]);
+      if (auditResult.status === 'fulfilled') {
+        auditData = auditResult.value;
         console.log('[NationalApp] Loaded online presence:', auditData);
-      } catch (err) {
-        console.warn('[NationalApp] Online presence fetch failed:', err.message);
+      } else {
+        console.warn('[NationalApp] Online presence fetch failed:', auditResult.reason?.message);
+      }
+      if (mappingResult.status === 'fulfilled') {
+        camMapping = mappingResult.value;
+        console.log('[NationalApp] Loaded owner→Cam mapping:', camMapping);
+      } else {
+        console.warn('[NationalApp] Owner→Cam mapping fetch failed:', mappingResult.reason?.message);
       }
     }
 
@@ -177,9 +188,9 @@ const NationalApp = {
       this._loadScaffoldData(campaignKey);
     }
 
-    // Step 3: Map online presence data to owners (if we have it)
+    // Step 3: Map online presence data to owners using Cam mapping (if we have it)
     if (auditData && auditData.businesses && auditData.businesses.length) {
-      this._mapAuditToOwners(auditData.businesses);
+      this._mapAuditToOwners(auditData.businesses, camMapping);
     }
   },
 
@@ -205,6 +216,18 @@ const NationalApp = {
     };
   },
 
+  // ── Fetch owner → Cam company mapping from _OwnerCamMapping tab ──
+  async _fetchOwnerCamMapping() {
+    const url = NATIONAL_CONFIG.appsScriptUrl +
+      '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
+      '&action=ownerCamMapping' +
+      '&_t=' + Date.now();
+    const resp = await fetch(url);
+    const result = await resp.json();
+    if (result.error) throw new Error(result.error);
+    return result.mapping || {};
+  },
+
   // ── Fetch online presence data from Cam's Performance Audit sheet ──
   async _fetchOnlinePresence() {
     const url = NATIONAL_CONFIG.appsScriptUrl +
@@ -218,40 +241,58 @@ const NationalApp = {
   },
 
   // ── Map online presence businesses to owners ──
-  // Uses Client Name → owner name matching with alias fallback
-  _mapAuditToOwners(businesses) {
-    const aliases = NATIONAL_CONFIG.ownerAliases || {};
-
-    // Build a lookup: lowercase canonical name → owner object
+  // Uses _OwnerCamMapping tab (Owner Name → Cam Company Name) for exact matching.
+  // Falls back to old alias/partial matching if no mapping is available.
+  _mapAuditToOwners(businesses, camMapping) {
+    // Build owner lookup: lowercase name → owner object
     const ownerMap = {};
     for (const owner of this.state.owners) {
       ownerMap[owner.name.toLowerCase()] = owner;
-    }
-
-    // Also index by tab name (sometimes different)
-    for (const owner of this.state.owners) {
       if (owner.tab && owner.tab.toLowerCase() !== owner.name.toLowerCase()) {
         ownerMap[owner.tab.toLowerCase()] = owner;
       }
     }
 
+    // Build reverse lookup from mapping: lowercase Cam company name → owner object
+    const companyToOwner = {};
+    if (camMapping && typeof camMapping === 'object') {
+      for (const [ownerName, companies] of Object.entries(camMapping)) {
+        const owner = ownerMap[ownerName.toLowerCase()];
+        if (!owner) {
+          console.warn('[NationalApp] Mapping references unknown owner:', ownerName);
+          continue;
+        }
+        for (const company of companies) {
+          companyToOwner[company.toLowerCase().trim()] = owner;
+        }
+      }
+      console.log('[NationalApp] Cam mapping loaded:', Object.keys(companyToOwner).length, 'companies →', Object.keys(camMapping).length, 'owners');
+    }
+
+    const hasMapping = Object.keys(companyToOwner).length > 0;
     const unmatched = [];
 
     for (const biz of businesses) {
-      const clientKey = biz.clientName.toLowerCase().trim();
+      const bizName = (biz.businessName || biz.clientName || '').toLowerCase().trim();
+      const clientKey = (biz.clientName || '').toLowerCase().trim();
+      let owner = null;
 
-      // Try: exact match → alias → partial match
-      let owner = ownerMap[clientKey]
-        || (aliases[clientKey] && ownerMap[aliases[clientKey].toLowerCase()])
-        || null;
-
-      // Partial match fallback: check if clientName contains or is contained by any owner name
-      if (!owner) {
-        for (const o of this.state.owners) {
-          const oLower = o.name.toLowerCase();
-          if (clientKey.indexOf(oLower) >= 0 || oLower.indexOf(clientKey) >= 0) {
-            owner = o;
-            break;
+      if (hasMapping) {
+        // Use mapping: match on business name or client name
+        owner = companyToOwner[bizName] || companyToOwner[clientKey] || null;
+      } else {
+        // Fallback: alias + partial matching (legacy behavior)
+        const aliases = NATIONAL_CONFIG.ownerAliases || {};
+        owner = ownerMap[clientKey]
+          || (aliases[clientKey] && ownerMap[aliases[clientKey].toLowerCase()])
+          || null;
+        if (!owner) {
+          for (const o of this.state.owners) {
+            const oLower = o.name.toLowerCase();
+            if (clientKey.indexOf(oLower) >= 0 || oLower.indexOf(clientKey) >= 0) {
+              owner = o;
+              break;
+            }
           }
         }
       }
@@ -260,12 +301,12 @@ const NationalApp = {
         if (!owner.audit.businesses) owner.audit.businesses = [];
         owner.audit.businesses.push(biz);
       } else {
-        unmatched.push(biz.clientName);
+        unmatched.push(biz.clientName + (biz.businessName ? ' / ' + biz.businessName : ''));
       }
     }
 
     if (unmatched.length) {
-      console.warn('[NationalApp] Unmatched audit businesses — add these to ownerAliases in national-config.js:', unmatched);
+      console.warn('[NationalApp] Unmatched audit businesses (' + unmatched.length + '):', unmatched);
     }
 
     // Calculate grades for each owner from their businesses

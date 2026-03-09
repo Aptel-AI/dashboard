@@ -53,6 +53,11 @@ function doGet(e) {
       return jsonResp(readNationalRecruiting(weeks));
     }
 
+    // ── Owner → Cam Company mapping from _OwnerCamMapping tab ──
+    if (action === 'ownerCamMapping') {
+      return jsonResp(readOwnerCamMapping());
+    }
+
     // ── Online presence / audit data from Cam's sheet ──
     if (action === 'onlinePresence') {
       return jsonResp(readOnlinePresence());
@@ -853,6 +858,35 @@ function _campaignSlug(label) {
 }
 
 // ══════════════════════════════════════════════════
+// OWNER → CAM COMPANY MAPPING
+// Reads '_OwnerCamMapping' tab from Ken's national sheet.
+// Two columns: Owner Name | Cam Company Name
+// Returns { mapping: { "Owner Name": ["Company A", "Company B"], ... } }
+// ══════════════════════════════════════════════════
+
+function readOwnerCamMapping() {
+  var ss = SpreadsheetApp.openById(SHEETS.NATIONAL);
+  var sheet = ss.getSheetByName('_OwnerCamMapping');
+  if (!sheet) return { mapping: {} };
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { mapping: {} };
+
+  // Expect headers: Owner Name | Cam Company Name
+  var mapping = {};
+  for (var i = 1; i < data.length; i++) {
+    var ownerName = String(data[i][0] || '').trim();
+    var camCompany = String(data[i][1] || '').trim();
+    if (!ownerName || !camCompany) continue;
+    if (!mapping[ownerName]) mapping[ownerName] = [];
+    mapping[ownerName].push(camCompany);
+  }
+
+  return { mapping: mapping };
+}
+
+
+// ══════════════════════════════════════════════════
 // ONLINE PRESENCE — Read Cam's Performance Audit sheet
 // Returns all business rows with review platforms,
 // Instagram, website, blog, and SEO data
@@ -868,29 +902,24 @@ function readOnlinePresence() {
     return { error: 'Cannot open Performance Audit sheet: ' + err.message, businesses: [] };
   }
 
-  // Find the tab with audit data (look for "Client Name" header)
-  var allSheets = ss.getSheets();
-  var sheet = null;
-  var data = null;
+  // Read from 'vlookup' tab specifically
+  var sheet = ss.getSheetByName('vlookup');
+  if (!sheet) return { businesses: [] };
+
+  var data = sheet.getDataRange().getValues();
   var headerRowIdx = -1;
 
-  for (var si = 0; si < allSheets.length; si++) {
-    var d = allSheets[si].getDataRange().getValues();
-    for (var r = 0; r < Math.min(5, d.length); r++) {
-      for (var c = 0; c < d[r].length; c++) {
-        if (String(d[r][c]).toLowerCase().trim() === 'client name') {
-          sheet = allSheets[si];
-          data = d;
-          headerRowIdx = r;
-          break;
-        }
+  for (var r = 0; r < Math.min(5, data.length); r++) {
+    for (var c = 0; c < data[r].length; c++) {
+      if (String(data[r][c]).toLowerCase().trim() === 'client name') {
+        headerRowIdx = r;
+        break;
       }
-      if (sheet) break;
     }
-    if (sheet) break;
+    if (headerRowIdx >= 0) break;
   }
 
-  if (!sheet || headerRowIdx < 0) return { businesses: [] };
+  if (headerRowIdx < 0) return { businesses: [] };
 
   var headers = data[headerRowIdx].map(function(h) { return String(h).toLowerCase().trim(); });
 
