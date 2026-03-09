@@ -722,9 +722,22 @@ function readNationalRecruiting(weekCount) {
       // Grab raw data from first data row to check alignment
       var firstDataRow = dsec.startRow < dbgData.length ? dbgData[dsec.startRow] : [];
       var rawFirstRow = {};
-      for (var ri2 = 0; ri2 < Math.min(firstDataRow.length, 15); ri2++) {
+      for (var ri2 = 0; ri2 < Math.min(firstDataRow.length, 25); ri2++) {
         rawFirstRow['col' + ri2] = firstDataRow[ri2];
       }
+      // Resolve colMap with updated patterns to show what parser will use
+      var resolvedColMap = {
+        '1stBooked': findCol(dsec.headers, ['1st rounds booked', '1st round booked', '1st rds booked']),
+        '1stShowed': findCol(dsec.headers, ['1st rounds showed', '1st round showed', '1st rds showed']),
+        'turnedTo2nd': findCol(dsec.headers, ['conversion', '% call list booked', 'turned to 2nd']),
+        'rete1': _findNthPattern(dsec.headers, 'rete', 1),
+        '2ndBooked': findCol(dsec.headers, ['2nd rounds booked', '2nd round booked', '2nd rds booked']),
+        '2ndShowed': findCol(dsec.headers, ['2nd rounds showed', '2nd round showed', '2nd rds showed']),
+        'rete2': _findNthPattern(dsec.headers, 'rete', 2),
+        'newStartSched': findCol(dsec.headers, ['new start scheduled', 'new starts scheduled', 'new start booked', 'new starts booked']),
+        'newStartShowed': findCol(dsec.headers, ['new starts showed', 'new start showed']),
+        'rete3': _findNthPattern(dsec.headers, 'rete', 3)
+      };
       _debugSections.push({
         label: dsec.label,
         slug: _campaignSlug(dsec.label),
@@ -734,6 +747,7 @@ function readNationalRecruiting(weekCount) {
         totalRows: dsec.endRow - dsec.startRow + 1,
         parsedOwnerCount: parsedCount,
         headerMap: headerMap,
+        resolvedColMap: resolvedColMap,
         rawFirstDataRow: rawFirstRow,
         firstRow: rowNames[0],
         lastRow: rowNames[rowNames.length - 1]
