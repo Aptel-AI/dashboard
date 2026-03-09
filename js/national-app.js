@@ -310,10 +310,7 @@ const NationalApp = {
     if (camMapping && typeof camMapping === 'object') {
       for (const [ownerName, companies] of Object.entries(camMapping)) {
         const owner = ownerMap[ownerName.toLowerCase()];
-        if (!owner) {
-          console.warn('[NationalApp] Mapping references unknown owner:', ownerName);
-          continue;
-        }
+        if (!owner) continue;
         for (const company of companies) {
           companyToOwner[company.toLowerCase().trim()] = owner;
         }
