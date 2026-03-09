@@ -711,13 +711,20 @@ function readNationalRecruiting(weekCount) {
       for (var dr = dsec.startRow; dr <= dsec.endRow; dr++) {
         rowNames.push({ row: dr, colA: String(dbgData[dr][0] || '').trim() });
       }
-      // Get parsed result for this section
+      // Get parsed result and column mapping for this section
       var parsedData = _parseOwnerRecruiting(dbgData, dsec);
-      var parsedOwners = Object.keys(parsedData).map(function(name) {
-        var vals = parsedData[name];
-        var hasData = vals.some(function(v) { return v > 0; });
-        return { name: name, hasData: hasData, sample: vals.slice(0, 4) };
-      });
+      var parsedCount = Object.keys(parsedData).length;
+      // Show the actual headers and which columns mapped
+      var sectionHeaders = dsec.headers.filter(function(h) { return h && h.length > 0; });
+      var colMap = [
+        findCol(dsec.headers, ['1st rounds booked', '1st round booked']),
+        findCol(dsec.headers, ['1st rounds showed', '1st round showed']),
+        findCol(dsec.headers, ['2nd rounds booked', '2nd round booked']),
+        findCol(dsec.headers, ['2nd rounds showed', '2nd round showed']),
+        findCol(dsec.headers, ['new start scheduled', 'new starts scheduled']),
+        findCol(dsec.headers, ['new starts showed']),
+        findCol(dsec.headers, ['conversion', '% call list booked'])
+      ];
       _debugSections.push({
         label: dsec.label,
         slug: _campaignSlug(dsec.label),
@@ -725,8 +732,17 @@ function readNationalRecruiting(weekCount) {
         startRow: dsec.startRow,
         endRow: dsec.endRow,
         totalRows: dsec.endRow - dsec.startRow + 1,
-        parsedOwnerCount: parsedOwners.length,
-        parsedOwners: parsedOwners,
+        parsedOwnerCount: parsedCount,
+        headers: sectionHeaders,
+        colMap: {
+          '1stBooked': colMap[0],
+          '1stShowed': colMap[1],
+          '2ndBooked': colMap[2],
+          '2ndShowed': colMap[3],
+          'newStartSched': colMap[4],
+          'newStartShowed': colMap[5],
+          'conversion': colMap[6]
+        },
         firstRow: rowNames[0],
         lastRow: rowNames[rowNames.length - 1]
       });
