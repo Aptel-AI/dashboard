@@ -1773,11 +1773,14 @@ function readNLRProduction() {
     for (var i = headersRow + 1; i < data.length; i++) {
       var row = data[i];
       var nameVal = cols.ownerName >= 0 ? String(row[9 + cols.ownerName] || '').trim() : '';
-      if (!nameVal) break; // Empty name = end of section
-
       var repVal = cols.rep >= 0 ? String(row[9 + cols.rep] || '').trim() : '';
+
+      // Owner total row has owner name in col J + "Total" in col K
+      // Rep rows have empty col J and rep name in col K
+      if (!nameVal && !repVal) break; // Both empty = end of section
+
       var entry = {
-        name: nameVal,
+        name: nameVal || repVal,
         rep: repVal,
         totalVolume:  cols.totalVolume >= 0 ? num(row[9 + cols.totalVolume]) : 0,
         repCount:     cols.repCount >= 0 ? num(row[9 + cols.repCount]) : 0,
