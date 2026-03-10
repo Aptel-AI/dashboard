@@ -216,7 +216,16 @@ function importLatestRecruiting(weekCount) {
 
   if (!importedTabNames.length) return { error: 'No importable data found in source tabs' };
 
-  // 6. Return success + fresh data
+  // 6. Import applies/STL from NLR B2B sheet
+  var appliesResult = {};
+  try {
+    appliesResult = importNLRApplies();
+    Logger.log('NLR applies import: ' + JSON.stringify(appliesResult));
+  } catch (err) {
+    Logger.log('NLR applies import failed (non-fatal): ' + err.message);
+  }
+
+  // 7. Return success + fresh data
   var freshData = readNationalRecruiting(6);
 
   return {
@@ -711,7 +720,67 @@ function readNationalRecruiting(weekCount) {
     }
   }
 
+  // Merge applies/STL from _B2B_Applies tab into positions 0 and 1
+  try {
+    var appliesData = readLocalApplies();
+    var appliesOwners = appliesData.owners || {};
+    if (Object.keys(appliesOwners).length) {
+      _mergeAppliesIntoCampaigns(campaigns, appliesOwners);
+    }
+  } catch (err) {
+    Logger.log('Applies merge failed (non-fatal): ' + err.message);
+  }
+
   return { campaigns: campaigns };
+}
+
+// ── Merge applies/STL into campaign week data ──
+// appliesOwners: { "OwnerName": { "MM/DD/YYYY": { applies, stl } } }
+// For each campaign week (tabName like "3/3"), find matching date in applies data.
+function _mergeAppliesIntoCampaigns(campaigns, appliesOwners) {
+  var keys = Object.keys(campaigns);
+  for (var k = 0; k < keys.length; k++) {
+    var camp = campaigns[keys[k]];
+    for (var w = 0; w < camp.weeks.length; w++) {
+      var week = camp.weeks[w];
+      var tabDate = _parseTabDate(week.tabName);
+      if (!tabDate) continue;
+      var normalizedTabDate = _normalizeDate(tabDate);
+
+      var ownerNames = Object.keys(week.data);
+      for (var o = 0; o < ownerNames.length; o++) {
+        var ownerName = ownerNames[o];
+        var ownerApplies = appliesOwners[ownerName];
+        if (!ownerApplies) continue;
+
+        // Try exact date match first
+        var match = ownerApplies[normalizedTabDate];
+
+        // If no exact match, try ±2 days (week boundaries may differ slightly)
+        if (!match) {
+          var tabMs = tabDate.getTime();
+          var bestKey = null;
+          var bestDiff = Infinity;
+          var aKeys = Object.keys(ownerApplies);
+          for (var ai = 0; ai < aKeys.length; ai++) {
+            var aDate = _parseTabDate(aKeys[ai]);
+            if (!aDate) continue;
+            var diff = Math.abs(aDate.getTime() - tabMs);
+            if (diff < bestDiff && diff <= 2 * 86400000) { // ±2 days
+              bestDiff = diff;
+              bestKey = aKeys[ai];
+            }
+          }
+          if (bestKey) match = ownerApplies[bestKey];
+        }
+
+        if (match) {
+          week.data[ownerName][0] = match.applies || 0;
+          week.data[ownerName][1] = match.stl || 0;
+        }
+      }
+    }
+  }
 }
 
 // ── Detect campaign section headers ──
@@ -1406,6 +1475,181 @@ function importNLRHeadcount() {
   }
 
   return { success: true, ownersImported: ownerNames.length, rowsWritten: rows.length };
+}
+
+// ══════════════════════════════════════════════════
+// READ NLR B2B APPLIES RECEIVED / SENT TO LIST
+// Each owner tab has a section further down:
+//   Row N-2: date headers (col C onward)
+//   Row N:   "Applies Received" in col A, values in col C+
+//   Row N+1: "Sent to List" in col A, values in col C+
+// Returns { owners: { "TabName": { dates: [...], appliesReceived: [...], sentToList: [...] } } }
+// ══════════════════════════════════════════════════
+
+function readNLRApplies() {
+  if (!SHEETS.NLR_B2B) return { owners: {} };
+
+  var ss;
+  try {
+    ss = SpreadsheetApp.openById(SHEETS.NLR_B2B);
+  } catch (err) {
+    return { error: 'Cannot open NLR B2B sheet: ' + err.message, owners: {} };
+  }
+
+  var SKIP_TABS = {
+    'input - sales qual metrics': true,
+    'input - comm per rep and total dd': true,
+    'input - market metrics': true,
+    'sheet2': true
+  };
+
+  var allSheets = ss.getSheets();
+  var owners = {};
+
+  for (var t = 0; t < allSheets.length; t++) {
+    var sheet = allSheets[t];
+    var tabName = sheet.getName().trim();
+    if (SKIP_TABS[tabName.toLowerCase()]) continue;
+
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    if (lastRow < 4 || lastCol < 3) continue;
+
+    var data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+
+    // Find "Applies Received" row in column A
+    var appliesRow = -1;
+    for (var i = 0; i < data.length; i++) {
+      var cellA = String(data[i][0] || '').trim().toLowerCase();
+      if (cellA === 'applies received') { appliesRow = i; break; }
+    }
+    if (appliesRow < 2) continue; // Need at least 2 rows above for headers
+
+    // Headers are 2 rows above, starting from column C (index 2)
+    var headerRow = appliesRow - 2;
+    var dates = [];
+    for (var c = 2; c < data[headerRow].length; c++) {
+      var h = data[headerRow][c];
+      if (!h && h !== 0) break;
+      dates.push(_normalizeDate(h));
+    }
+    if (!dates.length) continue;
+
+    // Read Applies Received values
+    var appliesValues = [];
+    for (var c = 2; c < 2 + dates.length; c++) {
+      appliesValues.push(num(data[appliesRow][c]));
+    }
+
+    // Read Sent to List values (next row)
+    var stlValues = [];
+    var stlRow = appliesRow + 1;
+    if (stlRow < data.length) {
+      var stlLabel = String(data[stlRow][0] || '').trim().toLowerCase();
+      if (stlLabel === 'sent to list') {
+        for (var c = 2; c < 2 + dates.length; c++) {
+          stlValues.push(num(data[stlRow][c]));
+        }
+      }
+    }
+
+    owners[tabName] = {
+      dates: dates,
+      appliesReceived: appliesValues,
+      sentToList: stlValues
+    };
+  }
+
+  return { owners: owners };
+}
+
+// ══════════════════════════════════════════════════
+// IMPORT NLR APPLIES → LOCAL _B2B_Applies TAB
+// Reads applies/STL from NLR B2B, writes to Ken's sheet.
+// Tab format: Owner | Date | AppliesReceived | SentToList
+// ══════════════════════════════════════════════════
+
+function importNLRApplies() {
+  var nlrResult = readNLRApplies();
+  if (nlrResult.error) return nlrResult;
+  var nlrOwners = nlrResult.owners || {};
+  if (!Object.keys(nlrOwners).length) return { error: 'No applies data found in NLR sheet' };
+
+  var ss;
+  try {
+    ss = SpreadsheetApp.openById(SHEETS.NATIONAL);
+  } catch (err) {
+    return { error: 'Cannot open national sheet: ' + err.message };
+  }
+
+  var TAB_NAME = '_B2B_Applies';
+  var sheet = ss.getSheetByName(TAB_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(TAB_NAME);
+    sheet.appendRow(['Owner', 'Date', 'AppliesReceived', 'SentToList']);
+  } else {
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, 4).clearContent();
+    }
+  }
+
+  var rows = [];
+  var ownerNames = Object.keys(nlrOwners).sort();
+  for (var o = 0; o < ownerNames.length; o++) {
+    var name = ownerNames[o];
+    var d = nlrOwners[name];
+    for (var i = 0; i < d.dates.length; i++) {
+      rows.push([
+        name,
+        d.dates[i],
+        d.appliesReceived[i] || 0,
+        d.sentToList.length > i ? d.sentToList[i] : 0
+      ]);
+    }
+  }
+
+  if (rows.length) {
+    sheet.getRange(2, 1, rows.length, 4).setValues(rows);
+  }
+
+  return { success: true, ownersImported: ownerNames.length, rowsWritten: rows.length };
+}
+
+// ══════════════════════════════════════════════════
+// READ LOCAL APPLIES from _B2B_Applies tab
+// Returns { owners: { "Name": { "MM/DD/YYYY": { applies: N, stl: N } } } }
+// ══════════════════════════════════════════════════
+
+function readLocalApplies() {
+  var ss;
+  try {
+    ss = SpreadsheetApp.openById(SHEETS.NATIONAL);
+  } catch (err) {
+    return { owners: {} };
+  }
+
+  var sheet = ss.getSheetByName('_B2B_Applies');
+  if (!sheet) return { owners: {} };
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { owners: {} };
+
+  var owners = {};
+  for (var i = 1; i < data.length; i++) {
+    var name = String(data[i][0] || '').trim();
+    if (!name) continue;
+    var date = _normalizeDate(data[i][1]);
+    if (!date || date === '—') continue;
+
+    if (!owners[name]) owners[name] = {};
+    owners[name][date] = {
+      applies: num(data[i][2]),
+      stl: num(data[i][3])
+    };
+  }
+
+  return { owners: owners };
 }
 
 // ══════════════════════════════════════════════════
