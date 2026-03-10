@@ -1044,6 +1044,24 @@ const NationalApp = {
             label: campaignData.label || ''
           });
         }
+
+        // Re-enrich B2B owners with headcount/production from _B2B_Headcount tab
+        // (buildOwnersFromSheet resets headcount to zeros, so we must re-fetch)
+        if (campaignKey === 'att-b2b' && NATIONAL_CONFIG.appsScriptUrl) {
+          try {
+            const hcData = await this._fetchB2BHeadcount();
+            if (hcData && hcData.owners && Object.keys(hcData.owners).length) {
+              this._enrichOwnersWithNLR(hcData.owners);
+            }
+          } catch (err) {
+            console.warn('[NationalApp] Post-import headcount re-fetch failed:', err.message);
+          }
+        }
+
+        // Re-map audit data to owners if cached
+        if (this._cachedAuditBusinesses && this._cachedAuditBusinesses.length) {
+          this._mapAuditToOwners(this._cachedAuditBusinesses, this.state.camMapping);
+        }
       }
 
       // Re-render dashboard
