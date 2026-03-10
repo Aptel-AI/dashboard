@@ -30,7 +30,7 @@ const PostSale = {
     this._formData = {
       dateOfSale: (() => { const n = new Date(); return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0'); })(),
       dsi: '',
-      accountType: 'Business',
+      accountType: 'Consumer',
       accountNotes: '',
       trainee: false,
       traineeName: '',
@@ -161,13 +161,8 @@ const PostSale = {
         <div class="wizard-error">SPM must be at least 12 characters</div>
       </div>
 
-      <div class="wizard-field">
-        <label class="wizard-label">Type of Account</label>
-        <div class="toggle-group" id="ps-account-type-toggle">
-          <button class="toggle-btn ${d.accountType === 'Consumer' ? 'active' : ''}" onclick="PostSale.setAccountType('Consumer')">Consumer</button>
-          <button class="toggle-btn ${d.accountType === 'Business' ? 'active' : ''}" onclick="PostSale.setAccountType('Business')">Business</button>
-        </div>
-      </div>
+      <!-- Account type hidden — NDS is always Consumer -->
+      <input type="hidden" id="ps-account-type" value="Consumer">
 
       <div class="wizard-field">
         <label class="wizard-label">Did you have a trainee?</label>
@@ -314,7 +309,7 @@ const PostSale = {
         <div class="review-row"><span class="review-row-label">Date</span><span class="review-row-value">${this._formatDate(d.dateOfSale)}</span></div>
         <div class="review-row"><span class="review-row-label">Campaign</span><span class="review-row-value">AT&T B2B</span></div>
         <div class="review-row"><span class="review-row-label">SPM</span><span class="review-row-value">${this._esc(d.dsi)}</span></div>
-        <div class="review-row"><span class="review-row-label">Account Type</span><span class="review-row-value">${d.accountType}</span></div>
+        <div class="review-row"><span class="review-row-label">Account Type</span><span class="review-row-value">Consumer</span></div>
         ${d.trainee ? `<div class="review-row"><span class="review-row-label">Trainee</span><span class="review-row-value">${this._esc(d.traineeName)}</span></div>` : ''}
         <div class="review-row"><span class="review-row-label">Processed Via</span><span class="review-row-value${d.orderChannel === 'Tower' ? '" style="color:var(--orange);font-weight:700' : ''}">${d.orderChannel}${d.orderChannel === 'Tower' ? ' (no leaderboard)' : ''}</span></div>
         ${d.codesUsed && d.codesUsedBy ? `<div class="review-row"><span class="review-row-label">Codes Used</span><span class="review-row-value" style="color:var(--orange)">${this._esc(d.codesUsedByName || d.codesUsedBy)}</span></div>` : ''}
@@ -520,7 +515,7 @@ const PostSale = {
       // Line 1: **Rep** made a sale with AT&T: B2B!
       msg += '**' + payload.repName + '** made a sale with AT&T: B2B!\n';
       // Line 2: Account type
-      msg += (payload.accountType || 'Business') + ' Account\n';
+      msg += 'Consumer Account\n';
       // Line 3: SPM
       msg += payload.dsi + '\n';
       // Product bullet lines
