@@ -521,26 +521,23 @@ const NationalApp = {
       owner.audit.reviewsCount = ratingCount;
     }
 
-    // Website: % updated this month
-    let websiteUpdated = 0;
+    // Website: aggregate per-business grades → modal (most common) grade
+    const websiteGrades = [];
     for (const b of bizList) {
-      const val = (b.website?.updatedMonth || '').toLowerCase();
-      if (val === 'yes' || val === 'y' || val === '✓' || val === 'true' || val === 'x') {
-        websiteUpdated++;
-      }
+      const g = this._bizWebsiteGrade(b);
+      if (g !== '—') websiteGrades.push(g);
     }
-    owner.audit.grades.website = this._pctToGrade(websiteUpdated, total);
-    owner.audit.websiteUpdated = websiteUpdated;
+    owner.audit.grades.website = this._modalGrade(websiteGrades);
+    owner.audit.websiteUpdated = websiteGrades.length;
 
-    // Social: has IG presence (link or followers > 0)
-    let hasIG = 0;
+    // Social: aggregate per-business grades → modal grade
+    const socialGrades = [];
     for (const b of bizList) {
-      if (b.instagram && (b.instagram.link || b.instagram.followers > 0)) {
-        hasIG++;
-      }
+      const g = this._bizSocialGrade(b);
+      if (g !== '—') socialGrades.push(g);
     }
-    owner.audit.grades.social = this._pctToGrade(hasIG, total);
-    owner.audit.igCount = hasIG;
+    owner.audit.grades.social = this._modalGrade(socialGrades);
+    owner.audit.igCount = socialGrades.length;
 
     // SEO: % passing
     let seoPassing = 0;
@@ -574,6 +571,24 @@ const NationalApp = {
     if (pct >= 0.5) return 'C';
     if (pct >= 0.3) return 'D';
     return 'F';
+  },
+
+  // Aggregate an array of letter grades into a single owner-level grade
+  // Uses grade-point average: A+=4.3, A=4, A-=3.7, B=3, B-=2.7, C=2.5, C-=2.3, D=1
+  _modalGrade(grades) {
+    if (!grades.length) return '—';
+    const gpa = { 'A+': 4.3, 'A': 4, 'A-': 3.7, 'B': 3, 'B-': 2.7, 'C': 2.5, 'C-': 2.3, 'D': 1, 'F': 0 };
+    let sum = 0;
+    for (const g of grades) sum += (gpa[g] ?? 0);
+    const avg = sum / grades.length;
+    if (avg >= 4.15) return 'A+';
+    if (avg >= 3.85) return 'A';
+    if (avg >= 3.35) return 'A-';
+    if (avg >= 2.85) return 'B';
+    if (avg >= 2.6)  return 'B-';
+    if (avg >= 2.4)  return 'C';
+    if (avg >= 2.15) return 'C-';
+    return 'D';
   },
 
   // ── Build owner objects from national sheet data ──
@@ -2040,26 +2055,53 @@ const NationalApp = {
     return '—';
   },
 
+  // Website grade: scored on site photos, updates, blog activity
+  // No Cam formula exists (grades are manual in Cam's system), so we
+  // score on available data: photos (no stock), updated, blog posts, blog queue
   _bizWebsiteGrade(b) {
     const ws = b.website;
     const blog = b.blog;
-    let score = 0, factors = 0;
-    // Site updated?
+    // Must have at least a website URL or site photo data to grade
+    if (!ws?.url && !ws?.sitePhotos && !blog?.url) return '—';
+
+    let score = 0;
+    // Site photos: "No stock photos" = good (1pt), has any photo data = neutral (0.5pt)
+    const photos = (ws?.sitePhotos || '').toLowerCase();
+    if (photos.includes('no stock')) score += 2;
+    else if (photos && !photos.includes('all stock')) score += 1;
+
+    // Updated this month: yes = 2pts
     const wsUpdated = (ws?.updatedMonth || '').toLowerCase();
-    const wsIsUpdated = wsUpdated === 'yes' || wsUpdated === 'y' || wsUpdated === '✓' || wsUpdated === 'true' || wsUpdated === 'x';
-    if (ws?.url) { factors++; if (wsIsUpdated) score++; }
-    // Blog active?
-    if (blog?.url) { factors++; if (blog.onQueue > 0 || blog.currentMonth > 0) score++; }
-    if (!factors) return '—';
-    return this._pctToGrade(score, factors);
+    if (wsUpdated === 'yes' || wsUpdated === 'y' || wsUpdated === '✓' || wsUpdated === 'true' || wsUpdated === 'x') score += 2;
+
+    // Last updated date: exists = 1pt
+    if (ws?.lastUpdated) score += 1;
+
+    // Blog: has URL = 1pt, has posts this month = 1pt, has queue = 1pt
+    if (blog?.url || blog?.lastPost) score += 1;
+    if (blog?.currentMonth > 0 || blog?.threeMonthCount > 0) score += 1;
+    if (blog?.onQueue > 0) score += 1;
+
+    // Grade: 7-8 = A+, 5-6 = A, 4 = A-, 3 = B, 2 = C, 1 = D, 0 = D
+    if (score >= 7) return 'A+';
+    if (score >= 5) return 'A';
+    if (score >= 4) return 'A-';
+    if (score >= 3) return 'B';
+    if (score >= 2) return 'C';
+    return 'D';
   },
 
+  // Matches Cam's Social Media grading formula from Dashboard V2
   _bizSocialGrade(b) {
     const ig = b.instagram;
-    if (!ig || (!ig.link && !ig.followers)) return '—';
-    if (ig.followers >= 500) return 'A';
-    if (ig.followers >= 200) return 'B';
-    if (ig.followers >= 50) return 'C';
+    if (!ig || (!ig.link && !ig.followers && !ig.shared && !ig.generated)) return '—';
+    const shared = ig.shared || 0;
+    const generated = ig.generated || 0;
+    const followers = ig.followers || 0;
+    if (shared >= 6 && followers > 500) return 'A+';
+    if (shared >= 6) return 'A';
+    if (shared >= 4) return 'B';
+    if ((shared === 0 && generated >= 6) || shared >= 2) return 'C';
     return 'D';
   },
 
