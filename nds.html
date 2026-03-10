@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATT NDS</title>
+
+  <!-- Favicon (swaps to white on dark tab bars) -->
+  <link rel="icon" type="image/png" href="references/logos/aptel-symbol-black.png" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" href="references/logos/aptel-symbol-white.png" media="(prefers-color-scheme: dark)">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/styles.css?v=20260305i">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     LOGIN SCREEN
+     ═══════════════════════════════════════════════════════ -->
+<div id="login-screen" class="login-screen" style="display:none">
+  <div class="login-card">
+    <div class="login-logo-wrap"><img id="login-logo" src="references/logos/aptel-symbol-black.png" alt="Aptel"></div>
+    <div class="login-step-title">Sign In</div>
+    <div class="login-step-subtitle">Enter your email to access the dashboard</div>
+
+    <!-- STEP 1: Email -->
+    <div id="login-email-wrap">
+      <input id="login-email" class="login-input" type="email" placeholder="Enter your email" autocomplete="email">
+    </div>
+
+    <!-- STEP 2a: Enter existing PIN -->
+    <div id="login-pin-wrap" style="display:none">
+      <input id="login-pin" class="login-input login-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Enter your PIN" autocomplete="off">
+    </div>
+
+    <!-- STEP 2b: Create new PIN (first login) -->
+    <div id="login-pin-create-wrap" style="display:none">
+      <input id="login-pin-new" class="login-input login-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Create a 4-6 digit PIN" autocomplete="off">
+      <input id="login-pin-confirm" class="login-input login-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Confirm your PIN" autocomplete="off">
+    </div>
+
+    <button id="login-btn" class="login-btn">Continue</button>
+    <div id="login-error" class="login-error"></div>
+
+    <div id="login-back-link" style="display:none">&larr; Use a different email</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     LOADING SCREEN
+     ═══════════════════════════════════════════════════════ -->
+<div id="loading-screen" style="display:flex;position:fixed;inset:0;z-index:9000;background:#FEFAF3;align-items:center;justify-content:center;flex-direction:column">
+  <img id="loading-logo" src="references/logos/aptel-full-black.png" alt="Aptel" style="height:40px;width:auto;margin-bottom:28px;opacity:0.85">
+  <div class="loading-spinner"></div>
+  <div id="loading-text" style="margin-top:20px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#708090">Loading...</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MAIN CONTAINER
+     ═══════════════════════════════════════════════════════ -->
+<div class="container" style="display:none">
+
+  <!-- HEADER (sticky) -->
+  <header>
+    <div class="header-top">
+      <div class="logo-area">
+        <img id="header-office-icon" class="header-office-icon" src="references/logos/aptel-symbol-black.png" alt="Office">
+        <span id="header-office-name" class="header-office-name"></span>
+        <div class="header-label-group">
+          <span class="week-label">Weekly Leaderboard</span>
+          <div class="live-badge">
+            <span class="live-dot"></span>
+            Live
+          </div>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <span id="last-updated-text" class="last-updated"></span>
+        <button class="refresh-btn" onclick="App.manualRefresh()" title="Refresh data">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 4v6h-6"/>
+            <path d="M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+          </svg>
+        </button>
+        <div id="office-switcher" style="display:none;position:relative">
+          <button id="office-switcher-btn" onclick="App.toggleOfficeSwitcher()"
+            style="display:flex;align-items:center;gap:6px;background:none;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:5px 12px;color:var(--white);font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.5px;cursor:pointer">
+            <span id="office-switcher-name" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div id="office-switcher-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;min-width:180px;background:#FFFFFF;border:1px solid rgba(0,0,0,0.15);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:100;overflow:hidden"></div>
+        </div>
+        <div id="header-user-info" style="display:none;text-align:right;margin-right:2px">
+          <div id="header-user-name" style="font-family:'Neue Montreal','Inter',sans-serif;font-size:13px;font-weight:700;color:var(--white);letter-spacing:0.3px"></div>
+          <div id="header-user-role" style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:10px;color:var(--silver-dim);letter-spacing:0.3px;text-transform:uppercase"></div>
+        </div>
+        <button onclick="App.logout()" title="Sign out" style="background:none;border:1px solid rgba(229,86,74,0.3);border-radius:6px;padding:5px 10px;color:#E5564A;font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">Logout</button>
+      </div>
+    </div>
+
+    <!-- NAV TABS — grouped: Post Sale | Personal | Team | Office -->
+    <nav id="main-nav">
+      <!-- POST SALE (pinned left, own category) -->
+      <button class="nav-tab" id="nav-post-sale" onclick="App.navTo('postSale')" style="display:none">Post Sale</button>
+      <span class="nav-separator" id="nav-sep-0" style="display:none"></span>
+
+      <!-- PERSONAL GROUP -->
+      <button class="nav-tab" id="nav-profile" onclick="App.navTo('profile')">My Profile</button>
+      <button class="nav-tab" id="nav-my-orders" onclick="App.navTo('myOrders')" style="display:none">My Orders</button>
+
+      <!-- SEPARATOR 1: Personal | Team -->
+      <span class="nav-separator" id="nav-sep-1" style="display:none"></span>
+
+      <!-- TEAM GROUP -->
+      <button class="nav-tab" id="nav-team" onclick="App.navTo('team')" style="display:none"><span id="nav-team-label">My Team</span></button>
+      <button class="nav-tab nav-tab-edit" id="nav-team-edit" onclick="App.handleTeamEditClick()" title="Customize team" style="position:relative;display:none">
+        <span id="edit-unlock-badge" style="display:none;position:absolute;top:2px;right:2px;width:8px;height:8px;background:#f97316;border-radius:50%;border:2px solid var(--black)"></span>
+      </button>
+      <button class="nav-tab" id="nav-team-roster" onclick="App.navTo('teamRoster')" style="display:none">Roster</button>
+
+      <!-- SEPARATOR 2: Team | Office (or Personal | Office) -->
+      <span class="nav-separator" id="nav-sep-2" style="display:none"></span>
+
+      <!-- OFFICE GROUP -->
+      <button class="nav-tab" id="nav-all-orders" onclick="App.navTo('allOrders')" style="display:none">All Orders</button>
+      <button class="nav-tab" id="nav-people" onclick="App.navTo('roster')" style="position:relative;display:none">
+        People
+        <span id="roster-notif-badge" style="display:none;position:absolute;top:4px;right:4px;min-width:16px;height:16px;background:#f97316;border-radius:8px;border:2px solid var(--black);font-size:9px;font-weight:700;color:#fff;align-items:center;justify-content:center;padding:0 3px;font-family:'Helvetica Neue','Inter',sans-serif;letter-spacing:0">0</span>
+      </button>
+      <button class="nav-tab" id="nav-teams" onclick="App.navTo('teams')" style="display:none">Teams</button>
+      <button class="nav-tab" id="nav-leaderboard" onclick="App.navTo('leaderboard')">Leaderboard</button>
+      <button class="nav-tab" id="nav-payroll" onclick="App.navTo('payroll')" style="display:none">Payroll</button>
+      <button class="nav-tab" id="nav-office" onclick="App.navTo('office')" style="display:none">Office</button>
+    </nav>
+  </header>
+
+  <!-- ════════════════════════════════════════════════
+       TEAM CUSTOMIZE MODAL
+       ════════════════════════════════════════════════ -->
+  <div id="team-customize-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.35);align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border:1px solid rgba(0,0,0,0.25);border-radius:16px;padding:32px;width:min(420px,90vw);box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+      <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:22px;font-weight:700;color:var(--white);margin-bottom:4px">Customize Your Team</div>
+      <div style="font-size:12px;color:var(--silver-dim);margin-bottom:24px">Changes how your team appears on the leaderboard</div>
+      <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:8px">Team Emoji</label>
+      <div id="emoji-picker" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;font-size:22px"></div>
+      <div style="font-size:11px;color:var(--silver-dim);margin-bottom:20px">Selected: <span id="emoji-display" style="font-size:18px"></span></div>
+      <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:8px">Team Name</label>
+      <input id="team-name-input" type="text" placeholder="Enter team name..."
+        style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:15px;outline:none;margin-bottom:24px">
+      <div style="display:flex;gap:10px">
+        <button onclick="App.saveTeamCustomize()" style="flex:1;background:var(--blue-core);border:none;border-radius:8px;padding:10px;color:#fff;font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">Save</button>
+        <button onclick="App.closeTeamCustomize()" style="flex:1;background:#F5F2EE;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:10px;color:var(--silver);font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       UNLOCK REQUEST MODAL (JD sees when not unlocked)
+       ════════════════════════════════════════════════ -->
+  <div id="unlock-request-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.35);align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border:1px solid rgba(0,0,0,0.25);border-radius:16px;padding:32px;width:min(400px,90vw);text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+      <div style="font-size:40px;margin-bottom:12px"></div>
+      <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:22px;font-weight:700;color:var(--white);margin-bottom:8px">Request Edit Access</div>
+      <div style="font-size:13px;color:var(--silver-dim);margin-bottom:24px;line-height:1.6">Team customization requires approval from an Admin or Owner. Send a request to unlock this feature.</div>
+      <div id="unlock-request-status"></div>
+      <div style="display:flex;gap:10px">
+        <button id="unlock-send-btn" onclick="App.sendUnlockRequest()" style="flex:1;background:var(--blue-core);border:none;border-radius:8px;padding:10px;color:#fff;font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">Send Request</button>
+        <button onclick="App.closeUnlockModal()" style="flex:1;background:#F5F2EE;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:10px;color:var(--silver);font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       ROSTER PAGE (People Management)
+       ════════════════════════════════════════════════ -->
+  <div id="roster-page" style="display:none">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 0 80px">
+
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid rgba(0,0,0,0.3);margin-bottom:28px">
+        <div style="display:flex;align-items:center;gap:16px">
+          <div>
+            <div style="display:flex;align-items:center;gap:16px">
+              <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:32px;font-weight:700;color:var(--white);letter-spacing:0.5px">People</div>
+              <button id="add-member-btn" onclick="App.openAddMemberModal()" style="display:none;background:var(--blue-core);border:none;border-radius:8px;padding:8px 16px;color:#fff;font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">+ Add Member</button>
+              <button id="roster-refresh-btn" onclick="App.refreshRoster()" style="background:none;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:8px 12px;color:var(--blue-core);font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">&#x21bb; Refresh</button>
+            </div>
+            <div style="font-size:12px;color:var(--silver-dim);margin-top:4px" id="roster-subtitle"></div>
+          </div>
+        </div>
+        <!-- Pending unlock requests badge -->
+        <div id="pending-requests-section" style="display:none;background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:12px 16px">
+          <div style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:#f97316;margin-bottom:8px">Pending Unlock Requests</div>
+          <div id="pending-requests-list"></div>
+        </div>
+      </div>
+
+      <!-- Active / Deactivated sub-tabs -->
+      <div style="margin-bottom:16px">
+        <div class="view-toggle-group">
+          <button class="view-toggle active" id="roster-tab-active" onclick="Roster.setStatusTab('active')">Active</button>
+          <button class="view-toggle" id="roster-tab-deactivated" onclick="Roster.setStatusTab('deactivated')">Deactivated</button>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div id="roster-filters" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px">
+        <input id="roster-search" type="text" placeholder="Search by name..."
+          oninput="Roster.applyFilters()"
+          style="flex:1;min-width:160px;background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;outline:none">
+        <select id="roster-filter-team" onchange="Roster.applyFilters()"
+          style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;cursor:pointer;outline:none">
+          <option value="">All Teams</option>
+        </select>
+        <select id="roster-filter-role" onchange="Roster.applyFilters()"
+          style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;cursor:pointer;outline:none">
+          <option value="">All Roles</option>
+        </select>
+        <select id="roster-sort" onchange="Roster.applyFilters()"
+          style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;cursor:pointer;outline:none">
+          <option value="name-asc">Name A–Z</option>
+          <option value="name-desc">Name Z–A</option>
+          <option value="role-desc">Role (highest first)</option>
+          <option value="role-asc">Role (lowest first)</option>
+          <option value="team-asc">Team A–Z</option>
+        </select>
+      </div>
+
+      <!-- Roster Table -->
+      <div id="roster-count" style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px"></div>
+      <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse" id="roster-table">
+          <thead>
+            <tr style="background:#F5F2EE">
+              <th style="text-align:left;padding:12px 16px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Name</th>
+              <th style="text-align:left;padding:12px 16px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Role</th>
+              <th style="text-align:left;padding:12px 16px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Team</th>
+              <th style="text-align:left;padding:12px 16px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Phone</th>
+              <th style="text-align:center;padding:12px 16px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Status</th>
+            </tr>
+          </thead>
+          <tbody id="roster-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       TEAM ROSTER PAGE (Scoped Team Management)
+       ════════════════════════════════════════════════ -->
+  <div id="team-roster-page" style="display:none">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 0 80px">
+
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid rgba(0,0,0,0.3);margin-bottom:28px">
+        <div>
+          <div style="display:flex;align-items:center;gap:16px">
+            <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:32px;font-weight:700;color:var(--white);letter-spacing:0.5px" id="team-roster-title">Roster</div>
+            <button id="team-roster-add-btn" onclick="App.openAddMemberModal(App._teamRosterTeamName)"
+              style="background:var(--blue-core);border:none;border-radius:8px;padding:8px 16px;color:#fff;font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">+ Add Member</button>
+          </div>
+          <div style="font-size:12px;color:var(--silver-dim);margin-top:4px" id="team-roster-subtitle"></div>
+        </div>
+      </div>
+
+      <!-- Active / Deactivated sub-tabs -->
+      <div style="margin-bottom:16px">
+        <div class="view-toggle-group">
+          <button class="view-toggle active" id="team-roster-tab-active" onclick="App.setTeamRosterStatusTab('active')">Active</button>
+          <button class="view-toggle" id="team-roster-tab-deactivated" onclick="App.setTeamRosterStatusTab('deactivated')">Deactivated</button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px">
+        <input id="team-roster-search" type="text" placeholder="Search by name..."
+          oninput="App.filterTeamRoster()"
+          style="flex:1;min-width:160px;background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;outline:none">
+      </div>
+
+      <!-- Count -->
+      <div id="team-roster-count" style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px"></div>
+
+      <!-- Table -->
+      <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:#F5F2EE">
+              <th style="text-align:left;padding:12px 16px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Name</th>
+              <th style="text-align:left;padding:12px 16px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Role</th>
+              <th style="text-align:center;padding:12px 16px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Status</th>
+            </tr>
+          </thead>
+          <tbody id="team-roster-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       TEAMS MANAGEMENT PAGE
+       ════════════════════════════════════════════════ -->
+  <div id="teams-page" style="display:none">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 0 80px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid rgba(0,0,0,0.3);margin-bottom:28px">
+        <div>
+          <div style="display:flex;align-items:center;gap:16px">
+            <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:32px;font-weight:700;color:var(--white);letter-spacing:0.5px">Teams</div>
+            <button id="create-team-btn" onclick="App.openCreateTeamModal()" style="background:var(--blue-core);border:none;border-radius:8px;padding:8px 16px;color:#fff;font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">+ Create Team</button>
+          </div>
+          <div style="font-size:12px;color:var(--silver-dim);margin-top:4px" id="teams-subtitle"></div>
+        </div>
+      </div>
+      <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:#F5F2EE">
+              <th style="text-align:left;padding:12px 16px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Team</th>
+              <th style="text-align:left;padding:12px 16px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Leader</th>
+              <th style="text-align:center;padding:12px 16px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Members</th>
+              <th style="text-align:center;padding:12px 16px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Units (Wk)</th>
+              <th style="text-align:right;padding:12px 16px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="teams-tree-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       ALL ORDERS PAGE
+       ════════════════════════════════════════════════ -->
+  <div id="all-orders-page" style="display:none">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 0 80px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid rgba(0,0,0,0.3);margin-bottom:28px">
+        <div>
+          <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:32px;font-weight:700;color:var(--white);letter-spacing:0.5px">All Orders</div>
+          <div style="font-size:12px;color:var(--silver-dim);margin-top:4px" id="all-orders-page-subtitle"></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px">
+        <input id="all-orders-search" type="text" placeholder="Search by name or DSI..." oninput="Orders.applyFilters('all')" style="flex:1;min-width:160px;background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;outline:none">
+        <select id="all-orders-filter-rep" onchange="Orders.applyFilters('all')" style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;cursor:pointer;outline:none">
+          <option value="">All Reps</option>
+        </select>
+        <select id="all-orders-filter-date" onchange="Orders.applyFilters('all')" style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;cursor:pointer;outline:none">
+          <option value="">All Dates</option>
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="7">Past 7 Days</option>
+          <option value="14">Past 14 Days</option>
+          <option value="30">Past 30 Days</option>
+        </select>
+        <select id="all-orders-filter-product" onchange="Orders.applyFilters('all')" style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;cursor:pointer;outline:none">
+          <option value="">All Products</option>
+          <option value="air">Air</option>
+          <option value="cell">Cell</option>
+          <option value="fiber">Fiber</option>
+          <option value="voip">VoIP</option>
+        </select>
+        <select id="all-orders-filter-status" onchange="Orders.applyFilters('all')" style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;cursor:pointer;outline:none">
+          <option value="">All Statuses</option>
+          <option value="Posted">Posted</option>
+          <option value="Delivered">Delivered</option>
+          <option value="Confirmed">Confirmed</option>
+          <option value="Shipped">Shipped</option>
+          <option value="Scheduled">Scheduled</option>
+          <option value="Open">Open</option>
+          <option value="Pending">Pending</option>
+          <option value="Port Approved">Port Approved</option>
+          <option value="Porting Issue">Porting Issue</option>
+          <option value="Pending Install">Pending Install</option>
+          <option value="BYOD">BYOD</option>
+          <option value="Backordered">Backordered</option>
+          <option value="Disconnected">Disconnected</option>
+          <option value="Canceled">Canceled</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:6px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;color:var(--white);cursor:pointer;white-space:nowrap">
+          <input type="checkbox" id="all-orders-hide-completed" onchange="Orders.applyFilters('all')" style="cursor:pointer"> Hide Completed
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;color:var(--white);cursor:pointer;white-space:nowrap">
+          <input type="checkbox" id="all-orders-hide-noted" onchange="Orders.applyFilters('all')" style="cursor:pointer"> Hide Recently Noted
+        </label>
+      </div>
+      <div id="all-orders-count" style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px"></div>
+      <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:#F5F2EE">
+              <th style="text-align:left;padding:12px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Rep</th>
+              <th style="text-align:left;padding:12px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">DSI</th>
+              <th style="text-align:left;padding:12px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Date</th>
+              <th style="text-align:left;padding:12px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Products</th>
+              <th style="text-align:center;padding:12px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Status</th>
+              <th style="text-align:left;padding:12px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Notes</th>
+              <th style="padding:12px"></th>
+            </tr>
+          </thead>
+          <tbody id="all-orders-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       MY ORDERS PAGE
+       ════════════════════════════════════════════════ -->
+  <div id="my-orders-page" style="display:none">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 0 80px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid rgba(0,0,0,0.3);margin-bottom:28px">
+        <div>
+          <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:32px;font-weight:700;color:var(--white);letter-spacing:0.5px">My Orders</div>
+          <div style="font-size:12px;color:var(--silver-dim);margin-top:4px" id="my-orders-page-subtitle"></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px">
+        <input id="my-orders-search" type="text" placeholder="Search by DSI..." oninput="Orders.applyFilters('my')" style="flex:1;min-width:160px;background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;outline:none">
+        <select id="my-orders-filter-status" onchange="Orders.applyFilters('my')" style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 12px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;cursor:pointer;outline:none">
+          <option value="">All Statuses</option>
+          <option value="Posted">Posted</option>
+          <option value="Delivered">Delivered</option>
+          <option value="Confirmed">Confirmed</option>
+          <option value="Shipped">Shipped</option>
+          <option value="Scheduled">Scheduled</option>
+          <option value="Open">Open</option>
+          <option value="Pending">Pending</option>
+          <option value="Port Approved">Port Approved</option>
+          <option value="Porting Issue">Porting Issue</option>
+          <option value="Pending Install">Pending Install</option>
+          <option value="BYOD">BYOD</option>
+          <option value="Backordered">Backordered</option>
+          <option value="Disconnected">Disconnected</option>
+          <option value="Canceled">Canceled</option>
+        </select>
+      </div>
+      <div id="my-orders-count" style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px"></div>
+      <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:#F5F2EE">
+              <th style="text-align:left;padding:12px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">DSI</th>
+              <th style="text-align:left;padding:12px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Date</th>
+              <th style="text-align:left;padding:12px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Products</th>
+              <th style="text-align:center;padding:12px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Status</th>
+              <th style="text-align:left;padding:12px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Notes</th>
+              <th style="padding:12px"></th>
+            </tr>
+          </thead>
+          <tbody id="my-orders-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       OFFICE PAGE (Owner only)
+       ════════════════════════════════════════════════ -->
+  <div id="office-page" style="display:none">
+    <div style="max-width:800px;margin:0 auto;padding:24px 0 80px">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
+        <div>
+          <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:32px;font-weight:700;letter-spacing:-0.5px;color:var(--white)">Office</div>
+          <div style="font-size:12px;color:var(--silver-dim);margin-top:4px">Office-level settings and assignments</div>
+        </div>
+      </div>
+
+      <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:12px;padding:24px;margin-bottom:16px">
+        <div style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:12px">Payroll Manager</div>
+        <div style="font-size:12px;color:var(--silver-dim);margin-bottom:12px;line-height:1.5">Managed from the admin portal. Contact your admin to change.</div>
+        <div id="office-payroll-info" style="font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;color:var(--white);padding:10px 14px;background:#F5F2EE;border-radius:8px;max-width:360px">Not assigned</div>
+      </div>
+
+      <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:12px;padding:24px;margin-bottom:16px">
+        <div style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:12px">Header Logo Style</div>
+        <div style="font-size:12px;color:var(--silver-dim);margin-bottom:12px;line-height:1.5">Choose how your logo appears in the dashboard header bar.</div>
+        <select id="office-header-logo-style" onchange="App._setHeaderLogoStyle(this.value)"
+          style="width:100%;max-width:360px;background:#F5F2EE;border:1px solid rgba(0,0,0,0.25);border-radius:8px;color:var(--white);padding:10px 14px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;cursor:pointer;outline:none">
+          <option value="full">Full Logo (best for wide/horizontal logos)</option>
+          <option value="icon">Icon + Name (best for square logos)</option>
+        </select>
+        <div id="office-logo-style-saved" style="display:none;font-size:11px;color:var(--green);margin-top:8px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-weight:700;letter-spacing:1px;text-transform:uppercase">Saved</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       PAYROLL PAGE (Owner + Payroll Manager)
+       ════════════════════════════════════════════════ -->
+  <div id="payroll-page" style="display:none">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 0 80px">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
+        <div>
+          <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:32px;font-weight:700;letter-spacing:-0.5px;color:var(--white)">Payroll</div>
+          <div style="font-size:12px;color:var(--silver-dim);margin-top:4px" id="payroll-page-subtitle"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+        <input type="text" id="payroll-search" placeholder="Search by rep, DSI, or SPE..."
+          oninput="App._filterPayrollOrders()"
+          style="flex:1;min-width:200px;background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:8px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;outline:none">
+      </div>
+
+      <div id="payroll-count" style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px"></div>
+
+      <div style="overflow-x:auto;border-radius:10px;border:1px solid rgba(0,0,0,0.2)">
+        <table style="width:100%;border-collapse:collapse;background:#FFFFFF">
+          <thead>
+            <tr>
+              <th style="padding:10px 16px;text-align:left;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);border-bottom:1px solid rgba(0,0,0,0.2)">Rep</th>
+              <th style="padding:10px 16px;text-align:left;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);border-bottom:1px solid rgba(0,0,0,0.2)">Trainee</th>
+              <th style="padding:10px 16px;text-align:left;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);border-bottom:1px solid rgba(0,0,0,0.2)">DSI</th>
+              <th style="padding:10px 16px;text-align:left;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);border-bottom:1px solid rgba(0,0,0,0.2)">Date</th>
+              <th style="padding:10px 16px;text-align:left;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);border-bottom:1px solid rgba(0,0,0,0.2)">Products</th>
+              <th style="padding:10px 16px;text-align:left;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);border-bottom:1px solid rgba(0,0,0,0.2)">Paid Out</th>
+              <th style="padding:10px 16px;text-align:center;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);border-bottom:1px solid rgba(0,0,0,0.2)">Notes</th>
+            </tr>
+          </thead>
+          <tbody id="payroll-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       ORDER NOTE MODAL
+       ════════════════════════════════════════════════ -->
+  <div id="order-note-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.35);align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border:1px solid rgba(0,0,0,0.25);border-radius:16px;padding:32px;width:min(480px,90vw);max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+      <div id="order-note-dsi" style="font-family:'Neue Montreal','Inter',sans-serif;font-size:22px;font-weight:700;color:var(--white);margin-bottom:4px">Order Note</div>
+      <div style="font-size:12px;color:var(--silver-dim);margin-bottom:20px">Add or view notes for this order</div>
+      <div style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px">History</div>
+      <div id="order-note-history" style="background:#F5F2EE;border:1px solid rgba(0,0,0,0.15);border-radius:10px;padding:12px 16px;margin-bottom:20px;max-height:200px;overflow-y:auto"></div>
+
+      <!-- Tickets Section -->
+      <div style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px">Tickets</div>
+      <div id="order-note-tickets" style="background:#F5F2EE;border:1px solid rgba(0,0,0,0.15);border-radius:10px;padding:12px 16px;margin-bottom:12px;max-height:180px;overflow-y:auto"></div>
+      <div style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:6px">Add Ticket</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="ticket-id-input" type="text" placeholder="Ticket ID (e.g. TK-1234)" style="flex:1;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;outline:none">
+        <input id="ticket-text-input" type="text" placeholder="Description" style="flex:2;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;outline:none">
+      </div>
+      <div id="ticket-error" style="color:#E5564A;font-size:12px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;min-height:18px;margin-bottom:4px"></div>
+      <button id="ticket-submit-btn" onclick="Orders.addTicket()" style="width:100%;background:rgba(44,110,106,0.15);border:1px solid rgba(44,110,106,0.3);border-radius:8px;padding:8px;color:var(--sc-cyan);font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer;margin-bottom:20px">ADD TICKET</button>
+
+      <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Add Note</label>
+      <textarea id="order-note-input" rows="3" placeholder="Type your note..." style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;outline:none;resize:vertical;margin-bottom:12px"></textarea>
+      <div id="order-note-error" style="color:#E5564A;font-size:12px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;min-height:18px;margin-bottom:12px"></div>
+      <div style="display:flex;gap:10px">
+        <button id="order-note-submit-btn" onclick="Orders.submitNote()" style="flex:1;background:var(--blue-core);border:none;border-radius:8px;padding:10px;color:#fff;font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">ADD NOTE</button>
+        <button onclick="Orders.closeNoteModal()" style="flex:1;background:#F5F2EE;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:10px;color:var(--silver);font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       ORDER EDIT MODAL
+       ════════════════════════════════════════════════ -->
+  <div id="order-edit-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.35);align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border:1px solid rgba(0,0,0,0.25);border-radius:16px;padding:32px;width:min(480px,90vw);max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+      <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:22px;font-weight:700;color:var(--white);margin-bottom:4px">Edit Order</div>
+      <div style="font-size:12px;color:var(--silver-dim);margin-bottom:20px">Modify order details</div>
+
+      <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Rep Name</label>
+      <input id="order-edit-rep" type="text" placeholder="Rep name"
+        style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;outline:none;margin-bottom:14px">
+
+      <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">DSI</label>
+      <input id="order-edit-dsi" type="text" placeholder="DSI number"
+        style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;outline:none;margin-bottom:14px">
+
+      <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Date of Sale</label>
+      <input id="order-edit-date" type="date"
+        style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;outline:none;margin-bottom:14px">
+
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <div style="flex:1">
+          <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Air</label>
+          <input id="order-edit-air" type="number" min="0" value="0"
+            style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;outline:none">
+        </div>
+        <div style="flex:1">
+          <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Cell</label>
+          <input id="order-edit-cell" type="number" min="0" value="0"
+            style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;outline:none">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <div style="flex:1">
+          <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Fiber</label>
+          <input id="order-edit-fiber" type="number" min="0" value="0"
+            style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;outline:none">
+        </div>
+        <div style="flex:1">
+          <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">VoIP</label>
+          <input id="order-edit-voip" type="number" min="0" value="0"
+            style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;outline:none">
+        </div>
+      </div>
+
+      <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Status</label>
+      <select id="order-edit-status"
+        style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;cursor:pointer;outline:none;margin-bottom:14px">
+        <option value="Pending">Pending</option>
+        <option value="Active">Active</option>
+        <option value="Complete">Complete</option>
+        <option value="Cancelled">Cancelled</option>
+      </select>
+
+      <div id="order-edit-error" style="color:#E5564A;font-size:12px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;min-height:18px;margin-bottom:12px"></div>
+      <div style="display:flex;gap:10px">
+        <button id="order-edit-submit-btn" onclick="Orders.submitEdit()" style="flex:1;background:var(--blue-core);border:none;border-radius:8px;padding:10px;color:#fff;font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">SAVE CHANGES</button>
+        <button onclick="Orders.closeEditModal()" style="flex:1;background:#F5F2EE;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:10px;color:var(--silver);font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       CREATE/EDIT TEAM MODAL
+       ════════════════════════════════════════════════ -->
+  <div id="team-crud-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.35);align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border:1px solid rgba(0,0,0,0.25);border-radius:16px;padding:32px;width:min(420px,90vw);box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+      <div id="team-modal-title" style="font-family:'Neue Montreal','Inter',sans-serif;font-size:22px;font-weight:700;color:var(--white);margin-bottom:4px">Create Team</div>
+      <div style="font-size:12px;color:var(--silver-dim);margin-bottom:24px">Set up a team in the hierarchy</div>
+      <input type="hidden" id="team-modal-id">
+
+      <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Team Name</label>
+      <input id="team-modal-name" type="text" placeholder="e.g. Alpha Squad"
+        style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:15px;outline:none;margin-bottom:16px">
+
+      <div style="display:flex;gap:12px;margin-bottom:16px">
+        <div style="flex:1">
+          <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Parent Team</label>
+          <select id="team-modal-parent"
+            style="width:100%;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;cursor:pointer;outline:none">
+            <option value="">None (Top Level)</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Leader</label>
+          <select id="team-modal-leader"
+            style="width:100%;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;cursor:pointer;outline:none">
+            <option value="">Unassigned</option>
+          </select>
+        </div>
+      </div>
+
+      <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Emoji</label>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div id="team-modal-emoji-display" style="font-size:28px;width:40px;text-align:center">⚡</div>
+        <div id="team-modal-emoji-picker" style="display:flex;flex-wrap:wrap;gap:2px"></div>
+      </div>
+
+      <div id="team-modal-error" style="color:#E5564A;font-size:12px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;min-height:18px;margin-bottom:12px"></div>
+
+      <div style="display:flex;gap:10px">
+        <button id="team-modal-submit" onclick="App.submitTeamModal()" style="flex:1;background:var(--blue-core);border:none;border-radius:8px;padding:10px;color:#fff;font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">CREATE TEAM</button>
+        <button onclick="App.closeTeamCrudModal()" style="flex:1;background:#F5F2EE;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:10px;color:var(--silver);font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       ADD MEMBER MODAL (JD+ only)
+       ════════════════════════════════════════════════ -->
+  <div id="add-member-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.35);align-items:center;justify-content:center">
+    <div style="background:var(--card-bg);border:1px solid rgba(0,0,0,0.25);border-radius:16px;padding:32px;width:min(420px,90vw);box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+      <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:22px;font-weight:700;color:var(--white);margin-bottom:4px">Add Team Member</div>
+      <div style="font-size:12px;color:var(--silver-dim);margin-bottom:24px">Create a roster entry for a new rep or leader</div>
+
+      <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Email</label>
+      <input id="add-member-email" type="email" placeholder="rep@example.com"
+        style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:15px;outline:none;margin-bottom:16px">
+
+      <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Name</label>
+      <input id="add-member-name" type="text" placeholder="Full name"
+        style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:15px;outline:none;margin-bottom:16px">
+
+      <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Phone</label>
+      <input id="add-member-phone" type="tel" placeholder="(555) 123-4567"
+        style="width:100%;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:15px;outline:none;margin-bottom:16px">
+
+      <div style="display:flex;gap:12px;margin-bottom:16px">
+        <div style="flex:1">
+          <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Team</label>
+          <select id="add-member-team"
+            style="width:100%;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;cursor:pointer;outline:none">
+            <option value="Unassigned">Unassigned</option>
+            <option value="Aces">Aces</option>
+            <option value="Squids">Squids</option>
+            <option value="Grind Team">Grind Team</option>
+            <option value="Queenz">Queenz</option>
+            <option value="Different Breed">Different Breed</option>
+            <option value="Sharks">Sharks</option>
+            <option value="Dawgs">Dawgs</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Rank</label>
+          <select id="add-member-rank"
+            style="width:100%;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;cursor:pointer;outline:none">
+            <option value="rep">Client Rep</option>
+            <option value="l1">Team Leader</option>
+            <option value="jd">Jr. Director</option>
+            <option value="admin">Admin</option>
+            <option value="manager">Manager</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="add-member-error" style="color:#E5564A;font-size:12px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;min-height:18px;margin-bottom:12px"></div>
+
+      <div style="display:flex;gap:10px">
+        <button onclick="App.submitAddMember()" style="flex:1;background:var(--blue-core);border:none;border-radius:8px;padding:10px;color:#fff;font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">Add Member</button>
+        <button onclick="App.closeAddMemberModal()" style="flex:1;background:#F5F2EE;border:1px solid rgba(0,0,0,0.2);border-radius:8px;padding:10px;color:var(--silver);font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       LEADERBOARD SECTION (toggleable)
+       ════════════════════════════════════════════════ -->
+  <div id="leaderboard-section" style="display:none">
+
+  <!-- ════════════════════════════════════════════════
+       HERO STATS BAR
+       ════════════════════════════════════════════════ -->
+  <div class="hero-bar">
+    <div class="hero-stat">
+      <div class="hero-stat-label">Week Yeses</div>
+      <div class="hero-stat-value" id="hero-yeses">&mdash;</div>
+    </div>
+    <div class="hero-divider"></div>
+    <div class="hero-stat">
+      <div class="hero-stat-label">Week Units</div>
+      <div class="hero-stat-value hero-units" id="hero-units">&mdash;</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       TOP PERFORMERS (Podiums)
+       ════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon"></span>
+      <span class="section-title">Top Performers</span>
+      <div class="section-line"></div>
+      <span class="section-count">This week</span>
+    </div>
+    <div style="margin-bottom:12px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Individuals</div>
+    <div class="podium-wrap" id="podium" style="margin-bottom:32px"></div>
+    <div style="margin-bottom:12px;font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;letter-spacing:0.5px;color:var(--silver-dim);text-transform:uppercase">Teams</div>
+    <div class="podium-wrap" id="team-podium"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       OFFICE LEADERBOARD
+       ════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon"></span>
+      <span class="section-title">Office Leaderboard</span>
+      <div class="section-line"></div>
+      <div class="view-toggle-group">
+        <button class="view-toggle active" onclick="Render.setView('days')" id="vt-days" data-view="days">Days</button>
+        <button class="view-toggle" onclick="Render.setView('weeks')" id="vt-weeks" data-view="weeks">Weeks</button>
+      </div>
+      <span class="section-count" id="member-count"></span>
+    </div>
+    <div class="table-scroll">
+      <div class="table-wrap">
+        <table id="main-table">
+          <thead>
+            <tr class="day-group"></tr>
+            <tr></tr>
+          </thead>
+          <tbody id="main-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       TEAM RANKINGS
+       ════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon"></span>
+      <span class="section-title">Team Rankings</span>
+      <div class="section-line"></div>
+      <span class="section-count" id="team-count"></span>
+    </div>
+    <div class="team-grid" id="team-grid"></div>
+  </div>
+
+  </div><!-- /#leaderboard-section -->
+
+  <!-- ════════════════════════════════════════════════
+       POST SALE PAGE (multi-step wizard)
+       ════════════════════════════════════════════════ -->
+  <div id="post-sale-page" style="display:none">
+    <div style="max-width:600px;margin:0 auto;padding:24px 16px 80px">
+      <div class="post-sale-header">
+        <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:28px;font-weight:700;color:var(--white);letter-spacing:0.5px">Post Sale</div>
+        <div id="post-sale-subtitle" style="font-size:12px;color:var(--silver-dim);margin-top:4px"></div>
+      </div>
+      <div id="post-sale-steps" class="wizard-steps"></div>
+      <div id="post-sale-body" class="wizard-body"></div>
+      <div id="post-sale-nav" class="wizard-nav"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       FOOTER
+       ════════════════════════════════════════════════ -->
+  <footer style="text-align:center;padding:40px 24px 24px;opacity:0.5">
+    <img src="references/logos/aptel-symbol-black.png" alt="Aptel" style="height:28px;width:auto;margin-bottom:8px" onerror="this.style.display='none'">
+    <div style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:10px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim)">Powered by Aptel</div>
+  </footer>
+
+</div><!-- /.container -->
+
+<!-- ═══════════════════════════════════════════════════════
+     FULL PROFILE PAGE (overlay)
+     ═══════════════════════════════════════════════════════ -->
+<div id="profile-page">
+  <div class="profile-page-inner" id="profile-page-inner"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCRIPTS (load order matters)
+     ═══════════════════════════════════════════════════════ -->
+<script src="js/nds-config.js?v=20260307e"></script>
+<script src="js/sheets-api.js?v=20260306a"></script>
+<script src="js/data.js?v=20260309h"></script>
+<script src="js/auth.js?v=20260307a"></script>
+<script src="js/roster.js?v=20260307e"></script>
+<script src="js/teams-manager.js?v=20260305h"></script>
+<script src="js/render.js?v=20260309e"></script>
+<script src="js/orders.js?v=20260305h"></script>
+<script src="js/nds-post-sale.js?v=20260309c"></script>
+<script src="js/app.js?v=20260309b"></script>
+
+</body>
+</html>
