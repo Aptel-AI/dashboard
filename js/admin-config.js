@@ -44,8 +44,12 @@ const ADMIN_CONFIG = {
       label: 'AT&T B2B',
       file: 'index.html',
       description: 'AT&T Business-to-Business sales dashboard'
+    },
+    'att-nds': {
+      label: 'AT&T NDS',
+      file: 'nds.html',
+      description: 'AT&T NDS sales dashboard (Air + Cell)'
     }
-    // Future: 'residential': { label: 'Residential', file: 'residential.html', ... }
   },
 
   // ── Campaign Sheet Config (AT&T B2B shared sheet) ──
@@ -56,6 +60,11 @@ const ADMIN_CONFIG = {
       sheetId: '1wxM6Htwfy8LrD_o_C7gmvnZEmkfV3FTCVjJU6IITZFc',
       appsScriptUrl: 'https://script.google.com/macros/s/AKfycbwPx0jfdYdLKurHPlfQhOkYu70vVpirTISYrR3I2EIszVrVaRNwwjBvauSIO69thKFe/exec',
       apiKey: 'elevate-dash-2026-secret'
+    },
+    'att-nds': {
+      sheetId: '1RQaw9XHdHXnr9laW0UtPDQxfCpHQVzeXfo6Z3Pz5VPA',
+      appsScriptUrl: 'https://script.google.com/macros/s/AKfycbyyG05ebEPT-MyrFHLvGtQwokFh5_HOP5B1OZh1Mc6FK_1_Rt800DHMw1o0MrCoEJM2hg/exec',
+      apiKey: 'nds-secret-key-2026'
     }
   }
 };
