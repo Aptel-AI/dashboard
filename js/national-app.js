@@ -1323,7 +1323,7 @@ const NationalApp = {
 
     trendEl.innerHTML = `
       <div class="coaching-label">Week-over-Week Headcount</div>
-      <div class="data-table-wrap">
+      <div class="data-table-wrap trend-scroll" id="hc-trend-scroll">
         <table class="data-table">
           <thead>
             <tr>
@@ -1350,6 +1350,11 @@ const NationalApp = {
           </tbody>
         </table>
       </div>`;
+    // Auto-scroll to bottom so most recent 5 weeks are visible
+    requestAnimationFrame(() => {
+      const el = document.getElementById('hc-trend-scroll');
+      if (el) el.scrollTop = el.scrollHeight;
+    });
   },
 
   // ── Trend arrow helper ──
@@ -1375,7 +1380,7 @@ const NationalApp = {
 
     trendEl.innerHTML = `
       <div class="coaching-label">Week-over-Week Production</div>
-      <div class="data-table-wrap">
+      <div class="data-table-wrap trend-scroll" id="prod-trend-scroll">
         <table class="data-table prod-trend-table">
           <thead>
             <tr>
@@ -1397,6 +1402,11 @@ const NationalApp = {
           </tbody>
         </table>
       </div>`;
+    // Auto-scroll to bottom so most recent 5 weeks are visible
+    requestAnimationFrame(() => {
+      const el = document.getElementById('prod-trend-scroll');
+      if (el) el.scrollTop = el.scrollHeight;
+    });
   },
 
   // ── Goal input handler ──

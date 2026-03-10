@@ -621,6 +621,15 @@ input, select, textarea { font-family: inherit; }
   overflow: hidden;
   box-shadow: var(--shadow-sm);
 }
+.data-table-wrap.trend-scroll {
+  max-height: 225px;
+  overflow-y: auto;
+}
+.trend-scroll .data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
 .data-table {
   width: 100%;
   border-collapse: collapse;
