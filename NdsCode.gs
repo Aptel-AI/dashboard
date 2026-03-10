@@ -1787,14 +1787,14 @@ function setupLeaderboardChat() {
     }
   }
 
-  // Create daily trigger at 6 PM (office timezone)
+  // Create daily trigger at 10 PM (office timezone)
   ScriptApp.newTrigger('postLeaderboardToChat')
     .timeBased()
     .everyDays(1)
-    .atHour(18)
+    .atHour(22)
     .create();
 
-  Logger.log('✅ Setup complete! Leaderboard will post daily at ~6 PM.');
+  Logger.log('✅ Setup complete! Leaderboard will post daily at ~10 PM.');
   Logger.log('Properties set: OFFICE_NAME=Delagroup, CHAT_PLATFORM=discord');
   Logger.log('Run postLeaderboardToChat() manually to test now.');
 }
