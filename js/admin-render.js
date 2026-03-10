@@ -60,7 +60,7 @@ const AdminRender = {
             </div>
           </div>
           <div class="office-card-actions" onclick="event.stopPropagation()">
-            ${isA3 ? `<button class="btn btn-secondary btn-sm" onclick="AdminApp.showEditOfficeModal('${office.officeId}')">Edit</button>` : ''}
+            ${isA3 ? `<button class="btn btn-secondary btn-sm" onclick="AdminApp.showEditOfficeModal('${office.officeId}')">Office Settings</button>` : ''}
             <button class="btn btn-${isOwner ? 'primary' : 'secondary'} btn-sm" onclick="AdminApp.openOffice('${office.officeId}')">Open Dashboard</button>
             ${isA3 ? `<button class="btn btn-danger btn-sm" onclick="AdminApp.deleteOffice('${office.officeId}')">Delete</button>` : ''}
           </div>
