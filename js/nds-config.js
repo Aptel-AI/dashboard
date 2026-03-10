@@ -16,7 +16,7 @@ const OFFICE_CONFIG = {
 
   // ── Sheet reference ──
   // Passed to Code.gs so it opens the correct campaign sheet (shard support).
-  sheetId: "1wxM6Htwfy8LrD_o_C7gmvnZEmkfV3FTCVjJU6IITZFc",
+  sheetId: "1RQaw9XHdHXnr9laW0UtPDQxfCpHQVzeXfo6Z3Pz5VPA",
   salesTab:  "_Sales",    // Per-office: _Sales_{officeId}
   rosterTab: "_Roster",   // Per-office: _Roster_{officeId}
 
