@@ -45,8 +45,8 @@ const OFFICE_CONFIG = {
   teams: [],
 
   // ── Logos ──
-  logoUrl: "references/logos/elevate-logo-full-standard-blue.png",
-  logoIconUrl: "references/logos/aptel-symbol-black.png",
+  logoUrl: "references/logos/delagroup-logo-full-standard.png",
+  logoIconUrl: "references/logos/delagroup-logo-full-standard.png",
   headerLogoStyle: "full",  // 'full' = full logo image, 'icon' = icon + text name
 
   // ── Team emojis for customization ──
