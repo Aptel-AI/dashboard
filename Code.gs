@@ -344,6 +344,12 @@ function doGet(e) {
       return jsonResponse({ html: buildLeaderboardHtml(lb) });
     }
 
+    // Leaderboard as emoji text (called by centralized AdminCode scheduler)
+    if (action === 'leaderboardText') {
+      var officeName = (e.parameter && e.parameter.officeName) || 'OFFICE';
+      return jsonResponse({ text: buildLeaderboardText(ss, officeId, officeName) });
+    }
+
     // Default: return full dashboard data (includes Tableau summary)
 
     // Auto-add office owner to roster if not already present
@@ -2713,35 +2719,24 @@ function migrateLunaData() {
 
 
 // ═══════════════════════════════════════════════════════════════
-// LEADERBOARD CHAT POST — Emoji-text format for Discord/GroupMe
+// LEADERBOARD TEXT — Emoji-format message for Discord/GroupMe
 // ═══════════════════════════════════════════════════════════════
-// Set up:
-//   1. Add Script Properties: CHAT_WEBHOOK_URL, CHAT_PLATFORM (discord|groupme)
-//   2. Create a time-based trigger for postLeaderboardToChat()
-//
-// CHAT_WEBHOOK_URL = full Discord webhook URL, or GroupMe bot_id
-// CHAT_PLATFORM    = 'discord' or 'groupme'
+// Called by AdminCode.gs centralized scheduler via ?action=leaderboardText
+// Can also be called manually via postLeaderboardToChat() for testing.
 
-function postLeaderboardToChat(optOfficeId) {
-  var props = PropertiesService.getScriptProperties();
-  var webhookUrl = (props.getProperty('CHAT_WEBHOOK_URL') || '').trim();
-  var platform   = (props.getProperty('CHAT_PLATFORM') || 'discord').trim().toLowerCase();
-  if (!webhookUrl || platform === 'none') {
-    Logger.log('[LeaderboardPost] No webhook configured — skipping');
-    return;
-  }
-
-  var ss = SpreadsheetApp.openById(SHEET_ID);
-  var officeId = optOfficeId || DEFAULT_OFFICE_ID;
-  var officeName = props.getProperty('OFFICE_NAME') || 'OFFICE';
-
-  // --- Read leaderboard data (Code.gs returns { topIndividuals, topTeams, weekUnits }) ---
-  // We need ALL individuals, not just top 3, so call readLeaderboard with full data
+/**
+ * Build emoji-formatted leaderboard text from this office's data.
+ * Code.gs aggregates from roster + sales (full roster, not just top 3).
+ * @param {Spreadsheet} ss - The office spreadsheet
+ * @param {string} officeId - The office ID for tab suffixes
+ * @param {string} officeName - Display name for the header
+ * @returns {string} The formatted message text
+ */
+function buildLeaderboardText(ss, officeId, officeName) {
   var roster = readRoster(ss, officeId);
-  var teams = readTeams(ss, officeId);
 
   var olSheet = ss.getSheetByName(officeTab(TAB.SALES, officeId));
-  if (!olSheet) { Logger.log('[LeaderboardPost] No Sales sheet'); return; }
+  if (!olSheet) return 'No sales data available.';
   var olData = olSheet.getDataRange().getValues();
   var thisWeekStart = getWeekStart();
 
@@ -2778,7 +2773,7 @@ function postLeaderboardToChat(optOfficeId) {
   });
   individuals.sort(function(a, b) { return b.units - a.units; });
 
-  // --- Build individual rankings ---
+  // Build individual rankings
   var medals = ['🥇', '🥈', '🥉'];
   var lines = [];
   lines.push('🔥 ' + officeName.toUpperCase() + ' WEEKLY 🔥');
@@ -2800,7 +2795,7 @@ function postLeaderboardToChat(optOfficeId) {
     lines.push('No sales this week yet.');
   }
 
-  // --- Build team rankings ---
+  // Team rankings
   var teamTotals = {};
   for (var j = 0; j < individuals.length; j++) {
     var ind = individuals[j];
@@ -2833,9 +2828,29 @@ function postLeaderboardToChat(optOfficeId) {
   lines.push('');
   lines.push('📊 Office Total: ' + officeTotal + ' units');
 
-  var message = lines.join('\n');
+  return lines.join('\n');
+}
 
-  // --- Post to webhook ---
+/**
+ * Manual test — posts leaderboard to the webhook configured in Script Properties.
+ * For centralized scheduling, use AdminCode.gs checkLeaderboardPosts() instead.
+ */
+function postLeaderboardToChat(optOfficeId) {
+  var props = PropertiesService.getScriptProperties();
+  var webhookUrl = (props.getProperty('CHAT_WEBHOOK_URL') || '').trim();
+  var platform   = (props.getProperty('CHAT_PLATFORM') || 'discord').trim().toLowerCase();
+  if (!webhookUrl || platform === 'none') {
+    Logger.log('[LeaderboardPost] No webhook configured — skipping');
+    return;
+  }
+
+  var ss = getSheet({});
+  var officeId = optOfficeId || DEFAULT_OFFICE_ID;
+  var officeName = props.getProperty('OFFICE_NAME') || 'OFFICE';
+
+  var message = buildLeaderboardText(ss, officeId, officeName);
+
+  // Post to webhook
   var url, payload;
   if (platform === 'groupme') {
     url = 'https://api.groupme.com/v3/bots/post';

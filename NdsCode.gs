@@ -316,6 +316,12 @@ function doGet(e) {
       return jsonResponse({ html: buildLeaderboardHtml(lb) });
     }
 
+    // Leaderboard as emoji text (called by centralized AdminCode scheduler)
+    if (action === 'leaderboardText') {
+      var officeName = (e.parameter && e.parameter.officeName) || 'OFFICE';
+      return jsonResponse({ text: buildLeaderboardText(ss, officeId, officeName) });
+    }
+
     // Default: return full dashboard data (includes Tableau summary)
 
     // Auto-add office owner to roster if not already present
@@ -1763,64 +1769,23 @@ function buildLeaderboardHtml(lb) {
 
 
 // ═══════════════════════════════════════════════════════════════
-// LEADERBOARD CHAT POST — Emoji-text format for Discord/GroupMe
+// LEADERBOARD TEXT — Emoji-format message for Discord/GroupMe
 // ═══════════════════════════════════════════════════════════════
-// Run setupLeaderboardChat() ONCE to configure, then it auto-posts daily.
+// Called by AdminCode.gs centralized scheduler via ?action=leaderboardText
+// Can also be called manually via postLeaderboardToChat() for testing.
 
 /**
- * ONE-TIME SETUP — run this manually from the Apps Script editor.
- * Sets Script Properties and creates a daily 6pm trigger.
+ * Build emoji-formatted leaderboard text from this office's data.
+ * @param {Spreadsheet} ss - The office spreadsheet
+ * @param {string} officeId - The office ID for tab suffixes
+ * @param {string} officeName - Display name for the header
+ * @returns {string} The formatted message text
  */
-function setupLeaderboardChat() {
-  var props = PropertiesService.getScriptProperties();
-  props.setProperty('OFFICE_NAME', 'Delagroup');
-  props.setProperty('CHAT_PLATFORM', 'discord');
-  props.setProperty('CHAT_WEBHOOK_URL',
-    'https://discord.com/api/webhooks/1480760352143835186/-5_VNhXKQ0eKXGwzzND5efpOqy1DXymhdDZ96CT8tzunTSWauJ86h2xS6ucSvBRTcnv4');
-
-  // Remove any existing leaderboard triggers to avoid duplicates
-  var triggers = ScriptApp.getProjectTriggers();
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'postLeaderboardToChat') {
-      ScriptApp.deleteTrigger(triggers[i]);
-      Logger.log('Removed existing trigger');
-    }
-  }
-
-  // Create daily trigger at 10 PM (office timezone)
-  ScriptApp.newTrigger('postLeaderboardToChat')
-    .timeBased()
-    .everyDays(1)
-    .atHour(22)
-    .create();
-
-  Logger.log('✅ Setup complete! Leaderboard will post daily at ~10 PM.');
-  Logger.log('Properties set: OFFICE_NAME=Delagroup, CHAT_PLATFORM=discord');
-  Logger.log('Run postLeaderboardToChat() manually to test now.');
-}
-
-// CHAT_WEBHOOK_URL = full Discord webhook URL, or GroupMe bot_id
-// CHAT_PLATFORM    = 'discord' or 'groupme'
-
-function postLeaderboardToChat() {
-  var props = PropertiesService.getScriptProperties();
-  var webhookUrl = (props.getProperty('CHAT_WEBHOOK_URL') || '').trim();
-  var platform   = (props.getProperty('CHAT_PLATFORM') || 'discord').trim().toLowerCase();
-  if (!webhookUrl || platform === 'none') {
-    Logger.log('[LeaderboardPost] No webhook configured — skipping');
-    return;
-  }
-
-  var ss = SpreadsheetApp.openById(SHEET_ID);
-  var officeId = DEFAULT_OFFICE_ID;
-  var officeName = props.getProperty('OFFICE_NAME') || 'OFFICE';
-
-  // --- Read leaderboard data ---
+function buildLeaderboardText(ss, officeId, officeName) {
   var lb = readLeaderboard(ss, officeId);
   var allPeople = (lb.reps || []).concat(lb.leaders || []);
   allPeople.sort(function(a, b) { return (b.tw.units || 0) - (a.tw.units || 0); });
 
-  // --- Build individual rankings ---
   var medals = ['🥇', '🥈', '🥉'];
   var lines = [];
   lines.push('🔥 ' + officeName.toUpperCase() + ' WEEKLY 🔥');
@@ -1843,7 +1808,7 @@ function postLeaderboardToChat() {
     lines.push('No sales this week yet.');
   }
 
-  // --- Build team rankings ---
+  // Team rankings
   var teamTotals = {};
   for (var j = 0; j < allPeople.length; j++) {
     var person = allPeople[j];
@@ -1876,9 +1841,29 @@ function postLeaderboardToChat() {
   lines.push('');
   lines.push('📊 Office Total: ' + officeTotal + ' units');
 
-  var message = lines.join('\n');
+  return lines.join('\n');
+}
 
-  // --- Post to webhook ---
+/**
+ * Manual test — posts leaderboard to the webhook configured in Script Properties.
+ * For centralized scheduling, use AdminCode.gs checkLeaderboardPosts() instead.
+ */
+function postLeaderboardToChat() {
+  var props = PropertiesService.getScriptProperties();
+  var webhookUrl = (props.getProperty('CHAT_WEBHOOK_URL') || '').trim();
+  var platform   = (props.getProperty('CHAT_PLATFORM') || 'discord').trim().toLowerCase();
+  if (!webhookUrl || platform === 'none') {
+    Logger.log('[LeaderboardPost] No webhook configured — skipping');
+    return;
+  }
+
+  var ss = getSheet({});
+  var officeId = DEFAULT_OFFICE_ID;
+  var officeName = props.getProperty('OFFICE_NAME') || 'OFFICE';
+
+  var message = buildLeaderboardText(ss, officeId, officeName);
+
+  // Post to webhook
   var url, payload;
   if (platform === 'groupme') {
     url = 'https://api.groupme.com/v3/bots/post';

@@ -312,17 +312,36 @@ const AdminRender = {
       if (groupmeInput) groupmeInput.value = '';
     }
 
+    // Leaderboard post settings
+    const lbEnabled = office ? (office.leaderboardEnabled === true || office.leaderboardEnabled === 'true') : false;
+    const lbHour = office ? (office.leaderboardHour || '22') : '22';
+    const lbToggle = document.getElementById('office-leaderboard-enabled');
+    const lbHourSelect = document.getElementById('office-leaderboard-hour');
+    if (lbToggle) lbToggle.checked = lbEnabled;
+    if (lbHourSelect) lbHourSelect.value = String(lbHour);
+
     // Show/hide the correct chat setup panel
     this.onChatPlatformChange();
+    this.onLeaderboardToggle();
   },
 
-  // Chat platform toggle — show/hide setup panels
+  // Chat platform toggle — show/hide setup panels + leaderboard settings
   onChatPlatformChange() {
     const platform = document.getElementById('office-chat-platform')?.value || 'none';
     const discordPanel = document.getElementById('chat-setup-discord');
     const groupmePanel = document.getElementById('chat-setup-groupme');
+    const lbSettings = document.getElementById('leaderboard-post-settings');
     if (discordPanel) discordPanel.style.display = platform === 'discord' ? '' : 'none';
     if (groupmePanel) groupmePanel.style.display = platform === 'groupme' ? '' : 'none';
+    // Only show leaderboard settings if a chat platform is selected
+    if (lbSettings) lbSettings.style.display = (platform !== 'none') ? '' : 'none';
+  },
+
+  // Leaderboard toggle — show/hide time picker
+  onLeaderboardToggle() {
+    const enabled = document.getElementById('office-leaderboard-enabled')?.checked;
+    const timeRow = document.getElementById('leaderboard-time-row');
+    if (timeRow) timeRow.style.display = enabled ? '' : 'none';
   },
 
 

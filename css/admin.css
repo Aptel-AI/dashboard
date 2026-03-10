@@ -762,6 +762,22 @@ body {
   margin-bottom: 2px;
 }
 
+/* ── TOGGLE SWITCH ── */
+.toggle-switch {
+  position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; cursor: pointer; inset: 0;
+  background: var(--gray-200); border-radius: 24px; transition: 0.25s;
+}
+.toggle-slider::before {
+  content: ""; position: absolute; height: 18px; width: 18px;
+  left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.25s;
+}
+.toggle-switch input:checked + .toggle-slider { background: var(--teal); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+
 /* ── RESPONSIVE ── */
 @media (max-width: 768px) {
   .admin-sidebar { display: none; }

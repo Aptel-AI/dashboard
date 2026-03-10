@@ -42,7 +42,8 @@ function getOrCreateSheet(name) {
           'officeId', 'name', 'templateType', 'sheetId', 'appsScriptUrl',
           'apiKey', 'status', 'ownerEmail', 'ownerName', 'ownerLevel',
           'logoUrl', 'logoIconUrl', 'brandColors', 'createdDate', 'discordWebhookUrl',
-          'headerLogoStyle', 'payrollManagerEmail', 'payrollMode', 'chatPlatform'
+          'headerLogoStyle', 'payrollManagerEmail', 'payrollMode', 'chatPlatform',
+          'leaderboardEnabled', 'leaderboardHour'
         ]);
         break;
       case OWNERS_TAB:
@@ -212,7 +213,9 @@ function doGet(e) {
                 payrollManagerEmail: o.payrollManagerEmail || '',
                 payrollMode: o.payrollMode || 'commission-split',
                 ownerEmail: o.ownerEmail || '',
-                ownerName: o.ownerName || ''
+                ownerName: o.ownerName || '',
+                leaderboardEnabled: o.leaderboardEnabled || 'false',
+                leaderboardHour: o.leaderboardHour || '22'
               }
             });
           }
@@ -351,7 +354,9 @@ function doPost(e) {
           body.headerLogoStyle || 'icon',
           body.payrollManagerEmail || '',
           body.payrollMode || 'commission-split',
-          body.chatPlatform || 'none'
+          body.chatPlatform || 'none',
+          body.leaderboardEnabled || 'false',
+          body.leaderboardHour || '22'
         ]);
         return jsonResponse({ success: true, officeId: officeId });
       }
@@ -379,6 +384,8 @@ function doPost(e) {
         if (body.payrollManagerEmail !== undefined) sheet.getRange(row, 17).setValue(body.payrollManagerEmail);
         if (body.payrollMode !== undefined) sheet.getRange(row, 18).setValue(body.payrollMode);
         if (body.chatPlatform !== undefined) sheet.getRange(row, 19).setValue(body.chatPlatform);
+        if (body.leaderboardEnabled !== undefined) sheet.getRange(row, 20).setValue(body.leaderboardEnabled);
+        if (body.leaderboardHour !== undefined) sheet.getRange(row, 21).setValue(body.leaderboardHour);
         return jsonResponse({ success: true });
       }
 
@@ -557,7 +564,9 @@ function readOffices() {
       headerLogoStyle: (data[i][15] || '').toString().trim() || 'icon',
       payrollManagerEmail: (data[i][16] || '').toString().trim().toLowerCase(),
       payrollMode: (data[i][17] || 'commission-split').toString().trim(),
-      chatPlatform: (data[i][18] || 'none').toString().trim()
+      chatPlatform: (data[i][18] || 'none').toString().trim(),
+      leaderboardEnabled: (data[i][19] || 'false').toString().trim(),
+      leaderboardHour: (data[i][20] || '22').toString().trim()
     });
   }
   return offices;
@@ -581,7 +590,9 @@ function readOfficesBasic() {
       logoUrl: (data[i][10] || '').toString().trim(),
       logoIconUrl: (data[i][11] || '').toString().trim(),
       discordWebhookUrl: (data[i][14] || '').toString().trim(),
-      chatPlatform: (data[i][18] || 'none').toString().trim()
+      chatPlatform: (data[i][18] || 'none').toString().trim(),
+      leaderboardEnabled: (data[i][19] || 'false').toString().trim(),
+      leaderboardHour: (data[i][20] || '22').toString().trim()
     });
   }
   return offices;
@@ -874,4 +885,109 @@ function readScoped(email) {
   }
 
   return { error: 'Unknown role: ' + admin.role };
+}
+
+
+// ═══════════════════════════════════════════════════════
+// CENTRALIZED LEADERBOARD SCHEDULER
+// ═══════════════════════════════════════════════════════
+// Run setupLeaderboardScheduler() ONCE to create an hourly trigger.
+// checkLeaderboardPosts() runs every hour — for each office with
+// leaderboardEnabled=true, if the current hour matches leaderboardHour,
+// it calls the office's ?action=leaderboardText endpoint and posts
+// the result to the configured webhook (Discord/GroupMe).
+
+/**
+ * ONE-TIME SETUP — run from Apps Script editor to create hourly trigger.
+ */
+function setupLeaderboardScheduler() {
+  // Remove existing leaderboard triggers to avoid duplicates
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'checkLeaderboardPosts') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      Logger.log('Removed existing checkLeaderboardPosts trigger');
+    }
+  }
+
+  // Create hourly trigger
+  ScriptApp.newTrigger('checkLeaderboardPosts')
+    .timeBased()
+    .everyHours(1)
+    .create();
+
+  Logger.log('✅ Leaderboard scheduler created — runs every hour.');
+}
+
+/**
+ * Hourly check — loops all offices, posts leaderboard text where due.
+ */
+function checkLeaderboardPosts() {
+  var now = new Date();
+  var currentHour = now.getHours(); // 0-23 in script timezone
+
+  var offices = readOffices();
+
+  for (var i = 0; i < offices.length; i++) {
+    var office = offices[i];
+
+    // Skip inactive, disabled, or wrong hour
+    if (office.status !== 'active') continue;
+    if (office.leaderboardEnabled !== 'true') continue;
+    if (String(office.leaderboardHour) !== String(currentHour)) continue;
+
+    // Must have a webhook configured
+    var platform = (office.chatPlatform || 'none').toLowerCase();
+    var webhookUrl = (office.discordWebhookUrl || '').trim();
+    if (!webhookUrl || platform === 'none') continue;
+
+    // Must have an Apps Script URL to call
+    var appsScriptUrl = (office.appsScriptUrl || '').trim();
+    var apiKey = (office.apiKey || '').trim();
+    if (!appsScriptUrl) continue;
+
+    try {
+      // Build the leaderboardText endpoint URL
+      var url = 'https://script.google.com/macros/s/' + appsScriptUrl + '/exec'
+        + '?action=leaderboardText'
+        + '&key=' + encodeURIComponent(apiKey)
+        + '&officeId=' + encodeURIComponent(office.officeId)
+        + '&sheetId=' + encodeURIComponent(office.sheetId)
+        + '&officeName=' + encodeURIComponent(office.name);
+
+      var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      var code = resp.getResponseCode();
+      if (code !== 200) {
+        Logger.log('[Leaderboard] ' + office.name + ' — HTTP ' + code);
+        continue;
+      }
+
+      var json = JSON.parse(resp.getContentText());
+      var text = (json.text || '').trim();
+      if (!text) {
+        Logger.log('[Leaderboard] ' + office.name + ' — empty text');
+        continue;
+      }
+
+      // Post to the office's webhook
+      var postUrl, postPayload;
+      if (platform === 'groupme') {
+        postUrl = 'https://api.groupme.com/v3/bots/post';
+        postPayload = JSON.stringify({ bot_id: webhookUrl, text: text });
+      } else {
+        postUrl = webhookUrl;
+        postPayload = JSON.stringify({ content: text });
+      }
+
+      var postResp = UrlFetchApp.fetch(postUrl, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: postPayload,
+        muteHttpExceptions: true
+      });
+      Logger.log('[Leaderboard] ' + office.name + ' — posted to ' + platform + ' (' + postResp.getResponseCode() + ')');
+    } catch (err) {
+      Logger.log('[Leaderboard] ' + office.name + ' — ERROR: ' + err.message);
+    }
+  }
 }
