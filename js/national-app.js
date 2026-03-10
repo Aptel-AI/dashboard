@@ -505,17 +505,18 @@ const NationalApp = {
     const bizList = owner.audit.businesses;
     const total = bizList.length;
 
-    // Reviews: average GBL rating
-    let ratingSum = 0, ratingCount = 0;
+    // Reviews: average GBL rating + total review count (for A+ threshold)
+    let ratingSum = 0, ratingCount = 0, totalReviews = 0;
     for (const b of bizList) {
       if (b.gbl && b.gbl.rating != null && b.gbl.rating > 0) {
         ratingSum += b.gbl.rating;
         ratingCount++;
+        totalReviews += (b.gbl.reviews || 0);
       }
     }
     if (ratingCount > 0) {
       const avg = ratingSum / ratingCount;
-      owner.audit.grades.reviews = this._ratingToGrade(avg);
+      owner.audit.grades.reviews = this._ratingToGrade(avg, totalReviews);
       owner.audit.reviewsAvg = Math.round(avg * 10) / 10;
       owner.audit.reviewsCount = ratingCount;
     }
@@ -553,13 +554,16 @@ const NationalApp = {
     owner.audit.seoPassing = seoPassing;
   },
 
-  _ratingToGrade(rating) {
-    if (rating >= 4.5) return 'A+';
-    if (rating >= 4.0) return 'A';
+  // Matches Cam's Performance Audit grading formula
+  _ratingToGrade(rating, reviewCount) {
+    if (rating >= 4.9 && reviewCount > 49) return 'A+';
+    if (rating >= 4.4) return 'A';
+    if (rating >= 4.0) return 'A-';
     if (rating >= 3.5) return 'B';
-    if (rating >= 3.0) return 'C';
-    if (rating >= 2.0) return 'D';
-    return 'F';
+    if (rating >= 3.2) return 'B-';
+    if (rating >= 2.8) return 'C';
+    if (rating >= 2.5) return 'C-';
+    return 'D';
   },
 
   _pctToGrade(count, total) {
@@ -2032,7 +2036,7 @@ const NationalApp = {
   // ── Per-business grade helpers ──
   _bizReviewGrade(b) {
     const rating = b.gbl?.rating;
-    if (rating != null && rating > 0) return this._ratingToGrade(rating);
+    if (rating != null && rating > 0) return this._ratingToGrade(rating, b.gbl?.reviews || 0);
     return '—';
   },
 
