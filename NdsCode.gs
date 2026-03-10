@@ -1784,6 +1784,14 @@ function buildLeaderboardHtml(lb) {
 function buildLeaderboardText(ss, officeId, officeName) {
   var lb = readLeaderboard(ss, officeId);
   var allPeople = (lb.reps || []).concat(lb.leaders || []);
+
+  // Filter out non-sales roles (superadmin/admin are test-only)
+  var NON_SALES = { superadmin: true, admin: true };
+  allPeople = allPeople.filter(function(p) {
+    var rank = (p.rank || 'rep').toLowerCase();
+    return !NON_SALES[rank];
+  });
+
   allPeople.sort(function(a, b) { return (b.tw.units || 0) - (a.tw.units || 0); });
 
   var medals = ['🥇', '🥈', '🥉'];
