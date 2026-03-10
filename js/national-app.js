@@ -1092,8 +1092,6 @@ const NationalApp = {
     document.getElementById('kpi-retention').textContent = t.retention || '—';
     document.getElementById('kpi-production').textContent = t.production || '—';
 
-    // Campaign-level recruiting table
-    this._renderRecruitingTable(this.state.campaignRecruiting, 'campaign-recruiting');
   },
 
   // ══════════════════════════════════════════════════
