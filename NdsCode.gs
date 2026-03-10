@@ -1698,10 +1698,15 @@ function readLeaderboard(ss, officeId) {
   var result = readPeople(ss, officeId, roster, teamMaps.nameMap);
   var people = result.people || result;
 
+  // Exclude non-sales roles (superadmin/admin are test-only)
+  var NON_SALES_LB = { superadmin: true, admin: true };
+
   var reps = [];
   var leaders = [];
   people.forEach(function(p) {
     if (p.deactivated) return;
+    var rank = (p.rank || 'rep').toLowerCase();
+    if (NON_SALES_LB[rank]) return;
     var entry = {
       name: p.name,
       rank: p.rank,
