@@ -2046,11 +2046,13 @@ const NationalApp = {
 
   _fmtDollar(v) {
     if (!v && v !== 0) return '—';
+    if (Number(v) === 0) return '—';
     return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   },
 
   _fmtNum(v) {
     if (!v && v !== 0) return '—';
+    if (Number(v) === 0) return '—';
     return Number(v).toLocaleString('en-US');
   },
 
