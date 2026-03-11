@@ -1202,10 +1202,11 @@ const NationalApp = {
     const status = document.getElementById('import-status');
 
     if (btn) { btn.disabled = true; btn.textContent = 'Loading Costs...'; }
-    if (status) { status.textContent = ''; status.className = 'import-status'; }
+    if (status) { status.textContent = 'Scanning owner spreadsheets...'; status.className = 'import-status import-success'; }
 
     try {
-      const indeedData = await this._fetchWithTimeout(this._fetchIndeedCosts(), 60000);
+      // 2 min timeout — server opens each owner's spreadsheet from Drive which is slow
+      const indeedData = await this._fetchWithTimeout(this._fetchIndeedCosts(), 120000);
       if (indeedData && indeedData.owners && Object.keys(indeedData.owners).length) {
         this._enrichOwnersWithIndeedCosts(indeedData.owners);
 
