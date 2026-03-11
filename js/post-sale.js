@@ -644,8 +644,7 @@ const PostSale = {
       this._submitting = false;
       if (result.ok || (result.data && result.data.ok)) {
         this._clearDraft();
-        // Fire Discord webhook (fire-and-forget — don't block success)
-        this._fireDiscordWebhook(payload);
+        // Discord webhook now fires server-side in Code.gs
         // Advance to success step
         const total = this._campaign === 'ooma' ? 3 : 4;
         this._step = total;
@@ -760,7 +759,11 @@ const PostSale = {
       oomaPackage: this._campaign === 'ooma' ? d.oomaPackage : '',
       // Order channel & codes
       orderChannel: d.orderChannel || 'Sara',
-      codesUsedBy: d.codesUsed ? (d.codesUsedBy || '') : ''
+      codesUsedBy: d.codesUsed ? (d.codesUsedBy || '') : '',
+      // Webhook config (for server-side Discord/GroupMe posting)
+      hashtags: d.hashtags || '',
+      discordWebhookUrl: OFFICE_CONFIG.discordWebhookUrl || '',
+      chatPlatform: OFFICE_CONFIG.chatPlatform || 'discord'
     };
   },
 

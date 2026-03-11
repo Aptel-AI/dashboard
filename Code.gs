@@ -2132,12 +2132,80 @@ function writeAddSale(body, ss, officeId) {
     CacheService.getScriptCache().remove('tableauSummary_v5_' + officeId);
   } catch (e) { /* non-critical */ }
 
+  // Fire Discord/GroupMe webhook server-side (fire-and-forget)
+  try {
+    _fireWebhook(body, units, teamEmoji);
+  } catch (e) { /* webhook failure should not block sale */ }
+
   return {
     ok: true,
     rowIndex: sheet.getLastRow(),
     units: units,
     yeses: yeses
   };
+}
+
+
+// === DISCORD / GROUPME WEBHOOK (server-side) ===
+
+function _fireWebhook(body, units, teamEmoji) {
+  var platform = String(body.chatPlatform || 'discord').toLowerCase();
+  var webhookUrl = String(body.discordWebhookUrl || '').trim();
+  if (!webhookUrl || platform === 'none') return;
+
+  var bold = (platform === 'discord') ? '**' : '';
+  var repName = String(body.repName || '').trim();
+  var campaign = String(body.campaign || '').trim();
+  var msg = '';
+
+  if (campaign === 'attb2b') {
+    msg += bold + repName + bold + ' made a sale with AT&T: B2B!\n';
+    msg += (body.accountType || 'Business') + ' Account\n';
+    msg += String(body.dsi || '') + '\n';
+    if (Number(body.air) > 0) msg += '• Internet Air\n';
+    var np = Number(body.newPhones) || 0;
+    var by = Number(body.byods) || 0;
+    if (np > 0 || by > 0) msg += '• ' + np + ' New Phone(s)|' + by + ' BYOD(s)\n';
+    if (Number(body.fiber) > 0) msg += '• ' + (body.fiberPackage || 'Fiber') + '\n';
+    var vq = Number(body.voipQty) || 0;
+    if (vq > 0) msg += '• ' + vq + ' VoIP(s)\n';
+    if (Number(body.dtv) > 0) msg += '• DIRECTV ' + (body.dtvPackage || '') + '\n';
+  } else if (campaign === 'ooma') {
+    msg += bold + repName + bold + ' made a sale with Ooma!\n';
+    msg += String(body.clientName || '') + '\n';
+    msg += '• ' + (body.oomaPackage || 'Ooma Pro') + '\n';
+  }
+
+  var tags = String(body.hashtags || '').trim();
+  if (tags) msg += tags + '\n';
+
+  if (teamEmoji && units > 0) {
+    var count = Math.min(units, 20);
+    for (var i = 0; i < count; i++) msg += teamEmoji;
+  }
+
+  msg = msg.trim();
+  if (!msg) return;
+
+  var payload, url;
+  if (platform === 'groupme') {
+    url = 'https://api.groupme.com/v3/bots/post';
+    payload = JSON.stringify({ bot_id: webhookUrl, text: msg });
+  } else {
+    url = webhookUrl;
+    payload = JSON.stringify({ content: msg });
+  }
+
+  try {
+    UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: payload,
+      muteHttpExceptions: true
+    });
+  } catch (e) {
+    Logger.log('Webhook error: ' + e.message);
+  }
 }
 
 

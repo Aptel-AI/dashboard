@@ -490,8 +490,7 @@ const PostSale = {
       this._submitting = false;
       if (result.ok || (result.data && result.data.ok)) {
         this._clearDraft();
-        // Fire Discord webhook (fire-and-forget — don't block success)
-        this._fireDiscordWebhook(payload);
+        // Discord webhook now fires server-side in NdsCode.gs
         // Advance to success step
         this._step = 4;
         this._render();
@@ -606,7 +605,11 @@ const PostSale = {
       byods: byods,
       // Order channel & codes
       orderChannel: d.orderChannel || 'Sara',
-      codesUsedBy: d.codesUsed ? (d.codesUsedBy || '') : ''
+      codesUsedBy: d.codesUsed ? (d.codesUsedBy || '') : '',
+      // Webhook config (for server-side Discord/GroupMe posting)
+      hashtags: d.hashtags || '',
+      discordWebhookUrl: OFFICE_CONFIG.discordWebhookUrl || '',
+      chatPlatform: OFFICE_CONFIG.chatPlatform || 'discord'
     };
   },
 
