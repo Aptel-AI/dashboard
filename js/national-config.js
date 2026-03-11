@@ -42,6 +42,11 @@ const NATIONAL_CONFIG = {
     national: {
       id: '1eGkwjQRD9RV4n-JR_TTlgE6VY858WZID8cAF8soYSYM',
       label: 'National Recruiting Data'
+    },
+    // Folder 6: Indeed ad cost spreadsheets (one per owner, named by owner name)
+    indeedCostsFolder: {
+      id: '1r2lGOOjXQkvzz1we5k1Gn5drXrZKc42y',
+      label: 'Indeed Ad Spend'
     }
   },
 
