@@ -1318,6 +1318,31 @@ td.cell-red    { background: #fecaca !important; color: #991b1b !important; }
 }
 
 /* ═══════════════════════════════════════════════════════
+   INDEED AD SPEND TABLE
+   ═══════════════════════════════════════════════════════ */
+.indeed-month-select {
+  padding: 4px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-700);
+  background: var(--white);
+  cursor: pointer;
+  margin-left: 8px;
+}
+.indeed-table-wrap { margin-top: 4px; }
+.indeed-table-wrap .data-table { max-width: 600px; }
+.indeed-table-wrap .data-table td.indeed-label {
+  white-space: nowrap;
+  font-weight: 700;
+  background: var(--gray-50);
+}
+.indeed-table-wrap .data-table td.indeed-total {
+  font-weight: 800;
+}
+
+/* ═══════════════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════════════ */
 @media (max-width: 768px) {

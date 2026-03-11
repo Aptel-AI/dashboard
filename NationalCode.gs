@@ -14,7 +14,8 @@ var SHEETS = {
   CAMPAIGN_TRACKER:   '1HvWJYox3JXvxmza63YBWAqKPtUGPFuaV-s-BOfbWGKM',  // ATT Campaign Tracker
   PERFORMANCE_AUDIT:  '15WCMzKnqvyyRMx2ae4tC1a12_-aoSRDh3McOuRAKuHk',  // Performance Audit
   NATIONAL:           '1eGkwjQRD9RV4n-JR_TTlgE6VY858WZID8cAF8soYSYM', // Ken's national recruiting sheet
-  NLR_B2B:            '1sxauFjNjq4_rRYM2PAl5cyOyHF3Hg4OkO-t_hLKDJB8'  // NLR's AT&T B2B 1-on-1's report
+  NLR_B2B:            '1sxauFjNjq4_rRYM2PAl5cyOyHF3Hg4OkO-t_hLKDJB8', // NLR's AT&T B2B 1-on-1's report
+  INDEED_COSTS_FOLDER: '1r2lGOOjXQkvzz1we5k1Gn5drXrZKc42y'              // Drive folder: per-owner Indeed ad spend sheets
 };
 
 // Campaign configs
@@ -72,6 +73,11 @@ function doGet(e) {
     // ── B2B production/sales data (local copy in _B2B_Production tab) ──
     if (action === 'b2bProduction') {
       return jsonResp(readLocalProduction());
+    }
+
+    // ── Indeed ad cost data from per-owner spreadsheets in Drive folder ──
+    if (action === 'indeedCosts') {
+      return jsonResp(readIndeedCosts());
     }
 
     if (owner) {
@@ -2314,5 +2320,197 @@ function ratingToGrade(rating) {
   if (rating >= 3.0) return 'C';
   if (rating >= 2.0) return 'D';
   return 'F';
+}
+
+// ══════════════════════════════════════════════════
+// INDEED AD SPEND — Per-Owner Drive Folder Reader
+// ══════════════════════════════════════════════════
+
+/**
+ * Read Indeed ad cost tables from per-owner spreadsheets in a shared Drive folder.
+ * Each spreadsheet is named after the owner and has monthly tabs with a fixed table.
+ * Returns { owners: { "OwnerName": { months: [{ month, local, nlr, total }] } } }
+ */
+function readIndeedCosts() {
+  var folder;
+  try {
+    folder = DriveApp.getFolderById(SHEETS.INDEED_COSTS_FOLDER);
+  } catch (err) {
+    Logger.log('readIndeedCosts: Cannot open folder: ' + err.message);
+    return { owners: {} };
+  }
+
+  var owners = {};
+  var files = folder.getFilesByType(MimeType.GOOGLE_SHEETS);
+
+  while (files.hasNext()) {
+    var file = files.next();
+    var ownerName = file.getName().trim();
+
+    try {
+      var ss = SpreadsheetApp.openById(file.getId());
+      var sheets = ss.getSheets();
+
+      // Parse month tabs and sort newest-first
+      var monthTabs = [];
+      for (var i = 0; i < sheets.length; i++) {
+        var tabName = sheets[i].getName().trim();
+        var parsed = _parseMonthTab(tabName);
+        if (parsed) {
+          monthTabs.push({ sheet: sheets[i], name: tabName, date: parsed });
+        }
+      }
+      monthTabs.sort(function(a, b) { return b.date - a.date; });
+
+      if (!monthTabs.length) {
+        Logger.log('readIndeedCosts: No month tabs found for ' + ownerName);
+        continue;
+      }
+
+      // Extract data from each month tab
+      var monthsData = [];
+      for (var m = 0; m < monthTabs.length; m++) {
+        var costData = _extractIndeedTable(monthTabs[m].sheet);
+        if (costData) {
+          costData.month = monthTabs[m].name;
+          monthsData.push(costData);
+        }
+      }
+
+      if (monthsData.length) {
+        owners[ownerName] = { months: monthsData };
+      }
+    } catch (err) {
+      Logger.log('readIndeedCosts: Error reading ' + ownerName + ': ' + err.message);
+    }
+  }
+
+  Logger.log('readIndeedCosts: Found data for ' + Object.keys(owners).length + ' owners');
+  return { owners: owners };
+}
+
+/**
+ * Parse a tab name as a month. Handles:
+ * "January 2026", "Jan 2026", "Feb", "March 26", "01/2026", "2026-03"
+ */
+function _parseMonthTab(name) {
+  var s = name.trim();
+  var MONTHS = {
+    'jan': 0, 'january': 0, 'feb': 1, 'february': 1,
+    'mar': 2, 'march': 2, 'apr': 3, 'april': 3,
+    'may': 4, 'jun': 5, 'june': 5, 'jul': 6, 'july': 6,
+    'aug': 7, 'august': 7, 'sep': 8, 'sept': 8, 'september': 8,
+    'oct': 9, 'october': 9, 'nov': 10, 'november': 10, 'dec': 11, 'december': 11
+  };
+
+  // "Month Year" or just "Month" (e.g., "January 2026", "Feb 26", "March")
+  var m1 = s.match(/^([a-zA-Z]+)\s*(\d{2,4})?$/);
+  if (m1) {
+    var idx = MONTHS[m1[1].toLowerCase()];
+    if (idx !== undefined) {
+      var yr = m1[2] ? parseInt(m1[2]) : new Date().getFullYear();
+      if (yr < 100) yr += 2000;
+      return new Date(yr, idx, 1);
+    }
+  }
+
+  // "MM/YYYY" or "M-YYYY"
+  var m2 = s.match(/^(\d{1,2})[\/\-](\d{4})$/);
+  if (m2) {
+    var mo = parseInt(m2[1]) - 1;
+    if (mo >= 0 && mo <= 11) return new Date(parseInt(m2[2]), mo, 1);
+  }
+
+  // "YYYY-MM"
+  var m3 = s.match(/^(\d{4})[\/\-](\d{1,2})$/);
+  if (m3) {
+    var mo2 = parseInt(m3[2]) - 1;
+    if (mo2 >= 0 && mo2 <= 11) return new Date(parseInt(m3[1]), mo2, 1);
+  }
+
+  return null;
+}
+
+/**
+ * Extract the Indeed cost table from a monthly sheet tab.
+ * Scans for a header row containing "Local Indeed" / "NLR Indeed" / "TOTAL",
+ * then reads 8 metric rows below.
+ */
+function _extractIndeedTable(sheet) {
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 3) return null;
+
+  var labelCol = -1, localCol = -1, nlrCol = -1, totalCol = -1;
+  var tableStartRow = -1;
+
+  // Find the header row with "Local Indeed", "NLR Indeed", "TOTAL"
+  for (var r = 0; r < data.length; r++) {
+    var foundLocal = false, foundNlr = false, foundTotal = false;
+    for (var c = 0; c < data[r].length; c++) {
+      var h = String(data[r][c] || '').toLowerCase().trim();
+      if (h.indexOf('local') >= 0 && h.indexOf('indeed') >= 0) { localCol = c; foundLocal = true; }
+      else if (h.indexOf('nlr') >= 0 && h.indexOf('indeed') >= 0) { nlrCol = c; foundNlr = true; }
+      else if (h === 'total') { totalCol = c; foundTotal = true; }
+    }
+    if (foundLocal || foundNlr || foundTotal) {
+      tableStartRow = r + 1;
+      // Label column is the leftmost before data columns
+      var minDataCol = Math.min(
+        localCol >= 0 ? localCol : 999,
+        nlrCol >= 0 ? nlrCol : 999,
+        totalCol >= 0 ? totalCol : 999
+      );
+      labelCol = minDataCol > 0 ? minDataCol - 1 : 0;
+      break;
+    }
+  }
+
+  if (tableStartRow < 0) return null;
+
+  // Row label patterns → keys
+  var ROW_DEFS = [
+    { patterns: ['# of ads', 'number of ads'],                          key: 'numAds' },
+    { patterns: ['total cost'],                                          key: 'totalCost' },
+    { patterns: ['# of applies', 'number of applies', 'applies'],       key: 'numApplies' },
+    { patterns: ['cost/apply', 'cost per apply', 'cost / apply'],        key: 'costPerApply' },
+    { patterns: ['# of 2nd', 'number of 2nd', '2nds'],                  key: 'num2nds' },
+    { patterns: ['cost/second', 'cost/2nd', 'cost per 2nd', 'cost per second'], key: 'costPer2nd' },
+    { patterns: ['# of new start', 'number of new start', 'new starts'], key: 'numNewStarts' },
+    { patterns: ['cost/new start', 'cost per new start'],                key: 'costPerNewStart' }
+  ];
+
+  var localData = {}, nlrData = {}, totalData = {};
+
+  for (var r = tableStartRow; r < Math.min(tableStartRow + 15, data.length); r++) {
+    var label = String(data[r][labelCol] || '').toLowerCase().trim();
+    if (!label) continue;
+
+    var matchedKey = null;
+    for (var d = 0; d < ROW_DEFS.length; d++) {
+      for (var p = 0; p < ROW_DEFS[d].patterns.length; p++) {
+        if (label.indexOf(ROW_DEFS[d].patterns[p]) >= 0) {
+          matchedKey = ROW_DEFS[d].key;
+          break;
+        }
+      }
+      if (matchedKey) break;
+    }
+    if (!matchedKey) continue;
+
+    if (localCol >= 0) localData[matchedKey] = _numVal(data[r][localCol]);
+    if (nlrCol >= 0)   nlrData[matchedKey]   = _numVal(data[r][nlrCol]);
+    if (totalCol >= 0) totalData[matchedKey]  = _numVal(data[r][totalCol]);
+  }
+
+  return { local: localData, nlr: nlrData, total: totalData };
+}
+
+/** Convert cell value to number, stripping $ and , */
+function _numVal(v) {
+  if (typeof v === 'number') return v;
+  if (!v) return 0;
+  var s = String(v).replace(/[$,\s]/g, '');
+  var n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
 }
 

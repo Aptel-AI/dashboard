@@ -223,6 +223,18 @@ const NationalApp = {
         console.warn('[NationalApp] B2B production fetch failed:', err.message);
       }
     }
+
+    // Step 6: Enrich B2B owners with Indeed ad cost data from per-owner Drive spreadsheets
+    if (campaignKey === 'att-b2b' && NATIONAL_CONFIG.appsScriptUrl) {
+      try {
+        const indeedData = await this._fetchIndeedCosts();
+        if (indeedData && indeedData.owners && Object.keys(indeedData.owners).length) {
+          this._enrichOwnersWithIndeedCosts(indeedData.owners);
+        }
+      } catch (err) {
+        console.warn('[NationalApp] Indeed costs fetch failed:', err.message);
+      }
+    }
   },
 
   // ── Fetch ALL recruiting data from Ken's national sheet via NationalCode.gs ──
@@ -388,6 +400,52 @@ const NationalApp = {
       matched++;
     }
     console.log('[NationalApp] Production enrichment: matched', matched, 'of', this.state.owners.length, 'owners');
+  },
+
+  // ── Fetch Indeed ad cost data from per-owner Drive spreadsheets ──
+  async _fetchIndeedCosts() {
+    const url = NATIONAL_CONFIG.appsScriptUrl +
+      '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
+      '&action=indeedCosts' +
+      '&_t=' + Date.now();
+    const resp = await fetch(url);
+    const result = await resp.json();
+    if (result.error) throw new Error(result.error);
+    return result;
+  },
+
+  // ── Enrich owners with Indeed ad cost data ──
+  _enrichOwnersWithIndeedCosts(indeedOwners) {
+    const keys = Object.keys(indeedOwners);
+    const lower = {};
+    for (const key of keys) lower[key.toLowerCase().trim()] = key;
+
+    let matched = 0;
+    for (const owner of this.state.owners) {
+      const ownerLc = owner.name.toLowerCase().trim();
+
+      // Exact match
+      let matchKey = lower[ownerLc];
+
+      // Starts-with
+      if (!matchKey) {
+        for (const lc in lower) {
+          if (lc.startsWith(ownerLc) || ownerLc.startsWith(lc)) { matchKey = lower[lc]; break; }
+        }
+      }
+
+      // Contains
+      if (!matchKey) {
+        for (const lc in lower) {
+          if (lc.indexOf(ownerLc) >= 0 || ownerLc.indexOf(lc) >= 0) { matchKey = lower[lc]; break; }
+        }
+      }
+
+      if (!matchKey) continue;
+      owner.indeedCosts = indeedOwners[matchKey];
+      matched++;
+    }
+    console.log('[NationalApp] Indeed costs enrichment: matched', matched, 'of', this.state.owners.length, 'owners');
   },
 
   // ── Import NLR headcount data into local sheet (one-time sync) ──
@@ -1601,12 +1659,16 @@ const NationalApp = {
         </div>`;
       const wowEl = document.getElementById('owner-recruiting-wow');
       if (wowEl) wowEl.innerHTML = '';
+      // Still render Indeed costs even if recruiting is empty
+      this._renderIndeedCosts(owner);
       return;
     }
     // Projected table (4 most recent weeks)
     this._renderRecruitingTable(r, 'owner-recruiting-table');
     // Week-over-week raw data (all weeks)
     this._renderRecruitingWoW(owner);
+    // Indeed ad spend (if available)
+    this._renderIndeedCosts(owner);
   },
 
   // ── Week-over-week raw recruiting data (stacked cards under projected table) ──
@@ -1663,6 +1725,100 @@ const NationalApp = {
 
     html += `</div>`;
     el.innerHTML = html;
+  },
+
+  // ══════════════════════════════════════════════════
+  // RENDER: Indeed Ad Spend (inside Recruiting tab)
+  // ══════════════════════════════════════════════════
+
+  _renderIndeedCosts(owner) {
+    const el = document.getElementById('owner-indeed-costs');
+    if (!el) return;
+
+    const data = owner.indeedCosts;
+    if (!data || !data.months || !data.months.length) {
+      el.innerHTML = '';
+      return;
+    }
+
+    const months = data.months;
+    const hasMultiple = months.length > 1;
+
+    let html = `<div class="coaching-label">
+      Indeed Ad Spend
+      ${hasMultiple
+        ? `<select class="indeed-month-select" onchange="NationalApp._switchIndeedMonth(this.value)">
+            ${months.map((m, i) => `<option value="${i}">${this._esc(m.month)}</option>`).join('')}
+          </select>`
+        : `<span class="coaching-sublabel">${this._esc(months[0].month)}</span>`
+      }
+    </div>`;
+
+    html += this._buildIndeedTable(months[0]);
+    el.innerHTML = html;
+  },
+
+  _switchIndeedMonth(idx) {
+    const owner = this.state.selectedOwner;
+    if (!owner || !owner.indeedCosts || !owner.indeedCosts.months) return;
+    const month = owner.indeedCosts.months[parseInt(idx)];
+    if (!month) return;
+
+    const wrap = document.querySelector('#owner-indeed-costs .indeed-table-wrap');
+    if (wrap) {
+      wrap.outerHTML = this._buildIndeedTable(month);
+    }
+  },
+
+  _buildIndeedTable(monthData) {
+    const local = monthData.local || {};
+    const nlr = monthData.nlr || {};
+    const total = monthData.total || {};
+
+    const rows = [
+      { label: '# of Ads',        key: 'numAds',         fmt: 'num' },
+      { label: 'Total Cost',      key: 'totalCost',      fmt: 'dollar' },
+      { label: '# of Applies',    key: 'numApplies',     fmt: 'num' },
+      { label: 'Cost/Apply',      key: 'costPerApply',   fmt: 'dollar' },
+      { label: '# of 2nds',       key: 'num2nds',        fmt: 'num' },
+      { label: 'Cost/2nd',        key: 'costPer2nd',     fmt: 'dollar' },
+      { label: '# of New Starts', key: 'numNewStarts',   fmt: 'num' },
+      { label: 'Cost/New Start',  key: 'costPerNewStart', fmt: 'dollar' }
+    ];
+
+    let h = `<div class="indeed-table-wrap"><div class="data-table-wrap"><table class="data-table">
+      <thead><tr>
+        <th></th>
+        <th class="num">Local Indeed</th>
+        <th class="num">NLR Indeed</th>
+        <th class="num">Total</th>
+      </tr></thead><tbody>`;
+
+    for (const r of rows) {
+      const lv = local[r.key] ?? 0;
+      const nv = nlr[r.key] ?? 0;
+      const tv = total[r.key] ?? 0;
+      const fmt = r.fmt === 'dollar' ? this._fmtDollar : this._fmtNum;
+      h += `<tr>
+        <td class="indeed-label">${r.label}</td>
+        <td class="num">${fmt(lv)}</td>
+        <td class="num">${fmt(nv)}</td>
+        <td class="num indeed-total">${fmt(tv)}</td>
+      </tr>`;
+    }
+
+    h += `</tbody></table></div></div>`;
+    return h;
+  },
+
+  _fmtDollar(v) {
+    if (!v && v !== 0) return '—';
+    return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  },
+
+  _fmtNum(v) {
+    if (!v && v !== 0) return '—';
+    return Number(v).toLocaleString('en-US');
   },
 
   // ══════════════════════════════════════════════════
