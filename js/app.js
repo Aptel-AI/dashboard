@@ -896,10 +896,19 @@ const App = {
       // Build paid-out checkboxes
       const paidOutHtml = this._buildPaidOutHtml(o);
 
+      // Payroll type badge
+      const isCodesSwap = !!o.codesUsedBy;
+      const isTrainee = !!o.traineeName;
+      const typeBadge = isCodesSwap
+        ? `<span style="display:inline-block;background:rgba(249,115,22,0.15);color:var(--orange);font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;border-radius:4px;padding:2px 6px;margin-top:3px">Transfer</span>`
+        : isTrainee
+          ? `<span style="display:inline-block;background:rgba(0,200,255,0.12);color:var(--sc-cyan);font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;border-radius:4px;padding:2px 6px;margin-top:3px">Split</span>`
+          : '';
+
       const tr = document.createElement('tr');
       tr.style.cssText = 'border-bottom:1px solid rgba(0,0,0,0.06)';
       tr.innerHTML = `
-        <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;font-weight:600;color:var(--white)">${o.repName}${o.codesUsedBy ? `<div style="font-size:10px;font-weight:700;color:var(--orange);margin-top:2px">⚠ Codes: ${this._escapeHtml((this.state.roster?.[o.codesUsedBy]?.name) || o.codesUsedBy)}</div>` : ''}</td>
+        <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;font-weight:600;color:var(--white)">${o.repName}${o.codesUsedBy ? `<div style="font-size:10px;font-weight:700;color:var(--orange);margin-top:2px">→ ${this._escapeHtml((this.state.roster?.[o.codesUsedBy]?.name) || o.codesUsedBy)}</div>` : ''}${typeBadge}</td>
         <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;font-weight:600;color:var(--sc-cyan)">${o.traineeName || '—'}</td>
         <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;color:var(--silver)">${o.dsi}</td>
         <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;color:var(--silver)">${o.dateOfSale}</td>
