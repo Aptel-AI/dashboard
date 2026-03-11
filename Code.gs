@@ -475,7 +475,7 @@ function readPeople(ss, officeId, roster, teamNameToEmoji) {
   if (!roster || Object.keys(roster).length === 0) return { people: [], _debug: { error: 'Empty roster' } };
 
   const olData = olSheet.getDataRange().getValues();
-  if (olData.length < 2) return { people: [], _debug: { error: 'Sales sheet has no data rows' } };
+  const hasSalesData = olData.length >= 2;
 
   // Debug counters
   var _dbg = {
@@ -539,7 +539,7 @@ function readPeople(ss, officeId, roster, teamNameToEmoji) {
   });
 
   // Process each sale row (skip header at index 0)
-  for (let i = 1; i < olData.length; i++) {
+  if (hasSalesData) for (let i = 1; i < olData.length; i++) {
     const row = olData[i];
     const email = String(row[OL.EMAIL] || '').trim().toLowerCase();
     if (!email) { _dbg.noEmail++; continue; }
