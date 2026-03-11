@@ -2133,15 +2133,17 @@ function writeAddSale(body, ss, officeId) {
   } catch (e) { /* non-critical */ }
 
   // Fire Discord/GroupMe webhook server-side (fire-and-forget)
+  var webhookDebug = '';
   try {
-    _fireWebhook(body, units, teamEmoji);
-  } catch (e) { /* webhook failure should not block sale */ }
+    webhookDebug = _fireWebhook(body, units, teamEmoji);
+  } catch (e) { webhookDebug = 'CATCH: ' + e.message; }
 
   return {
     ok: true,
     rowIndex: sheet.getLastRow(),
     units: units,
-    yeses: yeses
+    yeses: yeses,
+    webhookDebug: webhookDebug || 'no-return'
   };
 }
 
@@ -2151,7 +2153,7 @@ function writeAddSale(body, ss, officeId) {
 function _fireWebhook(body, units, teamEmoji) {
   var platform = String(body.chatPlatform || 'discord').toLowerCase();
   var webhookUrl = String(body.discordWebhookUrl || '').trim();
-  if (!webhookUrl || platform === 'none') return;
+  if (!webhookUrl || platform === 'none') return 'SKIP: url=' + !!webhookUrl + ' platform=' + platform;
 
   var bold = (platform === 'discord') ? '**' : '';
   var repName = String(body.repName || '').trim();
@@ -2185,27 +2187,25 @@ function _fireWebhook(body, units, teamEmoji) {
   }
 
   msg = msg.trim();
-  if (!msg) return;
+  if (!msg) return 'SKIP: empty msg';
 
-  var payload, url;
+  var fetchPayload, url;
   if (platform === 'groupme') {
     url = 'https://api.groupme.com/v3/bots/post';
-    payload = JSON.stringify({ bot_id: webhookUrl, text: msg });
+    fetchPayload = JSON.stringify({ bot_id: webhookUrl, text: msg });
   } else {
     url = webhookUrl;
-    payload = JSON.stringify({ content: msg });
+    fetchPayload = JSON.stringify({ content: msg });
   }
 
-  try {
-    UrlFetchApp.fetch(url, {
-      method: 'post',
-      contentType: 'application/json',
-      payload: payload,
-      muteHttpExceptions: true
-    });
-  } catch (e) {
-    Logger.log('Webhook error: ' + e.message);
-  }
+  var resp = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: fetchPayload,
+    muteHttpExceptions: true
+  });
+
+  return 'HTTP ' + resp.getResponseCode() + ' | msg=' + msg.substring(0, 50);
 }
 
 
