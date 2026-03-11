@@ -146,7 +146,7 @@ const NationalApp = {
     if (hasApi)      fetchPromises.camMapping  = this._fetchOwnerCamMapping();
     if (isB2B && hasApi) fetchPromises.headcount  = this._fetchB2BHeadcount();
     if (isB2B && hasApi) fetchPromises.production = this._fetchB2BProduction();
-    if (isB2B && hasApi) fetchPromises.indeedCosts = this._fetchIndeedCosts();
+    // Indeed/recruiting costs excluded from initial load — fetched only via Import button
 
     const keys = Object.keys(fetchPromises);
     const settled = await Promise.allSettled(keys.map(k => fetchPromises[k]));
