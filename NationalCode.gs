@@ -5,10 +5,10 @@
 // ═══════════════════════════════════════════════════════
 
 // ── Config ──
-const NC_API_KEY = 'national-dash-2026-secret'; // Must match Script Properties > API_KEY
+var NC_API_KEY = 'national-dash-2026-secret'; // Must match Script Properties > API_KEY
 
 // External sheet IDs
-const SHEETS = {
+var SHEETS = {
   RECRUITING_WEEKLY:  '1MNLqi8A329444SeZpKbYbcRe3dMxaOPLVdMy-7F1DPk',  // All Campaigns Stats Tracker 2026
   RECRUITING_DAILY:   '1ytTGen_AlzfDPW3HGYU1JKNLz1kfHrrhAFCVnmRS3fg',  // Recruiting Scoreboard Daily
   CAMPAIGN_TRACKER:   '1HvWJYox3JXvxmza63YBWAqKPtUGPFuaV-s-BOfbWGKM',  // ATT Campaign Tracker
@@ -18,7 +18,7 @@ const SHEETS = {
 };
 
 // Campaign configs
-const CAMPAIGNS = {
+var CAMPAIGNS = {
   'att-b2b': {
     label: 'AT&T B2B',
     sectionHeader: 'AT&T Campaign Totals',   // Header text in recruiting sheets
