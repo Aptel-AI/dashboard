@@ -2614,59 +2614,108 @@ const NationalApp = {
   },
 
   // ── Per-business grade helpers ──
+  // Determine service tier: 'full' or 'lite'
+  _bizTier(b) {
+    const st = b.serviceStatus;
+    if (st?.lite && !st?.full) return 'lite';
+    return 'full'; // default to full if both set or neither set
+  },
+
   _bizReviewGrade(b) {
     const rating = b.gbl?.rating;
     if (rating != null && rating > 0) return this._ratingToGrade(rating, b.gbl?.reviews || 0);
     return '—';
   },
 
-  // Website grade: scored on site photos, updates, blog activity
-  // No Cam formula exists (grades are manual in Cam's system), so we
-  // score on available data: photos (no stock), updated, blog posts, blog queue
+  // Website grade — matches Cam's Performance Audit rubric
+  // Full: Team Page photos + Blog (last post recency + queue depth)
+  // Lite: Team Page photos + Updated on current month (no blog)
   _bizWebsiteGrade(b) {
     const ws = b.website;
     const blog = b.blog;
-    // Must have at least a website URL or site photo data to grade
     if (!ws?.url && !ws?.sitePhotos && !blog?.url) return '—';
 
-    let score = 0;
-    // Site photos: "No stock photos" = good (1pt), has any photo data = neutral (0.5pt)
     const photos = (ws?.sitePhotos || '').toLowerCase();
-    if (photos.includes('no stock')) score += 2;
-    else if (photos && !photos.includes('all stock')) score += 1;
+    const isLite = this._bizTier(b) === 'lite';
 
-    // Updated this month: yes = 2pts
-    const wsUpdated = (ws?.updatedMonth || '').toLowerCase();
-    if (wsUpdated === 'yes' || wsUpdated === 'y' || wsUpdated === '✓' || wsUpdated === 'true' || wsUpdated === 'x') score += 2;
+    // Classify photo quality
+    const noStock = photos.includes('no stock');
+    const someStock = photos.includes('some stock');
+    const mostlyStock = photos.includes('mostly stock');
+    const allStock = photos.includes('all stock');
+    // If none of the keywords match, infer from content
+    const photoTier = noStock ? 4 : someStock ? 3 : mostlyStock ? 2 : allStock ? 1 : (photos ? 3 : 0);
+    // 4=no stock, 3=some stock, 2=mostly stock, 1=all stock, 0=unknown
 
-    // Last updated date: exists = 1pt
-    if (ws?.lastUpdated) score += 1;
+    if (isLite) {
+      // ── Website (Lite) — photos + updated this month ──
+      const updated = (ws?.updatedMonth || '').toLowerCase();
+      const isUpdated = ['yes','y','✓','true','x'].includes(updated);
+      if (photoTier >= 4 && isUpdated) return 'A+';  // no stock + updated
+      if (photoTier >= 4) return 'A';                  // no stock, not updated
+      if (photoTier >= 3 && isUpdated) return 'B';     // some stock + updated
+      if (photoTier >= 3) return 'B-';                 // some stock, not updated
+      if (photoTier >= 2) return 'C';                  // mostly stock
+      return 'D';                                       // all stock
+    }
 
-    // Blog: has URL = 1pt, has posts this month = 1pt, has queue = 1pt
-    if (blog?.url || blog?.lastPost) score += 1;
-    if (blog?.currentMonth > 0 || blog?.threeMonthCount > 0) score += 1;
-    if (blog?.onQueue > 0) score += 1;
+    // ── Website (Full) — photos + blog recency + queue ──
+    const blogCurrent = (blog?.currentMonth || 0) > 0;
+    const blogRecent = (blog?.threeMonthCount || 0) > 0;
+    const queue = blog?.onQueue || 0;
 
-    // Grade: 7-8 = A+, 5-6 = A, 4 = A-, 3 = B, 2 = C, 1 = D, 0 = D
-    if (score >= 7) return 'A+';
-    if (score >= 5) return 'A';
-    if (score >= 4) return 'A-';
-    if (score >= 3) return 'B';
-    if (score >= 2) return 'C';
+    // Blog recency: current month > previous month > 1-of-3 > none
+    // "Current Month" = blogCurrent, "Previous Month" = !blogCurrent && blogRecent
+    // "1 out of 3 months" = threeMonthCount > 0 (sparse), "Blog not updated" = neither
+
+    if (photoTier >= 4) {
+      // No stock photos
+      if (blogCurrent && queue >= 3) return 'A+';
+      if (blogCurrent && queue >= 1) return 'A';
+      if (blogRecent && queue >= 1) return 'A-';
+      if (blogCurrent || blogRecent) return 'A-';
+      return 'B'; // no stock but no blog activity
+    }
+    if (photoTier >= 3) {
+      // Some stock photos
+      if (blogCurrent && queue >= 1) return 'B';
+      if (blogRecent) return 'B-';
+      return 'C';
+    }
+    if (photoTier >= 2) {
+      // Mostly stock photos
+      if (blogCurrent && queue >= 1) return 'C';
+      if (queue >= 1) return 'C-';
+      return 'D';
+    }
+    // All stock photos
     return 'D';
   },
 
-  // Matches Cam's Social Media grading formula from Dashboard V2
+  // Social Media grade — matches Cam's Performance Audit rubric
+  // Full: Shared Posts per week + Followers Count
+  // Lite: lower thresholds (>=1/week for A+)
   _bizSocialGrade(b) {
     const ig = b.instagram;
     if (!ig || (!ig.link && !ig.followers && !ig.shared && !ig.generated)) return '—';
     const shared = ig.shared || 0;
-    const generated = ig.generated || 0;
     const followers = ig.followers || 0;
-    if (shared >= 6 && followers > 500) return 'A+';
-    if (shared >= 6) return 'A';
-    if (shared >= 4) return 'B';
-    if ((shared === 0 && generated >= 6) || shared >= 2) return 'C';
+    const isLite = this._bizTier(b) === 'lite';
+
+    if (isLite) {
+      // ── Social Media (Lite) ──
+      if (shared >= 1 && followers >= 500) return 'A+';
+      if (shared >= 1 && followers >= 100) return 'A';
+      if (shared >= 1) return 'B';
+      if (shared > 0) return 'C';  // <1 per week but some activity
+      return 'D';
+    }
+
+    // ── Social Media (Full) ──
+    if (shared >= 3 && followers >= 500) return 'A+';
+    if (shared >= 3) return 'A';
+    if (shared >= 2) return 'B';
+    if (shared >= 1) return 'C';
     return 'D';
   },
 
