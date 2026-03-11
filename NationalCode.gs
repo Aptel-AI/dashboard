@@ -1109,18 +1109,20 @@ function claimCompany(ownerName, companyName) {
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][0]).trim().toLowerCase() === ownerName.toLowerCase() &&
         String(data[i][1]).trim().toLowerCase() === companyName.toLowerCase()) {
-      return { ok: true, message: 'Already claimed', mapping: readOwnerCamMapping().mapping };
+      var r = readOwnerCamMapping();
+      return { ok: true, message: 'Already claimed', mapping: r.mapping, costSheets: r.costSheets };
     }
   }
 
   // Append new row
   sheet.appendRow([ownerName, companyName]);
 
-  return { ok: true, mapping: readOwnerCamMapping().mapping };
+  var result = readOwnerCamMapping();
+  return { ok: true, mapping: result.mapping, costSheets: result.costSheets };
 }
 
 
-// ── Unclaim a company from an owner (delete from _OwnerCamMapping) ──
+// ── Unclaim a company from an owner (preserves Cost Sheet ID in col C) ──
 function unclaimCompany(ownerName, companyName) {
   ownerName = String(ownerName || '').trim();
   companyName = String(companyName || '').trim();
@@ -1128,18 +1130,57 @@ function unclaimCompany(ownerName, companyName) {
 
   var ss = SpreadsheetApp.openById(SHEETS.NATIONAL);
   var sheet = ss.getSheetByName('_OwnerCamMapping');
-  if (!sheet) return { ok: true, mapping: {} };
+  if (!sheet) return { ok: true, mapping: {}, costSheets: {} };
 
   var data = sheet.getDataRange().getValues();
-  // Search from bottom to top so row indices don't shift when deleting
-  for (var i = data.length - 1; i >= 1; i--) {
-    if (String(data[i][0]).trim().toLowerCase() === ownerName.toLowerCase() &&
-        String(data[i][1]).trim().toLowerCase() === companyName.toLowerCase()) {
-      sheet.deleteRow(i + 1); // sheet rows are 1-indexed
+  var ownerLc = ownerName.toLowerCase();
+
+  // Find all rows for this owner and the target row to unclaim
+  var ownerRows = [];    // all row indices (0-based) for this owner
+  var targetRows = [];   // rows matching the company to remove
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim().toLowerCase() === ownerLc) {
+      ownerRows.push(i);
+      if (String(data[i][1]).trim().toLowerCase() === companyName.toLowerCase()) {
+        targetRows.push(i);
+      }
     }
   }
 
-  return { ok: true, mapping: readOwnerCamMapping().mapping };
+  // Delete target rows bottom-to-top, but if a row has a cost sheet ID in col C,
+  // migrate it to another surviving row first
+  for (var t = targetRows.length - 1; t >= 0; t--) {
+    var ri = targetRows[t];
+    var costId = String(data[ri][2] || '').trim();
+
+    if (costId) {
+      // Find another row for this owner that isn't being deleted
+      var otherRow = -1;
+      for (var oi = 0; oi < ownerRows.length; oi++) {
+        if (targetRows.indexOf(ownerRows[oi]) === -1) {
+          otherRow = ownerRows[oi];
+          break;
+        }
+      }
+      if (otherRow >= 0) {
+        // Move cost sheet ID to the surviving row
+        sheet.getRange(otherRow + 1, 3).setValue(costId);
+      } else {
+        // No other rows — clear company but keep row so cost sheet ID survives
+        sheet.getRange(ri + 1, 2).setValue('');
+        continue; // don't delete
+      }
+    }
+
+    sheet.deleteRow(ri + 1);
+    // Adjust remaining indices
+    for (var adj = 0; adj < ownerRows.length; adj++) {
+      if (ownerRows[adj] > ri) ownerRows[adj]--;
+    }
+  }
+
+  var result = readOwnerCamMapping();
+  return { ok: true, mapping: result.mapping, costSheets: result.costSheets };
 }
 
 

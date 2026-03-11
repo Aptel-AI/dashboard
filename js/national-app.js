@@ -2364,8 +2364,9 @@ const NationalApp = {
       const result = await resp.json();
       if (result.error) throw new Error(result.error);
 
-      // Update mapping in state
+      // Update mapping + costSheets in state
       this.state.camMapping = result.mapping || {};
+      if (result.costSheets) this.state.costSheets = result.costSheets;
 
       // Re-map audit data to owners with new mapping and re-render
       this._remapAndRenderAudit();
@@ -2405,8 +2406,9 @@ const NationalApp = {
       const result = await resp.json();
       if (result.error) throw new Error(result.error);
 
-      // Update mapping in state
+      // Update mapping + costSheets in state
       this.state.camMapping = result.mapping || {};
+      if (result.costSheets) this.state.costSheets = result.costSheets;
 
       // Re-map audit data to owners with new mapping and re-render
       this._remapAndRenderAudit();
