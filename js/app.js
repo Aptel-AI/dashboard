@@ -908,7 +908,7 @@ const App = {
       const tr = document.createElement('tr');
       tr.style.cssText = 'border-bottom:1px solid rgba(0,0,0,0.06)';
       tr.innerHTML = `
-        <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;font-weight:600;color:var(--white)">${o.repName}${o.codesUsedBy ? `<div style="font-size:10px;font-weight:700;color:var(--orange);margin-top:2px">→ ${this._escapeHtml((this.state.roster?.[o.codesUsedBy]?.name) || o.codesUsedBy)}</div>` : ''}${typeBadge}</td>
+        <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;font-weight:600;color:var(--white)">${o.repName}${o.codesUsedBy ? `<div style="font-size:10px;font-weight:700;color:var(--orange);margin-top:2px">→ ${Orders._escapeHtml((this.state.roster?.[o.codesUsedBy]?.name) || o.codesUsedBy)}</div>` : ''}${typeBadge}</td>
         <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;font-weight:600;color:var(--sc-cyan)">${o.traineeName || '—'}</td>
         <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;color:var(--silver)">${o.dsi}</td>
         <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;color:var(--silver)">${o.dateOfSale}</td>
