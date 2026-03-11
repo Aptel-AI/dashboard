@@ -2454,6 +2454,7 @@ const NationalApp = {
 
   _renderBizReport(b, auditMonth) {
     const e = s => this._esc(s || '');
+    const extUrl = s => { if (!s) return ''; s = s.trim(); return /^https?:\/\//i.test(s) ? s : 'https://' + s; };
     const bizName = e(b.businessName || b.clientName);
 
     // ── Compute section grades ──
@@ -2488,7 +2489,7 @@ const NationalApp = {
                 ${platforms.map(p => {
                   const link = p.data?.link;
                   return link
-                    ? `<th class="bis-platform-header"><a href="${e(link)}" target="_blank" rel="noopener" class="bis-link">${e(p.name)} ↗</a></th>`
+                    ? `<th class="bis-platform-header"><a href="${extUrl(link)}" target="_blank" rel="noopener" class="bis-link">${e(p.name)} ↗</a></th>`
                     : `<th class="bis-platform-header">${e(p.name)}</th>`;
                 }).join('')}
               </tr>
@@ -2532,7 +2533,7 @@ const NationalApp = {
           <div class="bis-grade-letter">${websiteGrade}</div>
         </div>
         <div class="bis-section-content">
-          <div class="bis-section-banner">Website${ws?.url ? ` <a href="${e(ws.url)}" target="_blank" rel="noopener" class="bis-link">↗</a>` : ''}</div>
+          <div class="bis-section-banner">Website${ws?.url ? ` <a href="${extUrl(ws.url)}" target="_blank" rel="noopener" class="bis-link">↗</a>` : ''}</div>
           <table class="bis-table bis-table-website">
             <thead>
               <tr>
@@ -2566,7 +2567,7 @@ const NationalApp = {
           <div class="bis-grade-letter">${socialGrade}</div>
         </div>
         <div class="bis-section-content">
-          <div class="bis-section-banner">Social Media${ig.link ? ` <a href="${e(ig.link)}" target="_blank" rel="noopener" class="bis-link">↗</a>` : ''}</div>
+          <div class="bis-section-banner">Social Media${ig.link ? ` <a href="${extUrl(ig.link)}" target="_blank" rel="noopener" class="bis-link">↗</a>` : ''}</div>
           <table class="bis-table">
             <thead>
               <tr>
