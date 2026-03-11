@@ -873,53 +873,61 @@ const App = {
       return;
     }
 
+    const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
     orders.forEach(o => {
-      // Build product list
-      const soldParts = [];
-      OFFICE_CONFIG.columns.products.forEach(prod => {
-        const val = o[prod.key] || 0;
-        if (val > 0) {
-          soldParts.push(prod.type === 'boolean' ? prod.label : `${prod.label} x${val}`);
-        }
-      });
-      const soldStr = soldParts.length > 0 ? soldParts.join(', ') : '—';
+      try {
+        // Build product list
+        const soldParts = [];
+        (OFFICE_CONFIG.columns.products || []).forEach(prod => {
+          const val = o[prod.key] || 0;
+          if (val > 0) {
+            soldParts.push(prod.type === 'boolean' ? prod.label : `${prod.label} x${val}`);
+          }
+        });
+        const soldStr = soldParts.length > 0 ? soldParts.join(', ') : '—';
 
-      // Notes preview
-      const noteLines = o.notes ? o.notes.split('\n').filter(l => l.trim()) : [];
-      const notePreview = noteLines.length > 0
-        ? `<span style="font-size:11px;color:var(--silver-dim)">${noteLines[noteLines.length - 1].substring(0, 40)}${noteLines[noteLines.length - 1].length > 40 ? '...' : ''}</span>
-           ${noteLines.length > 1 ? `<span style="background:rgba(0,0,0,0.15);color:var(--blue-core);font-size:9px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:4px">${noteLines.length}</span>` : ''}`
-        : '<span style="font-size:11px;color:var(--silver-dim)">—</span>';
+        // Notes preview
+        const noteLines = o.notes ? o.notes.split('\n').filter(l => l.trim()) : [];
+        const notePreview = noteLines.length > 0
+          ? `<span style="font-size:11px;color:var(--silver-dim)">${esc(noteLines[noteLines.length - 1].substring(0, 40))}${noteLines[noteLines.length - 1].length > 40 ? '...' : ''}</span>
+             ${noteLines.length > 1 ? `<span style="background:rgba(0,0,0,0.15);color:var(--blue-core);font-size:9px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:4px">${noteLines.length}</span>` : ''}`
+          : '<span style="font-size:11px;color:var(--silver-dim)">—</span>';
 
-      const escapedDsi = (o.dsi || '').replace(/'/g, "\\'");
+        const escapedDsi = (o.dsi || '').replace(/'/g, "\\'");
 
-      // Build paid-out checkboxes
-      const paidOutHtml = this._buildPaidOutHtml(o);
+        // Build paid-out checkboxes
+        let paidOutHtml = '';
+        try { paidOutHtml = this._buildPaidOutHtml(o); } catch (e) { console.warn('PaidOut render error:', e); paidOutHtml = '—'; }
 
-      // Payroll type badge
-      const isCodesSwap = !!o.codesUsedBy;
-      const isTrainee = !!o.traineeName;
-      const typeBadge = isCodesSwap
-        ? `<span style="display:inline-block;background:rgba(249,115,22,0.15);color:var(--orange);font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;border-radius:4px;padding:2px 6px;margin-top:3px">Transfer</span>`
-        : isTrainee
-          ? `<span style="display:inline-block;background:rgba(0,200,255,0.12);color:var(--sc-cyan);font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;border-radius:4px;padding:2px 6px;margin-top:3px">Split</span>`
-          : '';
+        // Payroll type badge + codes owner name
+        const isCodesSwap = !!o.codesUsedBy;
+        const isTrainee = !!o.traineeName;
+        const codesOwnerName = isCodesSwap ? esc((this.state.roster?.[o.codesUsedBy]?.name) || o.codesUsedBy) : '';
+        const typeBadge = isCodesSwap
+          ? `<span style="display:inline-block;background:rgba(249,115,22,0.15);color:var(--orange);font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;border-radius:4px;padding:2px 6px;margin-top:3px">Transfer</span>`
+          : isTrainee
+            ? `<span style="display:inline-block;background:rgba(0,200,255,0.12);color:var(--sc-cyan);font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;border-radius:4px;padding:2px 6px;margin-top:3px">Split</span>`
+            : '';
 
-      const tr = document.createElement('tr');
-      tr.style.cssText = 'border-bottom:1px solid rgba(0,0,0,0.06)';
-      tr.innerHTML = `
-        <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;font-weight:600;color:var(--white)">${o.repName}${o.codesUsedBy ? `<div style="font-size:10px;font-weight:700;color:var(--orange);margin-top:2px">→ ${Orders._escapeHtml((this.state.roster?.[o.codesUsedBy]?.name) || o.codesUsedBy)}</div>` : ''}${typeBadge}</td>
-        <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;font-weight:600;color:var(--sc-cyan)">${o.traineeName || '—'}</td>
-        <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;color:var(--silver)">${o.dsi}</td>
-        <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;color:var(--silver)">${o.dateOfSale}</td>
-        <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;color:var(--silver-dim)">${soldStr}</td>
-        <td style="padding:10px 16px">${paidOutHtml}</td>
-        <td style="padding:10px 16px;text-align:center">
-          <button onclick="Orders.openNoteModal(${o.rowIndex},'${escapedDsi}')"
-            style="background:rgba(44,110,106,0.1);border:1px solid rgba(44,110,106,0.3);border-radius:6px;color:var(--sc-cyan);padding:4px 12px;font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer">Notes</button>
-          <div style="margin-top:4px">${notePreview}</div>
-        </td>`;
-      tbody.appendChild(tr);
+        const tr = document.createElement('tr');
+        tr.style.cssText = 'border-bottom:1px solid rgba(0,0,0,0.06)';
+        tr.innerHTML = `
+          <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;font-weight:600;color:var(--white)">${esc(o.repName)}${isCodesSwap ? `<div style="font-size:10px;font-weight:700;color:var(--orange);margin-top:2px">→ ${codesOwnerName}</div>` : ''}${typeBadge}</td>
+          <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:14px;font-weight:600;color:var(--sc-cyan)">${esc(o.traineeName) || '—'}</td>
+          <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;color:var(--silver)">${esc(o.dsi)}</td>
+          <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;color:var(--silver)">${o.dateOfSale}</td>
+          <td style="padding:10px 16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:12px;color:var(--silver-dim)">${soldStr}</td>
+          <td style="padding:10px 16px">${paidOutHtml}</td>
+          <td style="padding:10px 16px;text-align:center">
+            <button onclick="Orders.openNoteModal(${o.rowIndex},'${escapedDsi}')"
+              style="background:rgba(44,110,106,0.1);border:1px solid rgba(44,110,106,0.3);border-radius:6px;color:var(--sc-cyan);padding:4px 12px;font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer">Notes</button>
+            <div style="margin-top:4px">${notePreview}</div>
+          </td>`;
+        tbody.appendChild(tr);
+      } catch (err) {
+        console.error('[Payroll] Row render error for', o.repName, o.dsi, ':', err);
+      }
     });
   },
 
