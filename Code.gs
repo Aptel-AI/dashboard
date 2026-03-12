@@ -1036,12 +1036,15 @@ function readTableauSummary(ss, officeId) {
     var tableauRep = String(tCol(row, col, 'REP') || '').trim();
 
     var orderStatus = String(tCol(row, col, 'ORDER_STATUS') || '').trim();
-    var orderDate = tCol(row, col, 'ORDER_DATE');
+    var rawOrderDate = tCol(row, col, 'ORDER_DATE');
+    // Handle both native Date objects (manual paste) and strings (CSV automation)
+    var orderDate = rawOrderDate instanceof Date ? rawOrderDate : (rawOrderDate ? new Date(rawOrderDate) : null);
+    if (orderDate && isNaN(orderDate.getTime())) orderDate = null;
     var bonusTier = String(tCol(row, col, 'BONUS_TIERS') || '').trim();
     var payoutReason = String(tCol(row, col, 'PAYOUT_REASON') || '').trim();
 
     // Collect current-week tier bonus data per rep name
-    if (bonusTier && tableauRep && orderDate instanceof Date && orderDate >= thisMonday) {
+    if (bonusTier && tableauRep && orderDate && orderDate >= thisMonday) {
       repTierData[tableauRep] = { bonusTier: bonusTier, payoutReason: payoutReason };
     }
 
@@ -1078,7 +1081,7 @@ function readTableauSummary(ss, officeId) {
       s.speList.push(spe);
       var ptUpper = productType.toUpperCase();
       var isWireless = ptUpper === 'WIRELESS';
-      var isInMonth = orderDate instanceof Date && orderDate >= thirtyDaysAgo;
+      var isInMonth = orderDate && orderDate >= thirtyDaysAgo;
       if (isInMonth && isWireless) {
         s.monthWirelessSPEs[spe] = {
           orderStatus: orderStatus.toLowerCase(),
