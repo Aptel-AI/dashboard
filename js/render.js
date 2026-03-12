@@ -209,8 +209,16 @@ const Render = {
     const data = JSON.parse(decodeURIComponent(encodedData));
     const popup = document.createElement('div');
     popup.className = 'tier-popup';
-    popup.innerHTML = `<div class="tier-popup-title">${data.tier}</div>`
-      + (data.reason ? `<div class="tier-popup-row"><span class="tier-popup-label">Reason:</span> ${data.reason}</div>` : '');
+    // Detect if reason is a payout amount (number) or a DNQ reason (text)
+    const numVal = parseFloat(data.reason.replace(/[$,]/g, ''));
+    const isPayout = data.reason && !isNaN(numVal) && isFinite(numVal);
+    let details = '';
+    if (isPayout) {
+      details = `<div class="tier-popup-row"><span class="tier-popup-label">Total Payout:</span> <span class="tier-popup-payout">$${numVal.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2})}</span></div>`;
+    } else if (data.reason) {
+      details = `<div class="tier-popup-row"><span class="tier-popup-label">Reason:</span> ${data.reason}</div>`;
+    }
+    popup.innerHTML = `<div class="tier-popup-title">${data.tier}</div>` + details;
     document.body.appendChild(popup);
     // Position near the badge
     const rect = el.getBoundingClientRect();
