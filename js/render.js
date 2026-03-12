@@ -63,6 +63,7 @@ const Render = {
   },
 
   twUnits(p) { return p.days.reduce((s, d) => s + d.units, 0); },
+  twUnitsNoVoip(p) { return p.days.reduce((s, d) => s + d.units - (d.products?.voip || 0), 0); },
   twYeses(p) { return p.days.reduce((s, d) => s + d.y, 0); },
 
   // Multi-level sort: units → yeses → prior week units → prior week yeses → keep going back
@@ -198,7 +199,7 @@ const Render = {
     // Extract per-unit rate from bonusTier (e.g., "TIER 1 $30/UNIT" → 30)
     const rateMatch = p.bonusTier.match(/\$(\d+(?:\.\d+)?)/);
     const perUnit = rateMatch ? parseFloat(rateMatch[1]) : 0;
-    const units = this.twUnits(p);
+    const units = this.twUnitsNoVoip(p);
     const projected = perUnit * units;
     // Build popup data
     const raw = p.bonusTier.trim();
@@ -217,7 +218,7 @@ const Render = {
     let details = '';
     if (data.perUnit > 0) {
       details += `<div class="tier-popup-row"><span class="tier-popup-label">Rate:</span> $${data.perUnit}/unit</div>`;
-      details += `<div class="tier-popup-row"><span class="tier-popup-label">Units:</span> ${data.units}</div>`;
+      details += `<div class="tier-popup-row"><span class="tier-popup-label">Units (excl. VoIP):</span> ${data.units}</div>`;
       details += `<div class="tier-popup-row tier-popup-projected"><span class="tier-popup-label">Projected Payout:</span> <span class="tier-popup-payout">$${data.projected.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2})}</span></div>`;
     }
     if (data.reason) {
