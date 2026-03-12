@@ -395,7 +395,7 @@ const PostSale = {
         sold.push('Wireless x' + total + ' (' + parts.join(', ') + ')');
       }
       if (prods.fiber.on) sold.push('Fiber' + (d.fiberPackage ? ' — ' + d.fiberPackage : ''));
-      if (prods.voip.on) sold.push('VoIP x' + (d.voipQty || 1));
+      if (prods.voip.on) sold.push('VoIP x' + (d.voipQty || 0));
       if (prods.dtv.on) sold.push('DIRECTV' + (d.dtvPackage ? ' — ' + d.dtvPackage : ''));
       productsHTML = sold.map(s => `<div class="review-row"><span class="review-row-value">✓ ${s}</span></div>`).join('');
     }
@@ -442,7 +442,7 @@ const PostSale = {
       if (this._products.air.on) soldItems.push('Air');
       if (this._products.wireless.on) soldItems.push('Cell x' + ((d.newPhones || 0) + (d.byods || 0)));
       if (this._products.fiber.on) soldItems.push('Fiber');
-      if (this._products.voip.on) soldItems.push('VoIP x' + (d.voipQty || 1));
+      if (this._products.voip.on) soldItems.push('VoIP x' + (d.voipQty || 0));
       if (this._products.dtv.on) soldItems.push('DTV');
       summary = d.dsi + ' — ' + soldItems.join(', ');
     } else {
@@ -634,6 +634,9 @@ const PostSale = {
 
   async submit() {
     this._collectCurrentStep();
+    // Re-validate all steps before submission
+    if (!this._validateStep1()) { this._step = 1; this._render(); return; }
+    if (this._campaign === 'attb2b' && !this._validateStep2()) { this._step = 2; this._render(); return; }
     if (this._submitting) return;
     this._submitting = true;
     this._renderNav();
@@ -753,7 +756,7 @@ const PostSale = {
       fiber: prods.fiber.on ? 1 : 0,
       fiberPackage: prods.fiber.on ? d.fiberPackage : '',
       installDate: prods.fiber.on ? d.installDate : '',
-      voipQty: prods.voip.on ? (d.voipQty || 1) : 0,
+      voipQty: prods.voip.on ? (d.voipQty || 0) : 0,
       dtv: prods.dtv.on ? 1 : 0,
       dtvPackage: prods.dtv.on ? d.dtvPackage : '',
       // Ooma
