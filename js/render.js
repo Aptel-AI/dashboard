@@ -137,7 +137,7 @@ const Render = {
 
       // Sub headers
       const yTh = document.createElement('th');
-      yTh.textContent = 'Yeses';
+      yTh.textContent = 'Orders';
       yTh.className = `${bc}${isWeek ? ' week-col' : ''}`;
       dr.appendChild(yTh);
 
@@ -328,7 +328,7 @@ const Render = {
       card.className = `podium-card ${classes[i]}`;
       card.innerHTML = `<div class="podium-position">${medals[i]}</div><div class="podium-name">${item.name}</div><div class="podium-role">${getRole(item)}</div>` +
         `<div class="podium-stats"><div class="podium-stat"><div class="podium-stat-val units-val">${getU(item)}</div><div class="podium-stat-lbl">Units</div></div>` +
-        `<div class="podium-stat"><div class="podium-stat-val yeses-val">${getY(item)}</div><div class="podium-stat-lbl">Yeses</div></div></div>`;
+        `<div class="podium-stat"><div class="podium-stat-val yeses-val">${getY(item)}</div><div class="podium-stat-lbl">Orders</div></div></div>`;
       wrap.appendChild(card);
     });
   },
