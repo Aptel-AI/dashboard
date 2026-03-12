@@ -191,13 +191,34 @@ const Render = {
   // ── Tier Badge ──
   tierBadgeHTML(p) {
     if (!p.bonusTier) return '';
-    // Strip parentheses and their contents, clean up
     const tierClean = p.bonusTier.replace(/\$.*/, '').replace(/\s*\([^)]*\)/g, '').trim().toUpperCase();
-    if (tierClean === 'DNQ') {
-      return ` <span class="tier-badge tier-dnq">DNQ</span>`;
-    }
-    const cls = tierClean.replace(/\s+/g, '-').toLowerCase();
-    return ` <span class="tier-badge ${cls}">${tierClean}</span>`;
+    const isDNQ = tierClean === 'DNQ';
+    const cls = isDNQ ? 'tier-dnq' : tierClean.replace(/\s+/g, '-').toLowerCase();
+    const label = isDNQ ? 'DNQ' : tierClean;
+    // Build popup data
+    const raw = p.bonusTier.trim();
+    const reason = (p.payoutReason || '').trim();
+    const popupData = encodeURIComponent(JSON.stringify({ tier: raw, reason }));
+    return `<span class="tier-badge ${cls}" onclick="event.stopPropagation();Render.showTierPopup(this,\'${popupData}\')" title="Click for details">${label}</span>`;
+  },
+
+  showTierPopup(el, encodedData) {
+    // Remove any existing popup
+    const old = document.querySelector('.tier-popup');
+    if (old) old.remove();
+    const data = JSON.parse(decodeURIComponent(encodedData));
+    const popup = document.createElement('div');
+    popup.className = 'tier-popup';
+    popup.innerHTML = `<div class="tier-popup-title">${data.tier}</div>`
+      + (data.reason ? `<div class="tier-popup-row"><span class="tier-popup-label">Reason:</span> ${data.reason}</div>` : '');
+    document.body.appendChild(popup);
+    // Position near the badge
+    const rect = el.getBoundingClientRect();
+    popup.style.top = (rect.bottom + 6) + 'px';
+    popup.style.left = Math.max(8, rect.left + rect.width / 2 - popup.offsetWidth / 2) + 'px';
+    // Close on click outside
+    const close = (e) => { if (!popup.contains(e.target) && e.target !== el) { popup.remove(); document.removeEventListener('click', close); } };
+    setTimeout(() => document.addEventListener('click', close), 0);
   },
 
   // ── Person Row ──
@@ -206,8 +227,8 @@ const Render = {
     const isSelf = p.name === App.state.currentPersona;
     const badge = this.tierBadgeHTML(p);
     const nameCell = canView
-      ? `<span class="name-text name-link" onclick="App.openPersonProfile('${p.name.replace(/'/g, "\\'")}')">${p.name}${badge}${isSelf ? ' <span style="font-size:9px;color:var(--sc-cyan);letter-spacing:1px">(YOU)</span>' : ''}</span><br><span style="font-size:10px;color:var(--silver-dim)">${p.role}</span>`
-      : `<span class="name-text" style="cursor:default">${p.name}${badge}<span class="locked-badge">🔒</span></span><br><span style="font-size:10px;color:var(--silver-dim)">${p.role}</span>`;
+      ? `<div class="name-cell-inner"><div class="name-cell-left"><span class="name-text name-link" onclick="App.openPersonProfile('${p.name.replace(/'/g, "\\'")}')">${p.name}${isSelf ? ' <span style="font-size:9px;color:var(--sc-cyan);letter-spacing:1px">(YOU)</span>' : ''}</span><br><span style="font-size:10px;color:var(--silver-dim)">${p.role}</span></div>${badge}</div>`
+      : `<div class="name-cell-inner"><div class="name-cell-left"><span class="name-text" style="cursor:default">${p.name}<span class="locked-badge">🔒</span></span><br><span style="font-size:10px;color:var(--silver-dim)">${p.role}</span></div>${badge}</div>`;
 
     let cells = `<td class="rank ${rankIdx < 3 ? 'rank-' + (rankIdx + 1) : ''}">${this.rankLabel(rankIdx)}</td><td class="name-cell">${nameCell}</td>`;
     this.visiblePeriods().forEach(pi => {
