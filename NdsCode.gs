@@ -1663,16 +1663,20 @@ function writeAddSale(body, ss, officeId) {
     CacheService.getScriptCache().remove('tableauSummary_v5_' + officeId);
   } catch (e) { /* non-critical */ }
 
-  // Fire Discord/GroupMe webhook server-side (fire-and-forget)
+  // Fire Discord/GroupMe webhook server-side
+  var webhookResult = 'skipped';
   try {
-    _fireWebhook(body, units, teamEmoji);
-  } catch (e) { /* webhook failure should not block sale */ }
+    webhookResult = _fireWebhook(body, units, teamEmoji);
+  } catch (e) {
+    webhookResult = 'error: ' + e.message;
+  }
 
   return {
     ok: true,
     rowIndex: sheet.getLastRow(),
     units: units,
-    yeses: yeses
+    yeses: yeses,
+    webhook: webhookResult
   };
 }
 
@@ -1682,7 +1686,8 @@ function writeAddSale(body, ss, officeId) {
 function _fireWebhook(body, units, teamEmoji) {
   var platform = String(body.chatPlatform || 'discord').toLowerCase();
   var webhookUrl = String(body.discordWebhookUrl || '').trim();
-  if (!webhookUrl || platform === 'none') return;
+  if (!webhookUrl) return 'no_url';
+  if (platform === 'none') return 'platform_none';
 
   var bold = (platform === 'discord') ? '**' : '';
   var repName = String(body.repName || '').trim();
@@ -1708,7 +1713,7 @@ function _fireWebhook(body, units, teamEmoji) {
   }
 
   msg = msg.trim();
-  if (!msg) return;
+  if (!msg) return 'empty_message';
 
   var payload, url;
   if (platform === 'groupme') {
@@ -1720,14 +1725,17 @@ function _fireWebhook(body, units, teamEmoji) {
   }
 
   try {
-    UrlFetchApp.fetch(url, {
+    var resp = UrlFetchApp.fetch(url, {
       method: 'post',
       contentType: 'application/json',
       payload: payload,
       muteHttpExceptions: true
     });
+    var code = resp.getResponseCode();
+    if (code >= 200 && code < 300) return 'sent_' + code;
+    return 'http_' + code + ':' + resp.getContentText().substring(0, 100);
   } catch (e) {
-    Logger.log('Webhook error: ' + e.message);
+    return 'fetch_error: ' + e.message;
   }
 }
 
