@@ -267,11 +267,19 @@ thead th.sticky-name {
 thead th.sticky-rank { left: 0; }
 thead th.sticky-name { left: 36px; }
 td.rank {
-  position: sticky; left: 0; z-index: 2; background: inherit;
+  position: sticky; left: 0; z-index: 2; background: var(--card-bg);
 }
 td.name-cell {
-  position: sticky; left: 36px; z-index: 2; background: inherit;
+  position: sticky; left: 36px; z-index: 2; background: var(--card-bg);
 }
+tbody tr:hover td.rank,
+tbody tr:hover td.name-cell { background: #ededed; }
+tr.own-row td.rank,
+tr.own-row td.name-cell { background: #e2f0ef; }
+tr.own-row:hover td.rank,
+tr.own-row:hover td.name-cell { background: #d5e8e6; }
+tr.leader-total-row td.rank,
+tr.leader-total-row td.name-cell { background: #ebebeb; }
 /* Shadow hint on frozen edge */
 td.name-cell::after, thead th.sticky-name::after {
   content: ''; position: absolute; top: 0; right: -6px;
