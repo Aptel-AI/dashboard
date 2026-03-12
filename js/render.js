@@ -192,15 +192,17 @@ const Render = {
   tierBadgeHTML(p) {
     if (!p.bonusTier) return '';
     const reason = (p.payoutReason || '').trim();
-    // Qualified if payout reason is empty or a number (possibly with $ or commas)
-    const isDqd = reason !== '' && !/^\$?[\d,.]+$/.test(reason);
-    if (isDqd) {
-      return ` <span class="tier-badge tier-dnq">DNQ: ${reason}</span>`;
+    // Strip parentheses and their contents from tier name
+    const tierClean = p.bonusTier.replace(/\s*\([^)]*\)/g, '').trim().toUpperCase();
+    // Qualified if payout reason is empty or a dollar amount (possibly with /unit)
+    const isDqd = reason !== '' && !/^\$?[\d,.]+(\s*\/\s*\w+)?$/.test(reason);
+
+    if (isDqd || tierClean === 'DNQ') {
+      return ` <span class="tier-card tier-dnq"><span class="tier-card-label">DNQ</span></span>`;
     }
-    const tier = p.bonusTier.toUpperCase();
-    if (tier === 'DNQ') return ` <span class="tier-badge tier-dnq">DNQ</span>`;
-    const cls = tier.replace(/\s+/g, '-').toLowerCase();
-    return ` <span class="tier-badge ${cls}">${tier}</span>`;
+    const cls = tierClean.replace(/\s+/g, '-').toLowerCase();
+    const payout = reason ? `<span class="tier-card-payout">${reason.toUpperCase()}</span>` : '';
+    return ` <span class="tier-card ${cls}"><span class="tier-card-label">${tierClean}</span>${payout}</span>`;
   },
 
   // ── Person Row ──
