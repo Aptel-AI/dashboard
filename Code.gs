@@ -1043,8 +1043,8 @@ function readTableauSummary(ss, officeId) {
     var bonusTier = String(tCol(row, col, 'BONUS_TIERS') || '').trim();
     var payoutReason = String(tCol(row, col, 'PAYOUT_REASON') || '').trim();
 
-    // Collect current-week tier bonus data per rep name
-    if (bonusTier && tableauRep && orderDate && orderDate >= thisMonday) {
+    // Collect tier bonus data per rep name (rep-level attribute, not date-dependent)
+    if (bonusTier && tableauRep && !repTierData[tableauRep]) {
       repTierData[tableauRep] = { bonusTier: bonusTier, payoutReason: payoutReason };
     }
 
