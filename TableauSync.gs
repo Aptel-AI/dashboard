@@ -979,27 +979,55 @@ function diagnosePipeline() {
   // Step 6: Check _Sales_off_001 for DSI matching
   var salesSheet = ss.getSheetByName('_Sales_off_001');
   if (!salesSheet || salesSheet.getLastRow() < 2) {
-    Logger.log('⚠️ "_Sales_off_001" tab has NO DATA — DSI→email mapping will fail');
+    Logger.log('❌ "_Sales_off_001" tab has NO DATA — DSI→email mapping will fail');
     return;
   }
   var salesData = salesSheet.getDataRange().getValues();
   Logger.log('✓ "_Sales_off_001": ' + (salesData.length - 1) + ' rows');
 
-  // Find DSI column in _Sales (uses OL.DSI index from Code.gs — but we'll search by header)
-  var salesHeaders = salesData[0].map(function(h) { return String(h || '').trim().toLowerCase(); });
-  var salesDsiIdx = salesHeaders.indexOf('dsi');
-  if (salesDsiIdx === -1) {
-    // Try column index 4 (typical position)
-    Logger.log('  Note: No "DSI" header in _Sales, DSIs may be at a fixed column index');
-  } else {
-    var salesDsis = [];
-    for (var sd = 1; sd < Math.min(6, salesData.length); sd++) {
-      salesDsis.push(String(salesData[sd][salesDsiIdx] || '').trim());
+  // DSI is at column index 5 (OL.DSI in Code.gs), EMAIL at index 1
+  var salesDsiCol = 5;
+  var salesEmailCol = 1;
+  var salesDsiMap = {};  // DSI → email
+  var salesDsis = [];
+  for (var sd = 1; sd < salesData.length; sd++) {
+    var sDsi = String(salesData[sd][salesDsiCol] || '').trim();
+    var sEmail = String(salesData[sd][salesEmailCol] || '').trim().toLowerCase();
+    if (sDsi && sEmail) {
+      salesDsiMap[sDsi] = sEmail;
     }
-    Logger.log('  Sample DSIs from _Sales: ' + salesDsis.join(', '));
+    if (sd <= 5) salesDsis.push(sDsi);
+  }
+  Logger.log('  Sales DSI→email map: ' + Object.keys(salesDsiMap).length + ' entries');
+  Logger.log('  Sample Sales DSIs: ' + salesDsis.join(', '));
+
+  // Step 7: Test the actual join — how many Tableau DSIs match Sales DSIs?
+  var matched = 0;
+  var unmatched = 0;
+  var unmatchedSamples = [];
+  for (var m = 1; m < tolData.length; m++) {
+    var tDsi = String(tolData[m][dsiIdx] || '').trim();
+    if (!tDsi) continue;
+    if (salesDsiMap[tDsi]) {
+      matched++;
+    } else {
+      unmatched++;
+      if (unmatchedSamples.length < 5) unmatchedSamples.push(tDsi);
+    }
+  }
+  Logger.log('=== DSI JOIN RESULTS ===');
+  Logger.log('  Matched: ' + matched + ' / ' + (matched + unmatched));
+  Logger.log('  Unmatched: ' + unmatched);
+  if (unmatchedSamples.length > 0) {
+    Logger.log('  Unmatched samples: ' + unmatchedSamples.join(', '));
+  }
+  if (matched === 0 && unmatched > 0) {
+    Logger.log('❌ ZERO DSI matches! Format mismatch between Tableau and Sales DSIs.');
+    Logger.log('  Tableau format: "' + sampleDsis[0] + '"');
+    Logger.log('  Sales format:   "' + salesDsis[0] + '"');
   }
 
-  // Step 7: Check cache
+  // Step 8: Check cache
   try {
     var cache = CacheService.getScriptCache();
     var cached = cache.get('tableauSummary_v6_off_001');
