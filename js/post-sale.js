@@ -642,7 +642,7 @@ const PostSale = {
     try {
       const result = await SheetsAPI.post(OFFICE_CONFIG, 'addSale', payload);
       this._submitting = false;
-      if (result.ok || (result.data && result.data.ok)) {
+      if (result.ok && result.data && result.data.ok) {
         this._clearDraft();
         // Discord webhook now fires server-side in Code.gs
         // Advance to success step
@@ -650,12 +650,14 @@ const PostSale = {
         this._step = total;
         this._render();
       } else {
-        const errMsg = (result.data && result.data.error) || 'Something went wrong. Please try again.';
-        alert(errMsg);
+        const errMsg = (result.data && result.data.error) || result.error || 'Something went wrong. Please try again.';
+        console.error('[PostSale] addSale failed:', errMsg, result);
+        alert('Sale failed to save: ' + errMsg);
         this._renderNav();
       }
     } catch (err) {
       this._submitting = false;
+      console.error('[PostSale] Network error:', err);
       alert('Network error — please check your connection and try again.');
       this._renderNav();
     }

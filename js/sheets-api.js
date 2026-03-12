@@ -62,10 +62,16 @@ const SheetsAPI = {
           ...payload
         })
       });
-      const result = await resp.json().catch(() => ({ ok: true }));
-      return { ok: true, data: result };
+      const result = await resp.json().catch(() => ({}));
+      const serverOk = result.ok === true && !result.error;
+      if (!serverOk) {
+        console.error('[SheetsAPI.post]', action, 'server responded:', JSON.stringify(result));
+      } else {
+        console.log('[SheetsAPI.post]', action, 'success:', JSON.stringify(result));
+      }
+      return { ok: serverOk, data: result };
     } catch (err) {
-      console.error('Write-back failed:', err);
+      console.error('[SheetsAPI.post]', action, 'network error:', err.message);
       return { ok: false, error: err.message };
     }
   },
