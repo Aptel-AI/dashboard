@@ -73,9 +73,9 @@ var REPORTS = {
       'Auto Bill Pay',
       'B2B Rep Volume Bonus Tiers',
       'Tier Bonus Payout/DNQ Reason',
-      'DD Date',
-      'Measure Values'
-    ]
+      'DD Date'
+    ],
+    deduplicateKey: ['sp.SPM Number', 'spe.Name']  // DSI + SPE uniquely identifies a device row
   }
 
   // Add more reports here:
@@ -320,6 +320,35 @@ function _filterColumns(data, columnsToKeep) {
 }
 
 /**
+ * De-duplicate rows based on a composite key (array of column names).
+ * Tableau's Measure Values creates one row per measure per dimension combination.
+ * Keeps the first occurrence of each unique key.
+ */
+function _deduplicateRows(filtered, keyColumns) {
+  var keyIndices = [];
+  for (var k = 0; k < keyColumns.length; k++) {
+    var idx = filtered.headers.indexOf(keyColumns[k]);
+    if (idx === -1) {
+      Logger.log('WARNING: dedup key column "' + keyColumns[k] + '" not found — skipping dedup');
+      return filtered;
+    }
+    keyIndices.push(idx);
+  }
+
+  var seen = {};
+  var beforeCount = filtered.rows.length;
+  filtered.rows = filtered.rows.filter(function(row) {
+    var key = keyIndices.map(function(i) { return String(row[i] || '').trim(); }).join('|');
+    if (seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
+
+  Logger.log('Dedup (' + keyColumns.join('+') + '): ' + beforeCount + ' → ' + filtered.rows.length + ' rows (removed ' + (beforeCount - filtered.rows.length) + ' duplicates)');
+  return filtered;
+}
+
+/**
  * Filter rows to only include those within the last N days (client-side).
  * The Tableau API vf_ date filter uses discrete matching, not ranges,
  * so this is the reliable way to enforce a rolling date window.
@@ -489,6 +518,11 @@ function syncReport(reportKey) {
     var filtered = _filterColumns(data, report.columns);
     Logger.log('Filtered to ' + filtered.headers.length + ' columns, ' + filtered.rows.length + ' data rows');
 
+    // De-duplicate rows (Tableau Measure Values creates one row per measure per device)
+    if (report.deduplicateKey) {
+      filtered = _deduplicateRows(filtered, report.deduplicateKey);
+    }
+
     // Client-side date filter — trims the wide custom view range to a rolling window
     if (report.dateFilterColumn && report.dateRangeDays) {
       filtered = _filterByDateRange(filtered, report.dateFilterColumn, report.dateRangeDays);
@@ -497,17 +531,6 @@ function syncReport(reportKey) {
     // Extract time-only from datetime columns
     if (report.timeColumns) {
       _formatTimeColumns(filtered, report.timeColumns);
-    }
-
-    // Verify Order Status values right before writing
-    var osVerifyIdx = filtered.headers.indexOf('Order Status');
-    if (osVerifyIdx >= 0) {
-      var osCounts = {};
-      for (var v = 0; v < filtered.rows.length; v++) {
-        var osVal = String(filtered.rows[v][osVerifyIdx] || '').trim();
-        osCounts[osVal] = (osCounts[osVal] || 0) + 1;
-      }
-      Logger.log('Order Status PRE-WRITE: ' + JSON.stringify(osCounts));
     }
 
     // Write to sheet
