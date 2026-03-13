@@ -86,6 +86,12 @@ function doGet(e) {
       return jsonResp(readCostSheet(sheetId));
     }
 
+    // ── Weekly Indeed Tracking (prototype — Jackie Leroy's sheet) ──
+    if (action === 'indeedTracking') {
+      var ownerName = (e && e.parameter && e.parameter.owner) || '';
+      return jsonResp(readIndeedTracking(ownerName));
+    }
+
     // ── [DEPRECATED] Bulk Indeed costs — use readCostSheet instead ──
     if (action === 'indeedCosts') {
       var ownerFilter = (e && e.parameter && e.parameter.owners) || '';
@@ -2902,5 +2908,269 @@ function _numVal(v) {
   var s = String(v).replace(/[$,\s]/g, '');
   var n = parseFloat(s);
   return isNaN(n) ? 0 : n;
+}
+
+
+// ══════════════════════════════════════════════════
+// INDEED TRACKING — Weekly Ad Spend (prototype)
+// Reads "Indeed Tracking 2026" tab from per-owner sheets.
+// For prototype: hardcoded mapping of owner → sheet ID.
+// ══════════════════════════════════════════════════
+
+// Prototype mapping: owner name → { sheetId, tab }
+var INDEED_TRACKING_SHEETS = {
+  'Jackie Leroy': {
+    sheetId: '1FnekrOkKwTCNgzSQEf2-Fz5P0BH7hfeHefsLmYc7A_g',
+    tab: 'Indeed Tracking 2026'
+  }
+};
+
+/**
+ * readIndeedTracking(ownerName)
+ * Returns: { weeks: [...], accounts: [...], error? }
+ *
+ * Each week object:
+ *   { weekOf, totalSpend, totalApplies, total2nds, totalNewStarts,
+ *     cpa, cpns, numAds,
+ *     ads: [ { account, postedBy, adTitle, location, datePosted,
+ *              spend, applies, seconds, newStarts, cpa, cpns, plan, adBudget } ] }
+ *
+ * accounts: unique Indeed Account names found across all weeks
+ */
+function readIndeedTracking(ownerName) {
+  ownerName = String(ownerName || '').trim();
+  if (!ownerName) return { error: 'owner parameter is required' };
+
+  var config = INDEED_TRACKING_SHEETS[ownerName];
+  if (!config) return { error: 'No Indeed Tracking sheet configured for ' + ownerName, weeks: [] };
+
+  try {
+    var ss = SpreadsheetApp.openById(config.sheetId);
+    var sheet = ss.getSheetByName(config.tab);
+    if (!sheet) return { error: 'Tab "' + config.tab + '" not found', weeks: [] };
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 3) return { weeks: [] };
+
+    // ── Parse weekly blocks ──
+    // Structure: Row with "WEEK OF MM/DD" → header row → data rows → blank → next week
+    var weeks = [];
+    var accountSet = {};
+    var r = 0;
+
+    while (r < data.length) {
+      // Look for "WEEK OF" header
+      var weekOf = _findWeekHeader(data, r);
+      if (!weekOf) { r++; continue; }
+
+      r++; // skip to header row
+      if (r >= data.length) break;
+
+      // Verify header row has expected columns
+      var colMap = _mapWeekColumns(data[r]);
+      if (!colMap) { r++; continue; }
+
+      r++; // skip to first data row
+
+      // Read data rows until blank row or next week header
+      var ads = [];
+      while (r < data.length) {
+        // Check if this is a blank separator or next week header
+        var cellA = String(data[r][0] || '').trim();
+        var cellAny = _rowHasData(data[r], colMap);
+
+        if (!cellAny && !cellA) { r++; break; } // blank row = end of block
+        if (_findWeekHeader(data, r)) break;     // next week header
+
+        // Skip rows that are FLAGGED/PAUSED in Plan column (status rows, not real ads)
+        var plan = colMap.plan >= 0 ? String(data[r][colMap.plan] || '').trim() : '';
+        var spend = colMap.totalSpend >= 0 ? _numVal(data[r][colMap.totalSpend]) : 0;
+        var applies = colMap.applies >= 0 ? _numVal(data[r][colMap.applies]) : 0;
+        var seconds = colMap.seconds >= 0 ? _numVal(data[r][colMap.seconds]) : 0;
+        var newStarts = colMap.newStarts >= 0 ? _numVal(data[r][colMap.newStarts]) : 0;
+        var account = colMap.account >= 0 ? String(data[r][colMap.account] || '').trim() : '';
+        var postedBy = colMap.postedBy >= 0 ? String(data[r][colMap.postedBy] || '').trim() : '';
+        var adTitle = colMap.adTitle >= 0 ? String(data[r][colMap.adTitle] || '').trim() : '';
+        var datePosted = colMap.datePosted >= 0 ? _formatCellDate(data[r][colMap.datePosted]) : '';
+        var location = colMap.location >= 0 ? String(data[r][colMap.location] || '').trim() : '';
+        var adBudget = colMap.adBudget >= 0 ? String(data[r][colMap.adBudget] || '').trim() : '';
+
+        // Skip entirely empty data rows or rows without a title
+        if (!adTitle && !account && applies === 0 && spend === 0) { r++; continue; }
+
+        // Track account names
+        if (account) accountSet[account] = true;
+
+        // Carry forward account name from preceding rows (merged cells in sheet)
+        var effectiveAccount = account;
+        if (!effectiveAccount && ads.length > 0) {
+          effectiveAccount = ads[ads.length - 1].account || '';
+        }
+
+        var adCpa = applies > 0 ? spend / applies : 0;
+        var adCpns = newStarts > 0 ? spend / newStarts : 0;
+
+        ads.push({
+          account: effectiveAccount,
+          postedBy: postedBy,
+          adTitle: adTitle,
+          datePosted: datePosted,
+          location: location,
+          spend: spend,
+          applies: applies,
+          seconds: seconds,
+          newStarts: newStarts,
+          cpa: Math.round(adCpa * 100) / 100,
+          cpns: Math.round(adCpns * 100) / 100,
+          plan: plan,
+          adBudget: adBudget
+        });
+
+        r++;
+      }
+
+      // Compute week totals
+      var wkSpend = 0, wkApplies = 0, wk2nds = 0, wkNewStarts = 0;
+      for (var a = 0; a < ads.length; a++) {
+        wkSpend += ads[a].spend;
+        wkApplies += ads[a].applies;
+        wk2nds += ads[a].seconds;
+        wkNewStarts += ads[a].newStarts;
+      }
+
+      var wkCpa = wkApplies > 0 ? wkSpend / wkApplies : 0;
+      var wkCpns = wkNewStarts > 0 ? wkSpend / wkNewStarts : 0;
+
+      weeks.push({
+        weekOf: weekOf,
+        totalSpend: Math.round(wkSpend * 100) / 100,
+        totalApplies: wkApplies,
+        total2nds: wk2nds,
+        totalNewStarts: wkNewStarts,
+        cpa: Math.round(wkCpa * 100) / 100,
+        cpns: Math.round(wkCpns * 100) / 100,
+        numAds: ads.length,
+        ads: ads
+      });
+    }
+
+    // Sort weeks chronologically (oldest first → newest last)
+    weeks.sort(function(a, b) {
+      return _parseWeekDate(a.weekOf).getTime() - _parseWeekDate(b.weekOf).getTime();
+    });
+
+    // ── Compute WoW deltas for effectiveness tracking ──
+    for (var wi = 0; wi < weeks.length; wi++) {
+      if (wi === 0) {
+        weeks[wi].delta = null;
+      } else {
+        var prev = weeks[wi - 1];
+        var curr = weeks[wi];
+        weeks[wi].delta = {
+          spend: Math.round((curr.totalSpend - prev.totalSpend) * 100) / 100,
+          applies: curr.totalApplies - prev.totalApplies,
+          seconds: curr.total2nds - prev.total2nds,
+          newStarts: curr.totalNewStarts - prev.totalNewStarts,
+          cpa: Math.round((curr.cpa - prev.cpa) * 100) / 100,
+          cpns: Math.round((curr.cpns - prev.cpns) * 100) / 100,
+          spendPct: prev.totalSpend > 0 ? Math.round(((curr.totalSpend - prev.totalSpend) / prev.totalSpend) * 1000) / 10 : null,
+          appliesPct: prev.totalApplies > 0 ? Math.round(((curr.totalApplies - prev.totalApplies) / prev.totalApplies) * 1000) / 10 : null,
+          cpaPct: prev.cpa > 0 ? Math.round(((curr.cpa - prev.cpa) / prev.cpa) * 1000) / 10 : null,
+          cpnsPct: prev.cpns > 0 ? Math.round(((curr.cpns - prev.cpns) / prev.cpns) * 1000) / 10 : null
+        };
+      }
+    }
+
+    var accounts = Object.keys(accountSet).sort();
+    Logger.log('readIndeedTracking: ' + weeks.length + ' weeks, ' + accounts.length + ' accounts for ' + ownerName);
+
+    return { weeks: weeks, accounts: accounts };
+
+  } catch (err) {
+    Logger.log('readIndeedTracking error: ' + err.message + '\n' + err.stack);
+    return { error: 'Failed to read Indeed Tracking: ' + err.message, weeks: [] };
+  }
+}
+
+
+// ── Helper: find "WEEK OF MM/DD" in row ──
+function _findWeekHeader(data, r) {
+  for (var c = 0; c < Math.min(data[r].length, 12); c++) {
+    var v = String(data[r][c] || '').trim().toUpperCase();
+    if (v.indexOf('WEEK OF') === 0) {
+      // Extract date portion: "WEEK OF 03/09" → "03/09"
+      return v.replace('WEEK OF', '').trim();
+    }
+  }
+  return null;
+}
+
+
+// ── Helper: map column headers to indices ──
+function _mapWeekColumns(row) {
+  var map = {
+    account: -1, postedBy: -1, adTitle: -1, datePosted: -1,
+    location: -1, totalSpend: -1, applies: -1, seconds: -1,
+    newStarts: -1, cpa: -1, cpns: -1, plan: -1, adBudget: -1
+  };
+
+  var found = 0;
+  for (var c = 0; c < row.length; c++) {
+    var h = String(row[c] || '').toLowerCase().trim().replace(/[:\s]+$/, '');
+    if (h === 'indeed account')                          { map.account = c; found++; }
+    else if (h === 'posted by')                          { map.postedBy = c; found++; }
+    else if (h === 'ad title')                           { map.adTitle = c; found++; }
+    else if (h === 'date posted')                        { map.datePosted = c; found++; }
+    else if (h === 'current location' || h === 'location') { map.location = c; found++; }
+    else if (h === 'total spend')                        { map.totalSpend = c; found++; }
+    else if (h === 'applies')                            { map.applies = c; found++; }
+    else if (h === '2nds')                               { map.seconds = c; found++; }
+    else if (h === 'new starts')                         { map.newStarts = c; found++; }
+    else if (h === 'cpa')                                { map.cpa = c; found++; }
+    else if (h === 'cpns')                               { map.cpns = c; found++; }
+    else if (h === 'plan')                               { map.plan = c; found++; }
+    else if (h === 'ad budget')                          { map.adBudget = c; found++; }
+  }
+
+  // Need at least a couple key columns to consider valid
+  return found >= 3 ? map : null;
+}
+
+
+// ── Helper: check if a data row has any useful data ──
+function _rowHasData(row, colMap) {
+  // Check key data columns for non-empty values
+  var cols = [colMap.adTitle, colMap.applies, colMap.totalSpend, colMap.newStarts, colMap.account, colMap.plan];
+  for (var i = 0; i < cols.length; i++) {
+    if (cols[i] >= 0 && cols[i] < row.length) {
+      var v = row[cols[i]];
+      if (v !== null && v !== undefined && String(v).trim() !== '') return true;
+    }
+  }
+  return false;
+}
+
+
+// ── Helper: parse "MM/DD" week date string into a Date for sorting ──
+function _parseWeekDate(dateStr) {
+  // dateStr like "03/09" or "01/26"
+  var parts = String(dateStr).split('/');
+  if (parts.length < 2) return new Date(0);
+  var month = parseInt(parts[0], 10) - 1;
+  var day = parseInt(parts[1], 10);
+  var year = new Date().getFullYear(); // assume current year
+  return new Date(year, month, day);
+}
+
+
+// ── Helper: format Date objects or date strings from cells ──
+function _formatCellDate(v) {
+  if (!v) return '';
+  if (v instanceof Date) {
+    var m = v.getMonth() + 1;
+    var d = v.getDate();
+    return (m < 10 ? '0' : '') + m + '/' + (d < 10 ? '0' : '') + d;
+  }
+  return String(v).trim();
 }
 

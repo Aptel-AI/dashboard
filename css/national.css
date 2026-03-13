@@ -1766,3 +1766,98 @@ td.cell-red    { background: #e53935 !important; color: #000 !important; font-we
   .bis-table td { padding: 8px 6px; }
   .bis-row-label { width: 70px; font-size: 11px; }
 }
+
+
+/* ═══════════════════════════════════════════════════
+   Indeed Tracking — Weekly Ad Spend Section
+   ═══════════════════════════════════════════════════ */
+
+/* KPI row — horizontal strip of metric cards */
+.it-kpi-row {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.it-kpi-card {
+  flex: 1; min-width: 100px;
+  background: var(--card-bg);
+  border-radius: 8px; padding: 10px 12px;
+  text-align: center;
+}
+.it-kpi-value {
+  font-size: 20px; font-weight: 800;
+  color: var(--gray-900); line-height: 1.2;
+}
+.it-kpi-label {
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.4px;
+  color: var(--gray-500); margin-top: 2px;
+}
+.it-kpi-delta {
+  font-size: 11px; font-weight: 700;
+  margin-left: 4px; vertical-align: middle;
+}
+.it-kpi-delta.it-good { color: var(--green); }
+.it-kpi-delta.it-bad { color: var(--red); }
+.it-kpi-delta.it-flat { color: var(--gray-400); font-size: 10px; }
+.it-kpi-week-label {
+  text-align: center; font-size: 11px;
+  color: var(--gray-500); margin-bottom: 16px;
+}
+
+/* Trend table */
+.it-section-label { margin-top: 18px; }
+.it-trend-wrap { margin-bottom: 16px; overflow-x: auto; }
+.it-trend-table th { font-size: 11px; white-space: nowrap; }
+.it-trend-table td.num { white-space: nowrap; }
+
+/* Week select dropdown */
+.it-week-select {
+  font-size: 12px; padding: 2px 6px;
+  border: 1px solid var(--gray-300); border-radius: 4px;
+  background: var(--card-bg); margin-left: 8px;
+  cursor: pointer;
+}
+
+/* Ad breakdown table */
+.it-breakdown-wrap { overflow-x: auto; }
+.it-breakdown-table { font-size: 12px; }
+.it-breakdown-table th { font-size: 10px; white-space: nowrap; }
+
+/* Account group header row */
+.it-acct-row td {
+  background: var(--gray-100) !important;
+  border-top: 2px solid var(--gray-300);
+  font-size: 12px;
+}
+.it-ad-count {
+  font-weight: 400; color: var(--gray-500);
+  font-size: 11px; margin-left: 4px;
+}
+
+/* Individual ad row */
+.it-ad-row td { font-size: 11px; }
+.it-indent { width: 20px; min-width: 20px; }
+.it-ad-title {
+  max-width: 200px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Total row */
+.it-total-row td {
+  background: var(--gray-50) !important;
+  border-top: 2px solid var(--gray-400);
+  font-size: 12px;
+}
+
+/* Plan column color coding */
+.it-plan-skip { color: var(--gray-400); font-style: italic; }
+.it-plan-repost { color: var(--green); font-weight: 600; }
+.it-plan-paused { color: var(--orange); font-weight: 600; }
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .it-kpi-row { gap: 6px; }
+  .it-kpi-card { min-width: 80px; padding: 8px; }
+  .it-kpi-value { font-size: 16px; }
+  .it-ad-title { max-width: 120px; }
+}

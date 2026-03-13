@@ -2343,7 +2343,8 @@ const NationalApp = {
       </div>`;
   },
 
-  // ── Lazy-load recruiting costs for a single owner via claimed costSheetId ──
+  // ── Lazy-load recruiting costs for a single owner ──
+  // Tries new weekly Indeed Tracking endpoint first, falls back to old cost sheet
   async _loadAndRenderCosts(owner) {
     const el = document.getElementById('owner-indeed-costs');
     if (!el) return;
@@ -2351,6 +2352,41 @@ const NationalApp = {
     // Render NLR banner above cost section
     this._renderNlrBanner();
 
+    // ── Try new weekly Indeed Tracking endpoint first ──
+    if (owner.indeedTracking) {
+      this._renderIndeedTracking(owner);
+      return;
+    }
+    if (!owner._trackingFetched && !owner._trackingFetching) {
+      owner._trackingFetching = true;
+      el.innerHTML = `<div class="coaching-label">Weekly Ad Spend</div>
+        <div class="empty-state"><div class="loading-spinner" style="width:24px;height:24px;border-width:3px;margin:0 auto"></div>
+        <div class="empty-state-text" style="margin-top:8px">Loading weekly ad data...</div></div>`;
+      try {
+        const url = NATIONAL_CONFIG.appsScriptUrl +
+          '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
+          '&action=indeedTracking' +
+          '&owner=' + encodeURIComponent(owner.name) +
+          '&_t=' + Date.now();
+        const resp = await this._fetchWithTimeout(fetch(url), 30000);
+        const result = await resp.json();
+        if (!result.error && result.weeks && result.weeks.length) {
+          owner.indeedTracking = result;
+          owner._trackingFetched = true;
+          owner._trackingFetching = false;
+          if (this.state.selectedOwner === owner && this.state.currentTab === 'recruiting') {
+            this._renderIndeedTracking(owner);
+          }
+          return;
+        }
+      } catch (err) {
+        console.warn('[NationalApp] Indeed Tracking load for', owner.name, ':', err.message);
+      }
+      owner._trackingFetched = true;
+      owner._trackingFetching = false;
+    }
+
+    // ── Fall back to old cost sheet claim system ──
     const costSheetId = this.state.costSheets[owner.name];
 
     // No cost sheet claimed — show claim UI
@@ -2950,6 +2986,238 @@ const NationalApp = {
     if (!v && v !== 0) return '—';
     if (Number(v) === 0) return '—';
     return Number(v).toLocaleString('en-US');
+  },
+
+  // ══════════════════════════════════════════════════
+  // RENDER: Weekly Indeed Tracking (new ad spend view)
+  // ══════════════════════════════════════════════════
+
+  _renderIndeedTracking(owner) {
+    const el = document.getElementById('owner-indeed-costs');
+    if (!el) return;
+
+    const data = owner.indeedTracking;
+    if (!data || !data.weeks || !data.weeks.length) {
+      el.innerHTML = '';
+      return;
+    }
+
+    const weeks = data.weeks; // oldest-first
+    const latest = weeks[weeks.length - 1];
+    const prev = weeks.length > 1 ? weeks[weeks.length - 2] : null;
+
+    let html = '';
+
+    // ── Part 1: Weekly Totals KPI Cards ──
+    html += `<div class="coaching-label">Weekly Ad Spend Overview</div>`;
+    html += `<div class="it-kpi-row">`;
+    html += this._itKpiCard('Total Spend', this._fmtDollar(latest.totalSpend),
+      latest.delta ? latest.delta.spendPct : null, true);
+    html += this._itKpiCard('Applies', this._fmtNum(latest.totalApplies),
+      latest.delta ? latest.delta.appliesPct : null, false);
+    html += this._itKpiCard('2nds', this._fmtNum(latest.total2nds), null, false);
+    html += this._itKpiCard('New Starts', this._fmtNum(latest.totalNewStarts), null, false);
+    html += this._itKpiCard('CPA', this._fmtDollar(latest.cpa),
+      latest.delta ? latest.delta.cpaPct : null, true);
+    html += this._itKpiCard('CPNS', this._fmtDollar(latest.cpns),
+      latest.delta ? latest.delta.cpnsPct : null, true);
+    html += `</div>`;
+    html += `<div class="it-kpi-week-label">Week of ${this._esc(latest.weekOf)} · ${latest.numAds} ads</div>`;
+
+    // ── Part 2: Week-over-Week Trend Table ──
+    html += `<div class="coaching-label it-section-label">Week-over-Week Trends</div>`;
+    html += this._buildTrackingTrend(weeks);
+
+    // ── Part 3: Ad Breakdown for Latest Week ──
+    html += `<div class="coaching-label it-section-label">Ad Breakdown
+      <select class="it-week-select" onchange="NationalApp._switchTrackingWeek(this.value)">
+        ${weeks.map((w, i) => `<option value="${i}"${i === weeks.length - 1 ? ' selected' : ''}>${this._esc(w.weekOf)}</option>`).join('')}
+      </select>
+    </div>`;
+    html += `<div id="it-ad-breakdown">`;
+    html += this._buildAdBreakdown(latest, prev);
+    html += `</div>`;
+
+    el.innerHTML = html;
+  },
+
+  // ── KPI card for weekly totals ──
+  _itKpiCard(label, value, pctChange, lowerIsBetter) {
+    let arrow = '';
+    if (pctChange !== null && pctChange !== undefined) {
+      const abs = Math.abs(pctChange);
+      if (abs < 0.5) {
+        arrow = `<span class="it-kpi-delta it-flat">—</span>`;
+      } else {
+        const isGood = lowerIsBetter ? (pctChange < 0) : (pctChange > 0);
+        const cls = isGood ? 'it-good' : 'it-bad';
+        const sym = pctChange > 0 ? '▲' : '▼';
+        arrow = `<span class="it-kpi-delta ${cls}">${sym} ${abs.toFixed(1)}%</span>`;
+      }
+    }
+    return `<div class="it-kpi-card">
+      <div class="it-kpi-value">${value}${arrow}</div>
+      <div class="it-kpi-label">${label}</div>
+    </div>`;
+  },
+
+  // ── WoW trend table: weeks as columns, key metrics as rows ──
+  _buildTrackingTrend(weeks) {
+    const TREND_ROWS = [
+      { label: 'Total Spend',  key: 'totalSpend',     fmt: 'dollar', lowerBetter: true },
+      { label: '# Applies',    key: 'totalApplies',   fmt: 'num',    lowerBetter: false },
+      { label: '# 2nds',       key: 'total2nds',      fmt: 'num',    lowerBetter: false },
+      { label: '# New Starts', key: 'totalNewStarts', fmt: 'num',    lowerBetter: false },
+      { label: 'CPA',          key: 'cpa',            fmt: 'dollar', lowerBetter: true },
+      { label: 'CPNS',         key: 'cpns',           fmt: 'dollar', lowerBetter: true },
+      { label: '# Ads',        key: 'numAds',         fmt: 'num',    lowerBetter: false }
+    ];
+
+    // Show last 6 weeks max (newest on right)
+    const shown = weeks.slice(-6);
+
+    let h = `<div class="it-trend-wrap"><div class="data-table-wrap"><table class="data-table it-trend-table">
+      <thead><tr><th></th>
+        ${shown.map(w => `<th class="num">${this._esc(w.weekOf)}</th>`).join('')}
+      </tr></thead><tbody>`;
+
+    for (const r of TREND_ROWS) {
+      const fmt = r.fmt === 'dollar' ? this._fmtDollar : this._fmtNum;
+      h += `<tr><td class="rc-label">${r.label}</td>`;
+      for (let i = 0; i < shown.length; i++) {
+        const val = shown[i][r.key] ?? 0;
+        const prev = i > 0 ? (shown[i - 1][r.key] ?? null) : null;
+        const arrow = prev !== null ? this._costTrendArrow(val, prev, r.lowerBetter) : '';
+        h += `<td class="num">${fmt(val)} ${arrow}</td>`;
+      }
+      h += `</tr>`;
+    }
+
+    h += `</tbody></table></div></div>`;
+    return h;
+  },
+
+  // ── Ad breakdown table for a single week ──
+  _buildAdBreakdown(week, prevWeek) {
+    if (!week || !week.ads || !week.ads.length) {
+      return `<div class="empty-state"><div class="empty-state-text">No ads this week</div></div>`;
+    }
+
+    // Group ads by account
+    const byAccount = {};
+    const accountOrder = [];
+    for (const ad of week.ads) {
+      const acct = ad.account || 'Unknown';
+      if (!byAccount[acct]) {
+        byAccount[acct] = [];
+        accountOrder.push(acct);
+      }
+      byAccount[acct].push(ad);
+    }
+
+    // Build prev-week lookup by adTitle for effectiveness comparison
+    const prevByTitle = {};
+    if (prevWeek && prevWeek.ads) {
+      for (const ad of prevWeek.ads) {
+        if (ad.adTitle) prevByTitle[ad.adTitle] = ad;
+      }
+    }
+
+    let h = `<div class="it-breakdown-wrap"><div class="data-table-wrap"><table class="data-table it-breakdown-table">
+      <thead><tr>
+        <th>Indeed Account</th>
+        <th>Ad Title</th>
+        <th>Location</th>
+        <th class="num">Spend</th>
+        <th class="num">Applies</th>
+        <th class="num">2nds</th>
+        <th class="num">New Starts</th>
+        <th class="num">CPA</th>
+        <th class="num">CPNS</th>
+        <th>Plan</th>
+      </tr></thead><tbody>`;
+
+    for (const acct of accountOrder) {
+      const ads = byAccount[acct];
+      // Account group header
+      const acctSpend = ads.reduce((s, a) => s + a.spend, 0);
+      const acctApplies = ads.reduce((s, a) => s + a.applies, 0);
+      const acct2nds = ads.reduce((s, a) => s + a.seconds, 0);
+      const acctNS = ads.reduce((s, a) => s + a.newStarts, 0);
+      const acctCPA = acctApplies > 0 ? acctSpend / acctApplies : 0;
+      const acctCPNS = acctNS > 0 ? acctSpend / acctNS : 0;
+
+      h += `<tr class="it-acct-row">
+        <td colspan="3"><strong>${this._esc(acct)}</strong> <span class="it-ad-count">${ads.length} ad${ads.length !== 1 ? 's' : ''}</span></td>
+        <td class="num"><strong>${this._fmtDollar(acctSpend)}</strong></td>
+        <td class="num"><strong>${this._fmtNum(acctApplies)}</strong></td>
+        <td class="num"><strong>${this._fmtNum(acct2nds)}</strong></td>
+        <td class="num"><strong>${this._fmtNum(acctNS)}</strong></td>
+        <td class="num"><strong>${this._fmtDollar(acctCPA)}</strong></td>
+        <td class="num"><strong>${this._fmtDollar(acctCPNS)}</strong></td>
+        <td></td>
+      </tr>`;
+
+      for (const ad of ads) {
+        // WoW effectiveness arrow for CPA
+        const prevAd = prevByTitle[ad.adTitle];
+        const cpaArrow = prevAd && prevAd.cpa > 0 && ad.cpa > 0
+          ? this._costTrendArrow(ad.cpa, prevAd.cpa, true) : '';
+        const cpnsArrow = prevAd && prevAd.cpns > 0 && ad.cpns > 0
+          ? this._costTrendArrow(ad.cpns, prevAd.cpns, true) : '';
+
+        // Plan column styling
+        const planLc = (ad.plan || '').toLowerCase();
+        const planCls = planLc === 'skip' ? 'it-plan-skip'
+          : planLc === 'repost' || planLc === 'repost' ? 'it-plan-repost'
+          : planLc.includes('paused') ? 'it-plan-paused'
+          : '';
+
+        h += `<tr class="it-ad-row">
+          <td class="it-indent"></td>
+          <td class="it-ad-title">${this._esc(ad.adTitle)}</td>
+          <td>${this._esc(ad.location)}</td>
+          <td class="num">${this._fmtDollar(ad.spend)}</td>
+          <td class="num">${this._fmtNum(ad.applies)}</td>
+          <td class="num">${this._fmtNum(ad.seconds)}</td>
+          <td class="num">${this._fmtNum(ad.newStarts)}</td>
+          <td class="num">${this._fmtDollar(ad.cpa)} ${cpaArrow}</td>
+          <td class="num">${this._fmtDollar(ad.cpns)} ${cpnsArrow}</td>
+          <td class="${planCls}">${this._esc(ad.plan)}</td>
+        </tr>`;
+      }
+    }
+
+    // Total row
+    h += `<tr class="it-total-row">
+      <td colspan="3"><strong>TOTAL</strong></td>
+      <td class="num"><strong>${this._fmtDollar(week.totalSpend)}</strong></td>
+      <td class="num"><strong>${this._fmtNum(week.totalApplies)}</strong></td>
+      <td class="num"><strong>${this._fmtNum(week.total2nds)}</strong></td>
+      <td class="num"><strong>${this._fmtNum(week.totalNewStarts)}</strong></td>
+      <td class="num"><strong>${this._fmtDollar(week.cpa)}</strong></td>
+      <td class="num"><strong>${this._fmtDollar(week.cpns)}</strong></td>
+      <td></td>
+    </tr>`;
+
+    h += `</tbody></table></div></div>`;
+    return h;
+  },
+
+  // ── Switch ad breakdown week via dropdown ──
+  _switchTrackingWeek(idx) {
+    const owner = this.state.selectedOwner;
+    if (!owner || !owner.indeedTracking) return;
+    const weeks = owner.indeedTracking.weeks;
+    const i = parseInt(idx);
+    const week = weeks[i];
+    const prev = i > 0 ? weeks[i - 1] : null;
+    if (!week) return;
+
+    const wrap = document.getElementById('it-ad-breakdown');
+    if (wrap) {
+      wrap.innerHTML = this._buildAdBreakdown(week, prev);
+    }
   },
 
   // ══════════════════════════════════════════════════
