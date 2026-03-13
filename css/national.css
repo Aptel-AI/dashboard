@@ -1002,7 +1002,7 @@ input, select, textarea { font-family: inherit; }
   letter-spacing: -0.1px;
 }
 
-/* Retention % card layout */
+/* Retention bar card layout */
 .rc-card-header {
   display: flex;
   justify-content: space-between;
@@ -1021,37 +1021,24 @@ input, select, textarea { font-family: inherit; }
   text-align: right;
   flex-shrink: 0;
 }
-.rc-card-hero-pct {
-  font-size: 28px;
+.rc-card-hero-num {
+  font-size: 36px;
   font-weight: 800;
   line-height: 1;
-  letter-spacing: -1px;
+  letter-spacing: -1.5px;
 }
-.rc-card-trend {
-  font-size: 11px;
-  font-weight: 700;
+.rc-card-hero-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--gray-400, #9ca3af);
   margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
-.rc-line-svg {
+.rc-bar-svg {
   width: 100%;
   height: auto;
   display: block;
-  margin: 0 auto;
-}
-.rc-card-footer {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--gray-600, #4b5563);
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid var(--gray-100, #e5e7eb);
-}
-.rc-card-sep {
-  color: var(--gray-400, #9ca3af);
-  font-weight: 500;
 }
 
 /* ═══════════════════════════════════════════════════════
