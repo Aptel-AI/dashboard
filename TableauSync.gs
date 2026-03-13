@@ -43,7 +43,7 @@ var REPORTS = {
 
   'b2b-order-log': {
     viewContentUrl: 'ATTTRACKER-B2B/sheets/ORDERLOG',
-    customViewId: 'c9cd7be0-1aac-4c89-aa0d-0928ce4c6150',  // "2026" custom view — locked to 1/1/2026–12/31/2026
+    customViewId: '41cadd3e-2873-474e-8871-2ae2fcc6178a',  // "2026_0" custom view — locked to 1/1/2026–12/31/2026
     tabName: 'B2B Order Log',
     dateFilterStart: 'Start Date',                                    // Tableau parameter display name
     dateFilterEnd: 'End Date',                                         // Tableau parameter display name
@@ -76,16 +76,17 @@ var REPORTS = {
       'DD Date'
     ],
     deduplicateKey: ['sp.SPM Number', 'spe.Name']  // DSI + SPE uniquely identifies a device row
+  },
+
+  'b2b-churn': {
+    viewContentUrl: 'ATTTRACKER-B2B/sheets/CHURNRATES',
+    customViewId: '58951ad0-8492-4390-91b4-4ebdfdbc2395',  // "2026" custom view
+    tabName: 'Churn Rates',
+    columns: null  // null = pull ALL columns from Tableau (no filtering)
   }
 
   // Add more reports here:
-  // 'churn-rates': {
-  //   viewContentUrl: 'ATTTRACKER-B2B/CHURNRATES',
-  //   tabName: 'Churn Rates',
-  //   dateFilterField: 'Order Date',
-  //   dateRangeDays: 90,
-  //   columns: [ ... ]
-  // }
+  // 'nds-order-log': { ... }
 };
 
 
@@ -515,8 +516,15 @@ function syncReport(reportKey) {
     var data = _parseCsv(csv);
     Logger.log('Parsed ' + data.length + ' rows (including header), source: ' + source);
 
-    var filtered = _filterColumns(data, report.columns);
-    Logger.log('Filtered to ' + filtered.headers.length + ' columns, ' + filtered.rows.length + ' data rows');
+    var filtered;
+    if (report.columns) {
+      filtered = _filterColumns(data, report.columns);
+      Logger.log('Filtered to ' + filtered.headers.length + ' columns, ' + filtered.rows.length + ' data rows');
+    } else {
+      // columns: null → pull ALL columns from Tableau
+      filtered = { headers: data[0], rows: data.slice(1) };
+      Logger.log('All columns mode: ' + filtered.headers.length + ' columns, ' + filtered.rows.length + ' data rows');
+    }
 
     // De-duplicate rows (Tableau Measure Values creates one row per measure per device)
     if (report.deduplicateKey) {
@@ -578,9 +586,13 @@ function syncAllReports() {
 //   Code.gs readTableauSummary already scopes data per-office by matching DSIs.
 //   So we write ALL rows once → bust cache for each office.
 //
+// campaignType:     matches templateType in admin _Offices tab — auto-discovers offices
 // filterColumn:     null = write ALL rows (shared sheets, Code.gs handles scoping)
 //                   'Owner & Office' = filter per-office using ownerOfficeMatch
 // ownerOfficeMatch: only needed when filterColumn is set (substring, case-insensitive)
+
+// Admin sheet ID — reads _Offices tab to auto-discover offices per campaign.
+// REQUIRED: Set ADMIN_SHEET_ID in Script Properties (Project Settings > Script Properties).
 
 var TARGETS = [
   {
@@ -589,33 +601,74 @@ var TARGETS = [
     sheetId: '1wxM6Htwfy8LrD_o_C7gmvnZEmkfV3FTCVjJU6IITZFc',  // Shared B2B campaign sheet
     tabName: '_TableauOrderLog',      // Destination tab in the campaign sheet
     filterColumn: null,               // null = write all rows (shared sheet)
-    offices: [
-      {
-        officeId: 'off_001',
-        appsScriptUrl: 'https://script.google.com/macros/s/AKfycbwPx0jfdYdLKurHPlfQhOkYu70vVpirTISYrR3I2EIszVrVaRNwwjBvauSIO69thKFe/exec',
-        apiKey: 'elevate-dash-2026-secret'
-      },
-      {
-        officeId: 'off_002',
-        appsScriptUrl: 'https://script.google.com/macros/s/AKfycbwPx0jfdYdLKurHPlfQhOkYu70vVpirTISYrR3I2EIszVrVaRNwwjBvauSIO69thKFe/exec',
-        apiKey: 'elevate-dash-2026-secret'
-      }
-    ]
+    campaignType: 'att-b2b'           // Auto-discovers offices from admin _Offices tab
+  },
+  {
+    reportKey: 'b2b-churn',            // Must match a REPORTS key
+    sourceTab: 'Churn Rates',          // Tab name in the Tableau Data sheet
+    sheetId: '1wxM6Htwfy8LrD_o_C7gmvnZEmkfV3FTCVjJU6IITZFc',  // Shared B2B campaign sheet
+    tabName: '_TableauChurnReport',    // Destination tab in the campaign sheet
+    filterColumn: null,                // null = write all rows (shared sheet)
+    campaignType: 'att-b2b'            // Auto-discovers offices from admin _Offices tab
   }
-  // Future: add NDS target, separate-sheet offices, etc.
-  // Example with per-office filtering (if an office has its own sheet):
+  // Future: add NDS target, etc.
   // {
-  //   reportKey: 'b2b-order-log',
-  //   sourceTab: 'B2B Order Log',
-  //   sheetId: 'SEPARATE_SHEET_ID',
+  //   reportKey: 'nds-order-log',
+  //   sourceTab: 'NDS Order Log',
+  //   sheetId: 'NDS_SHEET_ID',
   //   tabName: '_TableauOrderLog',
-  //   filterColumn: 'Owner & Office',
-  //   ownerOfficeMatch: 'some office name',
-  //   offices: [
-  //     { officeId: 'off_003', appsScriptUrl: '...', apiKey: '...' }
-  //   ]
+  //   filterColumn: null,
+  //   campaignType: 'att-nds'
   // }
 ];
+
+
+/**
+ * Read the admin _Offices tab and return active offices matching a campaignType.
+ * This means adding a new office in the admin portal automatically includes it
+ * in the nightly sync — no TableauSync.gs edits needed.
+ */
+function _getOfficesForCampaign(campaignType) {
+  var adminSheetId = PropertiesService.getScriptProperties().getProperty('ADMIN_SHEET_ID');
+  if (!adminSheetId) throw new Error('ADMIN_SHEET_ID not set in Script Properties');
+
+  var ss = SpreadsheetApp.openById(adminSheetId);
+  var sheet = ss.getSheetByName('_Offices');
+  if (!sheet || sheet.getLastRow() < 2) {
+    Logger.log('_getOfficesForCampaign: _Offices tab empty or missing');
+    return [];
+  }
+
+  var data = sheet.getDataRange().getValues();
+  // _Offices columns: 0=officeId, 1=name, 2=templateType, 3=sheetId, 4=appsScriptUrl,
+  //                    5=apiKey, 6=status
+  var offices = [];
+  for (var i = 1; i < data.length; i++) {
+    var templateType = String(data[i][2] || '').trim();
+    var status = String(data[i][6] || '').trim();
+    var officeId = String(data[i][0] || '').trim();
+    var appsScriptUrl = String(data[i][4] || '').trim();
+    var apiKey = String(data[i][5] || '').trim();
+
+    if (templateType !== campaignType) continue;
+    if (status !== 'active') continue;
+    if (!officeId || !appsScriptUrl) continue;
+
+    // appsScriptUrl may be the full URL or just the deployment ID
+    var fullUrl = appsScriptUrl.indexOf('https://') === 0
+      ? appsScriptUrl
+      : 'https://script.google.com/macros/s/' + appsScriptUrl + '/exec';
+
+    offices.push({
+      officeId: officeId,
+      appsScriptUrl: fullUrl,
+      apiKey: apiKey
+    });
+  }
+
+  Logger.log('_getOfficesForCampaign("' + campaignType + '"): ' + offices.length + ' active offices');
+  return offices;
+}
 
 
 // === DISTRIBUTE TO OFFICES ===
@@ -688,9 +741,15 @@ function distributeToOffices() {
 
       Logger.log(target.reportKey + ': wrote ' + rows.length + ' rows to ' + target.tabName);
 
+      // Resolve offices: auto-discover from admin _Offices tab if campaignType is set,
+      // otherwise fall back to hardcoded target.offices (backward compat)
+      var offices = target.campaignType
+        ? _getOfficesForCampaign(target.campaignType)
+        : (target.offices || []);
+
       // Bust cache for each office that reads from this sheet
-      for (var o = 0; o < target.offices.length; o++) {
-        var office = target.offices[o];
+      for (var o = 0; o < offices.length; o++) {
+        var office = offices[o];
         var bustResult = _bustOfficeCache(office);
         Logger.log('  ' + office.officeId + ': cache bust → ' + bustResult);
       }
@@ -699,7 +758,7 @@ function distributeToOffices() {
         ok: true,
         reportKey: target.reportKey,
         rowsWritten: rows.length,
-        officesBusted: target.offices.map(function(o) { return o.officeId; })
+        officesBusted: offices.map(function(o) { return o.officeId; })
       });
     } catch (e) {
       Logger.log(target.reportKey + ': ERROR — ' + e.message);
@@ -850,6 +909,14 @@ function testConnection() {
  */
 function testSyncB2BOrderLog() {
   var result = syncReport('b2b-order-log');
+  Logger.log(JSON.stringify(result, null, 2));
+}
+
+/**
+ * Test syncing just the B2B Churn report (run from editor)
+ */
+function testSyncB2BChurn() {
+  var result = syncReport('b2b-churn');
   Logger.log(JSON.stringify(result, null, 2));
 }
 
