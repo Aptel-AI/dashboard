@@ -2941,7 +2941,14 @@ function readIndeedTracking(ownerName) {
   ownerName = String(ownerName || '').trim();
   if (!ownerName) return { error: 'owner parameter is required' };
 
+  // Case-insensitive lookup
   var config = INDEED_TRACKING_SHEETS[ownerName];
+  if (!config) {
+    var lc = ownerName.toLowerCase();
+    for (var k in INDEED_TRACKING_SHEETS) {
+      if (k.toLowerCase() === lc) { config = INDEED_TRACKING_SHEETS[k]; break; }
+    }
+  }
   if (!config) return { error: 'No Indeed Tracking sheet configured for ' + ownerName, weeks: [] };
 
   // ── Check cache first (5 min TTL) ──
