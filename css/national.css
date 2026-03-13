@@ -1101,7 +1101,8 @@ input, select, textarea { font-family: inherit; }
 }
 .rt-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 3px 2px;
   font-size: 13px;
   min-width: 700px;
 }
@@ -1111,9 +1112,9 @@ input, select, textarea { font-family: inherit; }
   font-size: 11px; font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  border-bottom: 2px solid var(--gray-300);
   white-space: nowrap;
   text-align: center;
+  border-radius: 4px;
 }
 .rt-group-projected {
   background: #e8edf3; color: var(--gray-700);
@@ -1132,8 +1133,8 @@ input, select, textarea { font-family: inherit; }
   color: var(--gray-700);
   text-align: center;
   background: var(--gray-50);
-  border-bottom: 2px solid var(--gray-200);
   white-space: nowrap;
+  border-radius: 4px;
 }
 .rt-table thead tr.rt-date-row th:first-child {
   text-align: left;
@@ -1141,22 +1142,22 @@ input, select, textarea { font-family: inherit; }
 /* Data cells */
 .rt-table tbody td {
   padding: 8px 10px;
-  border-bottom: 1px solid var(--gray-100);
   text-align: center;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   color: var(--gray-700);
+  border-radius: 4px;
+  background: var(--gray-50, #f8fafc);
 }
 .rt-table tbody td:first-child {
   text-align: left;
   font-weight: 700;
   color: var(--gray-800);
   white-space: nowrap;
-  background: var(--gray-50);
+  background: var(--gray-100, #f1f5f9);
 }
-.rt-table tbody tr:hover td { background: rgba(0,0,0,0.02); }
-.rt-table tbody tr:hover td:first-child { background: var(--gray-100); }
-.rt-table tbody tr:last-child td { border-bottom: none; }
+.rt-table tbody tr:hover td { filter: brightness(0.97); }
+.rt-table tbody tr:hover td:first-child { background: var(--gray-200); }
 
 /* Projected column */
 td.rt-projected {
@@ -1172,11 +1173,11 @@ td.rt-total {
 }
 
 /* Conditional cell colors (teal → green → yellow → orange → red) */
-td.cell-blue   { background: #0d9488 !important; color: #fff !important; font-weight: 700; }
-td.cell-green  { background: #22c55e !important; color: #fff !important; font-weight: 700; }
-td.cell-yellow { background: #eab308 !important; color: #fff !important; font-weight: 700; }
-td.cell-orange { background: #f97316 !important; color: #fff !important; font-weight: 700; }
-td.cell-red    { background: #ef4444 !important; color: #fff !important; font-weight: 700; }
+td.cell-blue   { background: #0d9488 !important; color: #fff !important; font-weight: 700; border-radius: 4px; }
+td.cell-green  { background: #22c55e !important; color: #fff !important; font-weight: 700; border-radius: 4px; }
+td.cell-yellow { background: #eab308 !important; color: #fff !important; font-weight: 700; border-radius: 4px; }
+td.cell-orange { background: #f97316 !important; color: #fff !important; font-weight: 700; border-radius: 4px; }
+td.cell-red    { background: #ef4444 !important; color: #fff !important; font-weight: 700; border-radius: 4px; }
 
 /* Section divider rows in table */
 .rt-table tbody tr.rt-section-row td {
