@@ -195,7 +195,33 @@ const NationalApp = {
       this._enrichOwnersWithProduction(results.production.owners);
     }
 
-    // Recruiting costs are loaded per-owner when the Recruiting tab is opened (via _loadAndRenderCosts)
+    // Pre-fetch Indeed Tracking data for configured owners (non-blocking)
+    this._prefetchIndeedTracking();
+  },
+
+  // ── Pre-fetch Indeed Tracking for all owners in background ──
+  async _prefetchIndeedTracking() {
+    for (const owner of this.state.owners) {
+      if (owner.indeedTracking || owner._trackingFetched || owner._trackingFetching) continue;
+      owner._trackingFetching = true;
+      try {
+        const url = NATIONAL_CONFIG.appsScriptUrl +
+          '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
+          '&action=indeedTracking' +
+          '&owner=' + encodeURIComponent(owner.name) +
+          '&_t=' + Date.now();
+        const resp = await this._fetchWithTimeout(fetch(url), 45000);
+        const result = await resp.json();
+        if (!result.error && result.weeks && result.weeks.length) {
+          owner.indeedTracking = result;
+          owner._trackingFetched = true;
+          console.log('[NationalApp] Pre-fetched Indeed Tracking for', owner.name, ':', result.weeks.length, 'weeks');
+        }
+      } catch (err) {
+        console.warn('[NationalApp] Pre-fetch Indeed Tracking for', owner.name, ':', err.message);
+      }
+      owner._trackingFetching = false;
+    }
   },
 
   // ── Fetch ALL recruiting data from Ken's national sheet via NationalCode.gs ──

@@ -2944,12 +2944,26 @@ function readIndeedTracking(ownerName) {
   var config = INDEED_TRACKING_SHEETS[ownerName];
   if (!config) return { error: 'No Indeed Tracking sheet configured for ' + ownerName, weeks: [] };
 
+  // ── Check cache first (5 min TTL) ──
+  var cacheKey = 'indeedTracking_' + ownerName.replace(/\s+/g, '_');
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get(cacheKey);
+  if (cached) {
+    try {
+      Logger.log('readIndeedTracking: cache HIT for ' + ownerName);
+      return JSON.parse(cached);
+    } catch (e) { /* parse failed, fetch fresh */ }
+  }
+
   try {
     var ss = SpreadsheetApp.openById(config.sheetId);
     var sheet = ss.getSheetByName(config.tab);
     if (!sheet) return { error: 'Tab "' + config.tab + '" not found', weeks: [] };
 
-    var data = sheet.getDataRange().getValues();
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    if (lastRow < 3) return { weeks: [] };
+    var data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
     if (data.length < 3) return { weeks: [] };
 
     // ── Parse weekly blocks ──
@@ -3084,7 +3098,17 @@ function readIndeedTracking(ownerName) {
     var accounts = Object.keys(accountSet).sort();
     Logger.log('readIndeedTracking: ' + weeks.length + ' weeks, ' + accounts.length + ' accounts for ' + ownerName);
 
-    return { weeks: weeks, accounts: accounts };
+    // ── Cache result for 5 minutes ──
+    var result = { weeks: weeks, accounts: accounts };
+    try {
+      var json = JSON.stringify(result);
+      if (json.length < 100000) { // CacheService limit is 100KB per key
+        cache.put(cacheKey, json, 300); // 5 min
+        Logger.log('readIndeedTracking: cached (' + json.length + ' bytes)');
+      }
+    } catch (e) { Logger.log('Cache write failed: ' + e.message); }
+
+    return result;
 
   } catch (err) {
     Logger.log('readIndeedTracking error: ' + err.message + '\n' + err.stack);
