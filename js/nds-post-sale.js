@@ -89,7 +89,7 @@ const PostSale = {
   _collectStep1() {
     const v = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     this._formData.dateOfSale = v('ps-date') || this._formData.dateOfSale;
-    this._formData.dsi = v('ps-dsi');
+    this._formData.dsi = v('ps-dsi').toUpperCase();
     this._formData.accountNotes = v('ps-notes');
     this._formData.traineeName = v('ps-trainee-name');
     // Codes-used-by dropdown
@@ -156,7 +156,7 @@ const PostSale = {
 
       <div class="wizard-field" id="ps-dsi-field">
         <label class="wizard-label">SPM Number</label>
-        <input type="text" class="wizard-input" id="ps-dsi" value="${this._esc(d.dsi)}" placeholder="Enter 12+ character SPM" oninput="PostSale._updateDSIHint()">
+        <input type="text" class="wizard-input" id="ps-dsi" value="${this._esc(d.dsi)}" placeholder="Enter 12+ character SPM" style="text-transform:uppercase" oninput="PostSale._updateDSIHint()">
         <div class="wizard-hint" id="ps-dsi-hint">${d.dsi.length}/12 min characters</div>
         <div class="wizard-error">SPM must be at least 12 characters</div>
       </div>

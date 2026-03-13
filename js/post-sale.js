@@ -99,7 +99,7 @@ const PostSale = {
     const v = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     this._formData.dateOfSale = v('ps-date') || this._formData.dateOfSale;
     if (this._campaign === 'attb2b') {
-      this._formData.dsi = v('ps-dsi');
+      this._formData.dsi = v('ps-dsi').toUpperCase();
       this._formData.accountNotes = v('ps-notes');
     } else {
       this._formData.clientName = v('ps-client-name');
@@ -185,7 +185,7 @@ const PostSale = {
       ${this._campaign === 'attb2b' ? `
         <div class="wizard-field" id="ps-dsi-field">
           <label class="wizard-label">DSI Number</label>
-          <input type="text" class="wizard-input" id="ps-dsi" value="${this._esc(d.dsi)}" placeholder="Enter 12+ character DSI" oninput="PostSale._updateDSIHint()">
+          <input type="text" class="wizard-input" id="ps-dsi" value="${this._esc(d.dsi)}" placeholder="Enter 12+ character DSI" style="text-transform:uppercase" oninput="PostSale._updateDSIHint()">
           <div class="wizard-hint" id="ps-dsi-hint">${d.dsi.length}/12 min characters</div>
           <div class="wizard-error">DSI must be at least 12 characters</div>
         </div>
