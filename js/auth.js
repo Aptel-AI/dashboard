@@ -43,6 +43,12 @@ const Auth = {
     const cleanEmail = String(email).trim().toLowerCase();
     if (!cleanEmail) return { ok: false, error: 'Please enter your email' };
 
+    // Block owner from logging in through the rep portal — must use Admin Portal SSO
+    const ownerEmail = (OFFICE_CONFIG.ownerEmail || '').toLowerCase();
+    if (ownerEmail && cleanEmail === ownerEmail) {
+      return { ok: false, error: 'Owner accounts must log in through the Admin Portal.' };
+    }
+
     const match = rosterMap[cleanEmail];
     if (!match) {
       console.warn('Login failed — email not found in roster:', cleanEmail);
