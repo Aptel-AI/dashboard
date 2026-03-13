@@ -2337,7 +2337,7 @@ const NationalApp = {
       <div class="recruit-banner">
         <div class="recruit-banner-left">
           <img src="references/logos/nlr-logo-symbol.jpg" alt="NLR" class="recruit-banner-logo">
-          <div class="recruit-banner-title">Recruiting Pipeline Breakdown</div>
+          <div class="recruit-banner-title">Recruiting Ad Spend Report</div>
         </div>
         <div class="recruit-banner-right">Powered by Next Level Recruiting · ${this._esc(monthYear)}</div>
       </div>`;
