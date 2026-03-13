@@ -981,6 +981,28 @@ input, select, textarea { font-family: inherit; }
 }
 
 /* ═══════════════════════════════════════════════════════
+   RECRUITING TREND CHARTS (flip card front)
+   ═══════════════════════════════════════════════════════ */
+.recruit-charts-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.recruit-chart-card {
+  background: var(--white, #fff);
+  border: 1px solid var(--gray-100, #e5e7eb);
+  border-radius: var(--radius, 10px);
+  padding: 14px 16px 10px;
+}
+.recruit-chart-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gray-700, #374151);
+  margin-bottom: 8px;
+  letter-spacing: -0.1px;
+}
+
+/* ═══════════════════════════════════════════════════════
    RECRUITING TABLE (spreadsheet-style with conditional colors)
    ═══════════════════════════════════════════════════════ */
 .campaign-recruiting {

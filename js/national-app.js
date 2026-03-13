@@ -2550,7 +2550,7 @@ const NationalApp = {
     }
   },
 
-  // ── Week-over-week raw recruiting data (stacked cards under projected table) ──
+  // ── Week-over-week recruiting: flip card (charts front, table back) ──
   _renderRecruitingWoW(owner) {
     const el = document.getElementById('owner-recruiting-wow');
     if (!el) return;
@@ -2577,33 +2577,198 @@ const NationalApp = {
       return;
     }
 
-    // Stacked cards, newest first (reverse)
-    let html = `<div class="coaching-label">Week-over-Week Recruiting</div>
-      <div class="wow-cards">`;
+    // Reversed (newest-first) active week indices
+    const revIdxs = [...activeWeekIdxs].reverse();
+    const n = revIdxs.length;
 
+    const shortDate = (d) => {
+      if (!d) return '';
+      const parts = String(d).split(/[-\/]/);
+      return parts.length >= 2 ? parts[0] + '/' + parts[1] : d;
+    };
+
+    // Extract series data (newest-first)
+    const series = (ri) => revIdxs.map(wi => rows[ri]?.values?.[wi] ?? 0);
+
+    const newStartsShowed = series(10);
+    const newStartsBooked = series(9);
+    const r2Booked = series(6);
+    const r2Showed = series(7);
+    const r1Booked = series(2);
+    const r1Showed = series(3);
+    const weekLabels = revIdxs.map(wi => shortDate(weeks[wi]));
+
+    // ── Build 3 charts ──
+    const chart1 = this._buildRecruitChart('New Starts', weekLabels, [
+      { data: newStartsShowed, color: '#22c55e', label: 'Showed' },
+      { data: newStartsBooked, color: '#86efac', label: 'Booked', ghost: true }
+    ]);
+    const chart2 = this._buildRecruitChart('2nd Round Interviews', weekLabels, [
+      { data: r2Showed, color: '#3b82f6', label: 'Showed' },
+      { data: r2Booked, color: '#93c5fd', label: 'Booked', ghost: true }
+    ]);
+    const chart3 = this._buildRecruitChart('1st Round Interviews', weekLabels, [
+      { data: r1Showed, color: '#f59e0b', label: 'Showed' },
+      { data: r1Booked, color: '#fcd34d', label: 'Booked', ghost: true }
+    ]);
+
+    // ── Build table (back side — existing stacked cards) ──
+    let tableHtml = '<div class="wow-cards">';
     [...activeWeekIdxs].reverse().forEach(wi => {
       const prevWi = activeWeekIdxs[activeWeekIdxs.indexOf(wi) - 1] ?? null;
-      html += `<div class="wow-card">
+      tableHtml += `<div class="wow-card">
         <div class="wow-card-header">${this._esc(weeks[wi])}</div>
-        <div class="data-table-wrap"><table class="data-table">
-          <tbody>`;
-
+        <div class="data-table-wrap"><table class="data-table"><tbody>`;
       labels.forEach((def, ri) => {
         const val = rows[ri]?.values?.[wi] ?? 0;
         const prev = prevWi !== null ? (rows[ri]?.values?.[prevWi] ?? null) : null;
         const display = def.isRate ? val + '%' : val;
         const arrow = prev !== null ? this._trendArrow(val, prev) : '';
-        html += `<tr>
-          <td>${this._esc(def.label)}</td>
-          <td class="num">${display} ${arrow}</td>
-        </tr>`;
+        tableHtml += `<tr><td>${this._esc(def.label)}</td><td class="num">${display} ${arrow}</td></tr>`;
+      });
+      tableHtml += `</tbody></table></div></div>`;
+    });
+    tableHtml += '</div>';
+
+    // ── Assemble flip card ──
+    el.innerHTML = `
+      <div class="coaching-label">
+        Week-over-Week Recruiting
+        <button class="flip-btn" onclick="NationalApp._flipRecruitCard()" title="Flip to ${this._recruitFlipped ? 'charts' : 'table'} view">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
+      </div>
+      <div class="flip-card${this._recruitFlipped ? ' flipped' : ''}" id="recruit-flip-card">
+        <div class="flip-card-inner">
+          <div class="flip-card-front">
+            <div class="recruit-charts-grid">
+              ${chart1}${chart2}${chart3}
+            </div>
+          </div>
+          <div class="flip-card-back">
+            ${tableHtml}
+          </div>
+        </div>
+      </div>`;
+  },
+
+  _recruitFlipped: false,
+
+  _flipRecruitCard() {
+    this._recruitFlipped = !this._recruitFlipped;
+    const card = document.getElementById('recruit-flip-card');
+    if (card) card.classList.toggle('flipped', this._recruitFlipped);
+    const btn = card?.parentElement?.querySelector('.flip-btn');
+    if (btn) btn.title = 'Flip to ' + (this._recruitFlipped ? 'charts' : 'table') + ' view';
+  },
+
+  // ── Build a single recruiting trend chart (grouped bars) ──
+  _buildRecruitChart(title, weekLabels, seriesDefs) {
+    const n = weekLabels.length;
+    const VISIBLE = 6;
+    const PAD_T = 10, PAD_B = 26, PAD_R = 8;
+    const YAXIS_W = 32;
+    const svgH = 160;
+    const plotH = svgH - PAD_T - PAD_B;
+    const REF_W = 500;
+    const barAreaVisibleW = REF_W - YAXIS_W;
+    const slotW = barAreaVisibleW / Math.min(n, VISIBLE);
+    const barAreaW = n * slotW + PAD_R;
+    const needsScroll = n > VISIBLE;
+    const baseY = PAD_T + plotH;
+    const BAR_R = 4;
+
+    // Compute yMax across all series
+    let maxVal = 1;
+    for (let i = 0; i < n; i++) {
+      for (const s of seriesDefs) {
+        if (s.data[i] > maxVal) maxVal = s.data[i];
+      }
+    }
+    const step = maxVal > 100 ? 50 : maxVal > 40 ? 25 : maxVal > 15 ? 10 : 5;
+    const yMax = Math.ceil(maxVal / step) * step || step;
+    const yScale = plotH / yMax;
+
+    // Y-axis labels
+    let yAxisSvg = '';
+    for (let val = 0; val <= yMax; val += step) {
+      const y = baseY - val * yScale;
+      yAxisSvg += `<text x="${YAXIS_W - 4}" y="${y + 3.5}" text-anchor="end" fill="#b0b8c4" font-size="9" font-family="Inter,sans-serif">${val}</text>`;
+    }
+
+    // Bars + gridlines
+    let barsSvg = '';
+    for (let val = 0; val <= yMax; val += step) {
+      const y = baseY - val * yScale;
+      barsSvg += `<line x1="0" y1="${y}" x2="${barAreaW}" y2="${y}" stroke="#e8ecf1" stroke-width="0.7"/>`;
+    }
+
+    const numSeries = seriesDefs.length;
+    const GAP = 0.12;
+    const groupW = slotW * (1 - GAP);
+    const groupOff = (slotW - groupW) / 2;
+    const barW = numSeries > 1 ? (groupW - 4) / numSeries : groupW;
+    const barGap = numSeries > 1 ? 4 : 0;
+
+    const roundTop = (x, y, w, h, r) => {
+      if (h <= 0) return '';
+      const cr = Math.min(r, h / 2, w / 2);
+      return `M${x},${y + h}L${x},${y + cr}Q${x},${y} ${x + cr},${y}L${x + w - cr},${y}Q${x + w},${y} ${x + w},${y + cr}L${x + w},${y + h}Z`;
+    };
+
+    for (let i = 0; i < n; i++) {
+      const gx = i * slotW + groupOff;
+      const cx = i * slotW + slotW / 2;
+
+      seriesDefs.forEach((s, si) => {
+        const val = s.data[i];
+        const h = val * yScale;
+        const x = gx + si * (barW + barGap);
+        const y = baseY - h;
+
+        if (s.ghost) {
+          // "Booked" bar — behind showed, lighter with border
+          if (h > 0) {
+            barsSvg += `<path d="${roundTop(x, y, barW, h, BAR_R)}" fill="${s.color}" opacity="0.35"/>`;
+            barsSvg += `<path d="${roundTop(x, y, barW, h, BAR_R)}" fill="none" stroke="${s.color}" stroke-width="1.5" opacity="0.6"/>`;
+          }
+        } else {
+          // "Showed" bar — solid
+          if (h > 0) {
+            barsSvg += `<path d="${roundTop(x, y, barW, h, BAR_R)}" fill="${s.color}" opacity="0.9"/>`;
+          }
+        }
+
+        // Value label on top
+        if (val > 0 && h > 12) {
+          barsSvg += `<text x="${x + barW / 2}" y="${y + h / 2 + 4}" text-anchor="middle" fill="${s.ghost ? s.color : '#fff'}" font-size="10" font-weight="700" font-family="Inter,sans-serif" opacity="${s.ghost ? 0.8 : 1}">${val}</text>`;
+        }
       });
 
-      html += `</tbody></table></div></div>`;
-    });
+      // X-axis label
+      barsSvg += `<text x="${cx}" y="${svgH - 6}" text-anchor="middle" fill="#8a95a5" font-size="9" font-weight="600" font-family="Inter,sans-serif">${weekLabels[i]}</text>`;
+    }
 
-    html += `</div>`;
-    el.innerHTML = html;
+    const displayW = needsScroll ? REF_W : (YAXIS_W + barAreaW);
+
+    // Legend
+    const legendItems = seriesDefs.map(s =>
+      `<span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch" style="background:${s.color};${s.ghost ? 'opacity:0.5' : ''}"></span>${s.label}</span>`
+    ).join('');
+
+    return `
+      <div class="recruit-chart-card">
+        <div class="recruit-chart-title">${title}</div>
+        <div style="position:relative; max-width:${displayW}px">
+          <div style="display:flex">
+            <svg width="${YAXIS_W}" height="${svgH}" style="flex-shrink:0; background:var(--card-bg,#ddeaf5)">${yAxisSvg}</svg>
+            <div class="hc-chart-wrap" style="flex:1; min-width:0">
+              <svg width="${barAreaW}" height="${svgH}" overflow="hidden">${barsSvg}</svg>
+            </div>
+          </div>
+        </div>
+        <div class="hc-chart-legend" style="margin-top:6px">${legendItems}</div>
+      </div>`;
   },
 
   // ══════════════════════════════════════════════════
