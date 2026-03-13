@@ -2598,19 +2598,10 @@ const NationalApp = {
     const r1Showed = series(3);
     const weekLabels = revIdxs.map(wi => shortDate(weeks[wi]));
 
-    // ── Build 3 charts ──
-    const chart1 = this._buildRecruitChart('New Starts', weekLabels, [
-      { data: newStartsShowed, color: '#22c55e', label: 'Showed' },
-      { data: newStartsBooked, color: '#86efac', label: 'Booked', ghost: true }
-    ]);
-    const chart2 = this._buildRecruitChart('2nd Round Interviews', weekLabels, [
-      { data: r2Showed, color: '#3b82f6', label: 'Showed' },
-      { data: r2Booked, color: '#93c5fd', label: 'Booked', ghost: true }
-    ]);
-    const chart3 = this._buildRecruitChart('1st Round Interviews', weekLabels, [
-      { data: r1Showed, color: '#f59e0b', label: 'Showed' },
-      { data: r1Booked, color: '#fcd34d', label: 'Booked', ghost: true }
-    ]);
+    // ── Build 3 retention % trend cards ──
+    const chart1 = this._buildRetentionCard('New Starts', '#22c55e', weekLabels, newStartsBooked, newStartsShowed, 'Booked new starts that actually show up');
+    const chart2 = this._buildRetentionCard('2nd Round Interviews', '#3b82f6', weekLabels, r2Booked, r2Showed, '1st round interview quality');
+    const chart3 = this._buildRetentionCard('1st Round Interviews', '#f59e0b', weekLabels, r1Booked, r1Showed, 'Recruiting hub / phone booker performance');
 
     // ── Build table (back side — existing stacked cards) ──
     let tableHtml = '<div class="wow-cards">';
@@ -2662,112 +2653,124 @@ const NationalApp = {
     if (btn) btn.title = 'Flip to ' + (this._recruitFlipped ? 'charts' : 'table') + ' view';
   },
 
-  // ── Build a single recruiting trend chart (grouped bars) ──
-  _buildRecruitChart(title, weekLabels, seriesDefs) {
+  // ── Build a single retention % trend card (line chart + hero stat) ──
+  _buildRetentionCard(title, color, weekLabels, booked, showed, subtitle) {
     const n = weekLabels.length;
-    const VISIBLE = 6;
-    const PAD_T = 10, PAD_B = 26, PAD_R = 8;
-    const YAXIS_W = 32;
-    const svgH = 160;
-    const plotH = svgH - PAD_T - PAD_B;
-    const REF_W = 500;
-    const barAreaVisibleW = REF_W - YAXIS_W;
-    const slotW = barAreaVisibleW / Math.min(n, VISIBLE);
-    const barAreaW = n * slotW + PAD_R;
-    const needsScroll = n > VISIBLE;
-    const baseY = PAD_T + plotH;
-    const BAR_R = 4;
 
-    // Compute yMax across all series
-    let maxVal = 1;
+    // Compute retention % per week (newest-first already)
+    const pcts = booked.map((b, i) => b > 0 ? Math.round((showed[i] / b) * 100) : null);
+
+    // Current (most recent) values
+    const curPct = pcts[0];
+    const prevPct = pcts[1];
+    const curBooked = booked[0] || 0;
+    const curShowed = showed[0] || 0;
+
+    // Trend direction
+    const trending = curPct !== null && prevPct !== null
+      ? (curPct > prevPct ? 'up' : curPct < prevPct ? 'down' : 'flat')
+      : 'flat';
+    const trendColor = trending === 'up' ? '#22c55e' : trending === 'down' ? '#ef4444' : '#94a3b8';
+    const trendIcon = trending === 'up' ? '↑' : trending === 'down' ? '↓' : '→';
+    const trendDelta = curPct !== null && prevPct !== null ? Math.abs(curPct - prevPct) : 0;
+
+    // ── SVG line chart (% from 0-100) ──
+    const svgW = 280, svgH = 80;
+    const PAD_L = 4, PAD_R = 4, PAD_T = 8, PAD_B = 20;
+    const plotW = svgW - PAD_L - PAD_R;
+    const plotH = svgH - PAD_T - PAD_B;
+
+    // Filter out null entries for drawing (but keep positions)
+    const validPts = [];
     for (let i = 0; i < n; i++) {
-      for (const s of seriesDefs) {
-        if (s.data[i] > maxVal) maxVal = s.data[i];
+      if (pcts[i] !== null) {
+        const x = n > 1 ? PAD_L + (i / (n - 1)) * plotW : PAD_L + plotW / 2;
+        const y = PAD_T + plotH - (pcts[i] / 100) * plotH;
+        validPts.push({ x, y, pct: pcts[i], label: weekLabels[i], idx: i });
       }
     }
-    const step = maxVal > 100 ? 50 : maxVal > 40 ? 25 : maxVal > 15 ? 10 : 5;
-    const yMax = Math.ceil(maxVal / step) * step || step;
-    const yScale = plotH / yMax;
 
-    // Y-axis labels
-    let yAxisSvg = '';
-    for (let val = 0; val <= yMax; val += step) {
-      const y = baseY - val * yScale;
-      yAxisSvg += `<text x="${YAXIS_W - 4}" y="${y + 3.5}" text-anchor="end" fill="#b0b8c4" font-size="9" font-family="Inter,sans-serif">${val}</text>`;
-    }
+    let svg = '';
 
-    // Bars + gridlines
-    let barsSvg = '';
-    for (let val = 0; val <= yMax; val += step) {
-      const y = baseY - val * yScale;
-      barsSvg += `<line x1="0" y1="${y}" x2="${barAreaW}" y2="${y}" stroke="#e8ecf1" stroke-width="0.7"/>`;
-    }
+    // Subtle horizontal guide lines at 25%, 50%, 75%, 100%
+    [25, 50, 75, 100].forEach(val => {
+      const y = PAD_T + plotH - (val / 100) * plotH;
+      svg += `<line x1="${PAD_L}" y1="${y}" x2="${svgW - PAD_R}" y2="${y}" stroke="#e8ecf1" stroke-width="0.5"/>`;
+    });
 
-    const numSeries = seriesDefs.length;
-    const GAP = 0.12;
-    const groupW = slotW * (1 - GAP);
-    const groupOff = (slotW - groupW) / 2;
-    const barW = numSeries > 1 ? (groupW - 4) / numSeries : groupW;
-    const barGap = numSeries > 1 ? 4 : 0;
+    if (validPts.length > 1) {
+      // Gradient fill under line
+      const fillPts = validPts.map(p => `${p.x},${p.y}`).join(' ');
+      const bottomY = PAD_T + plotH;
+      svg += `<defs><linearGradient id="grad-${title.replace(/\s/g, '')}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.25"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0.02"/>
+      </linearGradient></defs>`;
+      svg += `<polygon points="${validPts[0].x},${bottomY} ${fillPts} ${validPts[validPts.length - 1].x},${bottomY}" fill="url(#grad-${title.replace(/\s/g, '')})"/>`;
 
-    const roundTop = (x, y, w, h, r) => {
-      if (h <= 0) return '';
-      const cr = Math.min(r, h / 2, w / 2);
-      return `M${x},${y + h}L${x},${y + cr}Q${x},${y} ${x + cr},${y}L${x + w - cr},${y}Q${x + w},${y} ${x + w},${y + cr}L${x + w},${y + h}Z`;
-    };
+      // Smooth line (catmull-rom-like with bezier)
+      let path = `M${validPts[0].x},${validPts[0].y}`;
+      for (let i = 1; i < validPts.length; i++) {
+        const prev = validPts[i - 1];
+        const cur = validPts[i];
+        const cpx = (prev.x + cur.x) / 2;
+        path += ` C${cpx},${prev.y} ${cpx},${cur.y} ${cur.x},${cur.y}`;
+      }
+      svg += `<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
 
-    for (let i = 0; i < n; i++) {
-      const gx = i * slotW + groupOff;
-      const cx = i * slotW + slotW / 2;
-
-      seriesDefs.forEach((s, si) => {
-        const val = s.data[i];
-        const h = val * yScale;
-        const x = gx + si * (barW + barGap);
-        const y = baseY - h;
-
-        if (s.ghost) {
-          // "Booked" bar — behind showed, lighter with border
-          if (h > 0) {
-            barsSvg += `<path d="${roundTop(x, y, barW, h, BAR_R)}" fill="${s.color}" opacity="0.35"/>`;
-            barsSvg += `<path d="${roundTop(x, y, barW, h, BAR_R)}" fill="none" stroke="${s.color}" stroke-width="1.5" opacity="0.6"/>`;
-          }
-        } else {
-          // "Showed" bar — solid
-          if (h > 0) {
-            barsSvg += `<path d="${roundTop(x, y, barW, h, BAR_R)}" fill="${s.color}" opacity="0.9"/>`;
-          }
-        }
-
-        // Value label on top
-        if (val > 0 && h > 12) {
-          barsSvg += `<text x="${x + barW / 2}" y="${y + h / 2 + 4}" text-anchor="middle" fill="${s.ghost ? s.color : '#fff'}" font-size="10" font-weight="700" font-family="Inter,sans-serif" opacity="${s.ghost ? 0.8 : 1}">${val}</text>`;
-        }
+      // Dots at each data point
+      validPts.forEach((p, i) => {
+        const isNewest = i === 0;
+        svg += `<circle cx="${p.x}" cy="${p.y}" r="${isNewest ? 4 : 2.5}" fill="${isNewest ? color : '#fff'}" stroke="${color}" stroke-width="${isNewest ? 2 : 1.5}"/>`;
       });
 
-      // X-axis label
-      barsSvg += `<text x="${cx}" y="${svgH - 6}" text-anchor="middle" fill="#8a95a5" font-size="9" font-weight="600" font-family="Inter,sans-serif">${weekLabels[i]}</text>`;
+      // % labels on dots (only first, middle-ish, and last to avoid clutter)
+      const labelIdxs = [0];
+      if (validPts.length > 3) labelIdxs.push(Math.floor(validPts.length / 2));
+      if (validPts.length > 1) labelIdxs.push(validPts.length - 1);
+      labelIdxs.forEach(li => {
+        const p = validPts[li];
+        if (!p) return;
+        svg += `<text x="${p.x}" y="${p.y - 8}" text-anchor="middle" fill="${color}" font-size="9" font-weight="700" font-family="Inter,sans-serif">${p.pct}%</text>`;
+      });
+    } else if (validPts.length === 1) {
+      const p = validPts[0];
+      svg += `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${color}" stroke="${color}" stroke-width="2"/>`;
+      svg += `<text x="${p.x}" y="${p.y - 8}" text-anchor="middle" fill="${color}" font-size="9" font-weight="700" font-family="Inter,sans-serif">${p.pct}%</text>`;
     }
 
-    const displayW = needsScroll ? REF_W : (YAXIS_W + barAreaW);
+    // X-axis week labels (show first, last, and a middle one)
+    if (n > 0) {
+      const xLabelIdxs = [0];
+      if (n > 3) xLabelIdxs.push(Math.floor(n / 2));
+      if (n > 1) xLabelIdxs.push(n - 1);
+      xLabelIdxs.forEach(i => {
+        const x = n > 1 ? PAD_L + (i / (n - 1)) * plotW : PAD_L + plotW / 2;
+        svg += `<text x="${x}" y="${svgH - 4}" text-anchor="middle" fill="#94a3b8" font-size="8" font-weight="600" font-family="Inter,sans-serif">${weekLabels[i]}</text>`;
+      });
+    }
 
-    // Legend
-    const legendItems = seriesDefs.map(s =>
-      `<span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch" style="background:${s.color};${s.ghost ? 'opacity:0.5' : ''}"></span>${s.label}</span>`
-    ).join('');
+    const heroDisplay = curPct !== null ? curPct + '%' : '—';
 
     return `
       <div class="recruit-chart-card">
-        <div class="recruit-chart-title">${title}</div>
-        <div style="position:relative; max-width:${displayW}px">
-          <div style="display:flex">
-            <svg width="${YAXIS_W}" height="${svgH}" style="flex-shrink:0; background:var(--card-bg,#ddeaf5)">${yAxisSvg}</svg>
-            <div class="hc-chart-wrap" style="flex:1; min-width:0">
-              <svg width="${barAreaW}" height="${svgH}" overflow="hidden">${barsSvg}</svg>
-            </div>
+        <div class="rc-card-header">
+          <div>
+            <div class="recruit-chart-title">${title}</div>
+            <div class="rc-card-subtitle">${subtitle}</div>
+          </div>
+          <div class="rc-card-hero">
+            <div class="rc-card-hero-pct" style="color:${color}">${heroDisplay}</div>
+            ${trendDelta > 0 ? `<div class="rc-card-trend" style="color:${trendColor}">${trendIcon} ${trendDelta}pp</div>` : ''}
           </div>
         </div>
-        <div class="hc-chart-legend" style="margin-top:6px">${legendItems}</div>
+        <svg width="${svgW}" height="${svgH}" class="rc-line-svg">${svg}</svg>
+        <div class="rc-card-footer">
+          <span>${curShowed} showed</span>
+          <span class="rc-card-sep">of</span>
+          <span>${curBooked} booked</span>
+          <span class="rc-card-sep">this week</span>
+        </div>
       </div>`;
   },
 
