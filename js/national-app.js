@@ -1591,17 +1591,70 @@ const NationalApp = {
       ? `viewBox="0 0 ${svgW} ${svgH}" width="${svgW}" height="${svgH}"`
       : `viewBox="0 0 ${svgW} ${svgH}" preserveAspectRatio="xMidYMid meet"`;
 
-    trendEl.innerHTML = `
-      <div class="coaching-label">Week-over-Week Headcount</div>
-      <div class="hc-chart-wrap${needsScroll ? ' hc-chart-scrollable' : ''}">
-        <svg ${svgAttrs}>${svg}</svg>
-        <div class="hc-chart-tooltip" id="hc-chart-tt"></div>
-      </div>
-      <div class="hc-chart-legend">
-        <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-leaders"></span>Leaders</span>
-        <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-dist"></span>Distributors</span>
-        <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-training"></span>Training</span>
+    // ── Build table (back side) ──
+    // Show newest first (same order as chart)
+    const tableRows = hist.map((r, i) => {
+      const prev = i < n - 1 ? hist[i + 1] : null; // prev = older = next in reversed array
+      const dist = (r.active || 0) - (r.leaders || 0);
+      return `<tr>
+        <td class="bold">${this._esc(r.date)}</td>
+        <td class="num">${r.active || 0} ${this._trendArrow(r.active, prev?.active)}</td>
+        <td class="num">${r.leaders || 0}</td>
+        <td class="num">${dist}</td>
+        <td class="num">${r.training || 0}</td>
+      </tr>`;
+    }).join('');
+
+    const tableHtml = `
+      <div class="data-table-wrap trend-scroll">
+        <table class="data-table">
+          <thead><tr>
+            <th>Week</th><th class="num">Active</th><th class="num">Leaders</th><th class="num">Dist</th><th class="num">Training</th>
+          </tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
       </div>`;
+
+    // ── Assemble flip card ──
+    trendEl.innerHTML = `
+      <div class="coaching-label">
+        Week-over-Week Headcount
+        <button class="flip-btn" onclick="NationalApp._flipHcCard()" title="Flip to ${this._hcFlipped ? 'chart' : 'table'} view">
+          ${this._hcFlipped ? '&#9776;' : '&#8801;'}
+        </button>
+      </div>
+      <div class="flip-card${this._hcFlipped ? ' flipped' : ''}" id="hc-flip-card">
+        <div class="flip-card-inner">
+          <div class="flip-card-front">
+            <div class="hc-chart-wrap${needsScroll ? ' hc-chart-scrollable' : ''}">
+              <svg ${svgAttrs}>${svg}</svg>
+              <div class="hc-chart-tooltip" id="hc-chart-tt"></div>
+            </div>
+            <div class="hc-chart-legend">
+              <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-leaders"></span>Leaders</span>
+              <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-dist"></span>Distributors</span>
+              <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-training"></span>Training</span>
+            </div>
+          </div>
+          <div class="flip-card-back">
+            ${tableHtml}
+          </div>
+        </div>
+      </div>`;
+  },
+
+  _hcFlipped: false,
+
+  _flipHcCard() {
+    this._hcFlipped = !this._hcFlipped;
+    const card = document.getElementById('hc-flip-card');
+    if (card) card.classList.toggle('flipped', this._hcFlipped);
+    // Update button icon
+    const btn = card?.parentElement?.querySelector('.flip-btn');
+    if (btn) {
+      btn.innerHTML = this._hcFlipped ? '&#9776;' : '&#8801;';
+      btn.title = 'Flip to ' + (this._hcFlipped ? 'chart' : 'table') + ' view';
+    }
   },
 
   // ── Headcount chart tooltip helpers ──

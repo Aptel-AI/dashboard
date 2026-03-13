@@ -565,6 +565,58 @@ input, select, textarea { font-family: inherit; }
 }
 .hc-submit-note.show { opacity: 1; }
 
+/* ── Flip Card ── */
+.flip-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--gray-500);
+  font-size: 14px;
+  padding: 2px 8px;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.15s;
+}
+.flip-btn:hover {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  border-color: var(--gray-300);
+}
+.flip-card {
+  perspective: 1200px;
+}
+.flip-card-inner {
+  position: relative;
+  transition: transform 0.5s ease;
+  transform-style: preserve-3d;
+}
+.flip-card.flipped .flip-card-inner {
+  transform: rotateX(180deg);
+}
+.flip-card-front,
+.flip-card-back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-card-front {
+  position: relative;
+}
+.flip-card-back {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  transform: rotateX(180deg);
+}
+/* When flipped, front becomes hidden and back is interactive */
+.flip-card.flipped .flip-card-front {
+  visibility: hidden;
+}
+.flip-card:not(.flipped) .flip-card-back {
+  visibility: hidden;
+}
+
 /* ── Headcount Trend Chart ── */
 .hc-chart-wrap {
   position: relative;
