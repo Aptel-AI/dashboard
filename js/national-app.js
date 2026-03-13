@@ -2778,8 +2778,8 @@ const NationalApp = {
       { label: '# Ads',        key: 'numAds',         fmt: 'num',    lowerBetter: false }
     ];
 
-    // Show last 6 weeks max (newest on right)
-    const shown = weeks.slice(-6);
+    // Show last 6 weeks max, newest on left
+    const shown = weeks.slice(-6).reverse();
 
     let h = `<div class="it-trend-wrap"><div class="data-table-wrap"><table class="data-table it-trend-table">
       <thead><tr><th></th>
@@ -2791,8 +2791,9 @@ const NationalApp = {
       h += `<tr><td class="rc-label">${r.label}</td>`;
       for (let i = 0; i < shown.length; i++) {
         const val = shown[i][r.key] ?? 0;
-        const prev = i > 0 ? (shown[i - 1][r.key] ?? null) : null;
-        const arrow = prev !== null ? this._costTrendArrow(val, prev, r.lowerBetter) : '';
+        // Compare against next column (older week) since order is reversed
+        const older = i < shown.length - 1 ? (shown[i + 1][r.key] ?? null) : null;
+        const arrow = older !== null ? this._costTrendArrow(val, older, r.lowerBetter) : '';
         h += `<td class="num">${fmt(val)} ${arrow}</td>`;
       }
       h += `</tr>`;
