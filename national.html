@@ -15,7 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="css/national.css?v=41">
+  <link rel="stylesheet" href="css/national.css?v=43">
 </head>
 <body>
 
@@ -160,25 +160,20 @@
       <button class="detail-tab" data-tab="audit" onclick="NationalApp.switchDetailTab('audit')">Online Presence</button>
     </div>
 
-    <!-- HEALTH TAB (1-on-1 Coaching Flow) -->
+    <!-- HEALTH TAB (1-on-1 Coaching Flow) — 2-column: cards | trends -->
     <div id="tab-health" class="detail-tab-content">
-      <!-- Section 1: Headcount Check + Submit + Trend -->
-      <div id="health-headcount" class="coaching-section">
-        <!-- Active Reps, Leaders, Dist (calc), In Training + Submit btn -->
-      </div>
-      <div id="health-hc-trend" class="coaching-section">
-        <!-- Week-over-week headcount history table -->
-      </div>
-      <!-- Section 2: Production Review (Goal vs Actual) -->
-      <div id="health-production" class="coaching-section">
-        <!-- Total Units + Wireless Lines cards -->
-      </div>
-      <div id="health-prod-trend" class="coaching-section">
-        <!-- Week-over-week production history table -->
-      </div>
-      <!-- Section 3: Set Goals (Next Week) -->
-      <div id="health-goals" class="coaching-section">
-        <!-- Total Units + Wireless Units goals for next week -->
+      <div class="health-grid">
+        <!-- LEFT COLUMN: Input / summary cards -->
+        <div class="health-col-left">
+          <div id="health-headcount" class="coaching-section"></div>
+          <div id="health-production" class="coaching-section"></div>
+          <div id="health-goals" class="coaching-section"></div>
+        </div>
+        <!-- RIGHT COLUMN: Trend charts -->
+        <div class="health-col-right">
+          <div id="health-hc-trend" class="coaching-section"></div>
+          <div id="health-prod-trend" class="coaching-section"></div>
+        </div>
       </div>
     </div>
 
@@ -223,7 +218,7 @@
      ═══════════════════════════════════════════════════════ -->
 <script src="js/national-config.js?v=13"></script>
 <script src="js/sheets-api.js?v=10"></script>
-<script src="js/national-app.js?v=65"></script>
+<script src="js/national-app.js?v=66"></script>
 
 </body>
 </html>

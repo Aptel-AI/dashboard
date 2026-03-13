@@ -455,6 +455,19 @@ input, select, textarea { font-family: inherit; }
    HEALTH TAB — 1-on-1 Coaching Flow
    ═══════════════════════════════════════════════════════ */
 
+/* Health tab 2-column grid: cards left, trends right */
+.health-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 20px;
+  align-items: start;
+}
+.health-col-left,
+.health-col-right {
+  display: flex;
+  flex-direction: column;
+}
+
 /* Coaching section wrapper */
 .coaching-section {
   background: var(--white);
@@ -1479,6 +1492,7 @@ td.cell-red    { background: #fecaca !important; color: #991b1b !important; }
   .kpi-row { grid-template-columns: repeat(2, 1fr); }
   .top-bar-title { display: none; }
   .top-bar-divider { display: none; }
+  .health-grid { grid-template-columns: 1fr; }
   .hc-grid { grid-template-columns: repeat(2, 1fr); }
   .prod-cards { grid-template-columns: 1fr; }
   .coaching-section { padding: 16px; }
