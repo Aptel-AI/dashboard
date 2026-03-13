@@ -1855,48 +1855,351 @@ const NationalApp = {
     return '';
   },
 
-  // ── Render production week-over-week trend table ──
+  // ── Render production week-over-week bar chart (newest-first, dynamic Y-axis) ──
   _renderProductionTrend(owner, ownerIdx) {
     const trendEl = document.getElementById('health-prod-trend');
     if (!trendEl) return;
 
-    const hist = owner.productionHistory || [];
-    if (!hist.length) {
-      trendEl.style.display = 'none';
-      return;
-    }
+    const rawHist = owner.productionHistory || [];
+    if (!rawHist.length) { trendEl.style.display = 'none'; return; }
     trendEl.style.display = '';
-    const isB2B = this.state.campaign === 'att-b2b';
 
-    trendEl.innerHTML = `
-      <div class="coaching-label">Week-over-Week Production</div>
-      <div class="data-table-wrap trend-scroll" id="prod-trend-scroll">
-        <table class="data-table prod-trend-table">
-          <thead>
-            <tr>
-              <th>Week</th>
-              <th class="num">Total Units</th>
-              ${isB2B ? '' : '<th class="num">Wireless Lines</th>'}
-            </tr>
-          </thead>
-          <tbody>
-            ${hist.map((r, i) => {
-              const prev = i > 0 ? hist[i - 1] : null;
-              return `
-                <tr>
-                  <td class="bold">${this._esc(r.date)}</td>
-                  <td class="num"><span class="prod-trend-actual">${r.tA}</span><span class="prod-trend-suffix"><span class="prod-trend-goal"> of ${r.tG}</span> ${this._trendArrow(r.tA, prev?.tA)}</span></td>
-                  ${isB2B ? '' : `<td class="num"><span class="prod-trend-actual">${r.wA}</span><span class="prod-trend-suffix"><span class="prod-trend-goal"> of ${r.wG}</span> ${this._trendArrow(r.wA, prev?.wA)}</span></td>`}
-                </tr>`;
-            }).join('')}
-          </tbody>
+    // Reverse so newest week is on the LEFT
+    const hist = [...rawHist].reverse();
+    const n = hist.length;
+
+    const shortDate = (d) => {
+      if (!d) return '';
+      const parts = String(d).split('/');
+      return parts.length >= 2 ? parts[0] + '/' + parts[1] : d;
+    };
+
+    // ── Layout constants (match headcount chart) ──
+    const VISIBLE = 5;
+    const YAXIS_W = 36;
+    const PAD_R = 10, PAD_T = 14, PAD_B = 28;
+    const BAR_R = 5;
+    const GAP = 0.14;
+    const MIN_LABEL_H = 14;
+    const svgH = 220;
+    const plotH = svgH - PAD_T - PAD_B;
+    const REF_W = 500;
+    const barAreaVisibleW = REF_W - YAXIS_W;
+    const slotW = barAreaVisibleW / VISIBLE;
+    const barAreaW = n * slotW + PAD_R;
+    const needsScroll = n > VISIBLE;
+    const barW = slotW * (1 - GAP);
+    const barOff = (slotW - barW) / 2;
+    const baseY = PAD_T + plotH;
+
+    // Store chart state for scroll-driven re-renders
+    this._prodData = { hist, ownerIdx, n, slotW, barW, barOff, barAreaW, barAreaVisibleW, plotH, PAD_T, PAD_R, BAR_R, GAP, MIN_LABEL_H, svgH, baseY, YAXIS_W, VISIBLE, shortDate };
+
+    // Compute initial yMax from visible bars (multiples of 5)
+    const visibleMax = this._getProdVisibleMax(0);
+    const yMax = Math.ceil(visibleMax / 5) * 5 || 5;
+    this._prodCurrentYMax = yMax;
+
+    const yAxisSvg = this._buildProdYAxisSvg(yMax);
+    const barsSvg = this._buildProdBarsSvg(yMax);
+
+    const displayW = needsScroll ? REF_W : (YAXIS_W + barAreaW);
+
+    // ── Build editable table (back side) ──
+    const tableRows = hist.map((r, i) => {
+      const origIdx = n - 1 - i;
+      const prev = i < n - 1 ? hist[i + 1] : null;
+      const arrow = this._trendArrow(r.tA, prev?.tA);
+      const pct = r.tG > 0 ? Math.round((r.tA / r.tG) * 100) : 0;
+      const pctClass = pct >= 100 ? 'pct-green' : pct >= 80 ? 'pct-yellow' : pct >= 60 ? 'pct-orange' : 'pct-red';
+      return `<tr>
+        <td class="bold">${this._esc(r.date)}</td>
+        <td class="num"><input type="number" class="hc-edit-input" value="${r.tA || 0}" min="0"
+          onchange="NationalApp._onProdTableEdit(${ownerIdx},${origIdx},'tA',this.value)">${arrow}</td>
+        <td class="num"><input type="number" class="hc-edit-input" value="${r.tG || 0}" min="0"
+          onchange="NationalApp._onProdTableEdit(${ownerIdx},${origIdx},'tG',this.value)"></td>
+        <td class="num"><span class="prod-pct-badge ${pctClass}">${pct}%</span></td>
+      </tr>`;
+    }).join('');
+
+    const tableHtml = `
+      <div class="data-table-wrap trend-scroll">
+        <table class="data-table">
+          <thead><tr>
+            <th>Week</th><th class="num">Actual</th><th class="num">Goal</th><th class="num">%</th>
+          </tr></thead>
+          <tbody>${tableRows}</tbody>
         </table>
       </div>`;
-    // Auto-scroll to bottom so most recent 5 weeks are visible
-    requestAnimationFrame(() => {
-      const el = document.getElementById('prod-trend-scroll');
-      if (el) el.scrollTop = el.scrollHeight;
+
+    // ── Assemble flip card (split Y-axis + scrollable bars) ──
+    trendEl.innerHTML = `
+      <div class="coaching-label">
+        Week-over-Week Production
+        <button class="flip-btn" onclick="NationalApp._flipProdCard()" title="Flip to ${this._prodFlipped ? 'chart' : 'table'} view">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
+      </div>
+      <div class="flip-card${this._prodFlipped ? ' flipped' : ''}" id="prod-flip-card">
+        <div class="flip-card-inner">
+          <div class="flip-card-front">
+            <div class="prod-chart-outer" style="position:relative; max-width:${displayW}px">
+              <div style="display:flex">
+                <svg id="prod-yaxis-svg" width="${YAXIS_W}" height="${svgH}" style="flex-shrink:0; background:var(--card-bg,#ddeaf5)">${yAxisSvg}</svg>
+                <div class="hc-chart-wrap" id="prod-chart-scroll" style="flex:1; min-width:0">
+                  <svg id="prod-bars-svg" width="${barAreaW}" height="${svgH}" overflow="hidden">${barsSvg}</svg>
+                </div>
+              </div>
+              <div class="hc-chart-tooltip" id="prod-chart-tt"></div>
+            </div>
+            <div class="hc-chart-legend">
+              <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-prod-actual"></span>Actual</span>
+              <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-prod-goal"></span>Goal</span>
+            </div>
+          </div>
+          <div class="flip-card-back">
+            ${tableHtml}
+          </div>
+        </div>
+      </div>`;
+
+    // Attach scroll listener for dynamic Y-axis rescaling
+    const scrollEl = document.getElementById('prod-chart-scroll');
+    if (scrollEl && needsScroll) {
+      this._prodScrollRaf = null;
+      scrollEl.addEventListener('scroll', () => {
+        if (this._prodScrollRaf) return;
+        this._prodScrollRaf = requestAnimationFrame(() => {
+          this._prodScrollRaf = null;
+          this._onProdScroll();
+        });
+      });
+    }
+  },
+
+  // ── Production dynamic Y-axis helpers ──
+  _prodCurrentYMax: 5,
+  _prodScrollRaf: null,
+  _prodData: null,
+
+  _getProdVisibleMax(scrollLeft) {
+    const d = this._prodData;
+    if (!d) return 5;
+    const firstVisible = Math.max(0, Math.floor(scrollLeft / d.slotW) - 1);
+    const lastVisible = Math.min(d.n - 1, Math.ceil((scrollLeft + d.barAreaVisibleW) / d.slotW));
+    let maxVal = 1;
+    for (let i = firstVisible; i <= lastVisible; i++) {
+      const r = d.hist[i];
+      const barTop = Math.max(r.tA || 0, r.tG || 0);
+      if (barTop > maxVal) maxVal = barTop;
+    }
+    return maxVal;
+  },
+
+  _onProdScroll() {
+    const scrollEl = document.getElementById('prod-chart-scroll');
+    if (!scrollEl || !this._prodData) return;
+    const visibleMax = this._getProdVisibleMax(scrollEl.scrollLeft);
+    const yMax = Math.ceil(visibleMax / 5) * 5 || 5;
+    if (yMax === this._prodCurrentYMax) return;
+    this._prodCurrentYMax = yMax;
+    const yAxisEl = document.getElementById('prod-yaxis-svg');
+    if (yAxisEl) yAxisEl.innerHTML = this._buildProdYAxisSvg(yMax);
+    const barsEl = document.getElementById('prod-bars-svg');
+    if (barsEl) barsEl.innerHTML = this._buildProdBarsSvg(yMax);
+  },
+
+  _buildProdYAxisSvg(yMax) {
+    const d = this._prodData;
+    if (!d) return '';
+    const yScale = d.plotH / yMax;
+    const step = yMax <= 10 ? 1 : yMax <= 30 ? 5 : 10;
+    let svg = '';
+    for (let val = 0; val <= yMax; val += step) {
+      const y = d.baseY - val * yScale;
+      svg += `<text x="${d.YAXIS_W - 6}" y="${y + 3.5}" text-anchor="end" fill="#b0b8c4" font-size="10" font-family="Inter,sans-serif">${val}</text>`;
+    }
+    return svg;
+  },
+
+  _buildProdBarsSvg(yMax) {
+    const d = this._prodData;
+    if (!d) return '';
+    const yScale = d.plotH / yMax;
+    const step = yMax <= 10 ? 1 : yMax <= 30 ? 5 : 10;
+    let svg = '';
+
+    // Gridlines
+    for (let val = 0; val <= yMax; val += step) {
+      const y = d.baseY - val * yScale;
+      svg += `<line x1="0" y1="${y}" x2="${d.barAreaW}" y2="${y}" stroke="#e8ecf1" stroke-width="0.7"/>`;
+    }
+
+    const roundTop = (x, y, w, h, r) => {
+      if (h <= 0) return '';
+      const cr = Math.min(r, h / 2, w / 2);
+      return `M${x},${y + h}L${x},${y + cr}Q${x},${y} ${x + cr},${y}L${x + w - cr},${y}Q${x + w},${y} ${x + w},${y + cr}L${x + w},${y + h}Z`;
+    };
+
+    const segLabel = (cx, segTop, segH, val, color) => {
+      if (segH < d.MIN_LABEL_H || !val) return '';
+      const ty = segTop + segH / 2 + 4;
+      return `<text x="${cx}" y="${ty}" text-anchor="middle" fill="${color}" font-size="11" font-weight="700" font-family="Inter,sans-serif">${val}</text>`;
+    };
+
+    d.hist.forEach((r, i) => {
+      const origIdx = d.n - 1 - i;
+      const actual = r.tA || 0;
+      const goal = r.tG || 0;
+      const x = i * d.slotW + d.barOff;
+      const cx = x + d.barW / 2;
+      const actualH = actual * yScale;
+      const goalH = goal * yScale;
+      const actualTop = d.baseY - actualH;
+
+      // Determine color based on goal attainment
+      const pct = goal > 0 ? (actual / goal) : 0;
+      const barColor = pct >= 1 ? '#22c55e' : pct >= 0.8 ? '#f0b429' : pct >= 0.6 ? '#f97316' : '#e53535';
+
+      // Actual bar (solid, color-coded)
+      if (actualH > 0) {
+        svg += `<path d="${roundTop(x, actualTop, d.barW, actualH, d.BAR_R)}" fill="${barColor}" opacity="0.85"/>`;
+        svg += segLabel(cx, actualTop, actualH, actual, '#fff');
+      }
+
+      // Goal marker line (dashed horizontal line at goal level)
+      if (goal > 0) {
+        const goalY = d.baseY - goalH;
+        svg += `<line x1="${x - 2}" y1="${goalY}" x2="${x + d.barW + 2}" y2="${goalY}" stroke="#6366f1" stroke-width="2" stroke-dasharray="4 2" opacity="0.7"/>`;
+      }
+
+      // Hover target
+      const topY = Math.min(actualTop, goal > 0 ? d.baseY - goalH : actualTop);
+      const totalH = d.baseY - topY;
+      svg += `<rect x="${x}" y="${Math.min(topY, d.baseY - 1)}" width="${d.barW}" height="${Math.max(totalH, 4)}" fill="transparent" style="cursor:pointer" onmouseenter="NationalApp._showProdTooltip(event,${origIdx},${d.ownerIdx})" onmouseleave="NationalApp._hideProdTooltip()"/>`;
+
+      // X-axis date label
+      svg += `<text x="${cx}" y="${d.svgH - 8}" text-anchor="middle" fill="#8a95a5" font-size="10" font-weight="600" font-family="Inter,sans-serif">${d.shortDate(r.date)}</text>`;
     });
+
+    return svg;
+  },
+
+  _prodFlipped: false,
+
+  _flipProdCard() {
+    this._prodFlipped = !this._prodFlipped;
+
+    // If flipping back to chart and table data was edited, re-render everything
+    if (!this._prodFlipped && this._prodDirty) {
+      this._prodDirty = false;
+      const ownerIdx = this._prodData?.ownerIdx;
+      if (ownerIdx !== undefined) {
+        const owner = this.state.owners[ownerIdx];
+        if (owner) {
+          this._renderProductionTrend(owner, ownerIdx);
+          return;
+        }
+      }
+    }
+
+    const card = document.getElementById('prod-flip-card');
+    if (card) card.classList.toggle('flipped', this._prodFlipped);
+    const btn = card?.parentElement?.querySelector('.flip-btn');
+    if (btn) btn.title = 'Flip to ' + (this._prodFlipped ? 'chart' : 'table') + ' view';
+  },
+
+  // ── Production table inline-edit helpers ──
+  _prodDirty: false,
+
+  _onProdTableEdit(ownerIdx, histIdx, field, value) {
+    const owner = this.state.owners[ownerIdx];
+    if (!owner) return;
+    const entry = owner.productionHistory[histIdx];
+    if (!entry) return;
+    entry[field] = parseInt(value) || 0;
+    // If editing the most recent entry, keep current production in sync
+    if (histIdx === owner.productionHistory.length - 1) {
+      if (field === 'tA') owner.production.totalActual = entry.tA;
+      if (field === 'tG') owner.production.totalGoal = entry.tG;
+    }
+    this._prodDirty = true;
+
+    // Update % badge live
+    const row = event?.target?.closest('tr');
+    if (row) {
+      const pctCell = row.querySelector('.prod-pct-badge');
+      if (pctCell) {
+        const pct = entry.tG > 0 ? Math.round((entry.tA / entry.tG) * 100) : 0;
+        const pctClass = pct >= 100 ? 'pct-green' : pct >= 80 ? 'pct-yellow' : pct >= 60 ? 'pct-orange' : 'pct-red';
+        pctCell.textContent = pct + '%';
+        pctCell.className = 'prod-pct-badge ' + pctClass;
+      }
+    }
+
+    // Debounced save to spreadsheet
+    const saveKey = `prod_${ownerIdx}_${histIdx}`;
+    if (this._hcSaveTimers?.[saveKey]) clearTimeout(this._hcSaveTimers[saveKey]);
+    if (!this._hcSaveTimers) this._hcSaveTimers = {};
+    this._hcSaveTimers[saveKey] = setTimeout(() => {
+      this._saveProdRow(owner, entry);
+      delete this._hcSaveTimers[saveKey];
+    }, 1200);
+  },
+
+  async _saveProdRow(owner, entry) {
+    const sheetName = owner._sheetName || owner.tab || owner.name;
+    try {
+      const resp = await fetch(NATIONAL_CONFIG.appsScriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          key: NATIONAL_CONFIG.apiKey,
+          action: 'updateProduction',
+          ownerName: sheetName,
+          date: entry.date,
+          productionLW: entry.tA || 0,
+          productionGoals: entry.tG || 0
+        })
+      });
+      const result = await resp.json();
+      if (result.error) console.warn('[Prod Save] Error:', result.error);
+      else console.log('[Prod Save] Saved', sheetName, entry.date);
+    } catch (err) {
+      console.warn('[Prod Save] Network error:', err.message);
+    }
+  },
+
+  // ── Production chart tooltip helpers ──
+  _showProdTooltip(event, origIdx, ownerIdx) {
+    const owner = this.state.owners[ownerIdx];
+    if (!owner) return;
+    const r = owner.productionHistory[origIdx];
+    if (!r) return;
+    const pct = r.tG > 0 ? Math.round((r.tA / r.tG) * 100) : 0;
+    const tt = document.getElementById('prod-chart-tt');
+    if (!tt) return;
+
+    tt.innerHTML = `
+      <div style="font-weight:700;margin-bottom:4px">${this._esc(r.date)}</div>
+      <div><span class="tt-swatch" style="background:#22c55e"></span>Actual: <strong>${r.tA}</strong></div>
+      <div><span class="tt-swatch" style="background:#6366f1;border-radius:0;height:2px;width:10px;border-top:2px dashed #6366f1;background:none"></span>Goal: <strong>${r.tG}</strong></div>
+      <div style="border-top:1px solid rgba(255,255,255,0.2);margin:4px 0;padding-top:4px">${pct}% of goal</div>`;
+
+    tt.classList.add('visible');
+    const outer = tt.closest('.prod-chart-outer');
+    if (!outer) return;
+    const rect = outer.getBoundingClientRect();
+    const bar = event.target.getBoundingClientRect();
+    let left = bar.left - rect.left + bar.width / 2 - tt.offsetWidth / 2;
+    left = Math.max(4, Math.min(left, rect.width - tt.offsetWidth - 4));
+    tt.style.left = left + 'px';
+    tt.style.top = (bar.top - rect.top - tt.offsetHeight - 6) + 'px';
+  },
+
+  _hideProdTooltip() {
+    const tt = document.getElementById('prod-chart-tt');
+    if (tt) tt.classList.remove('visible');
   },
 
   // ── Goal input handler ──
