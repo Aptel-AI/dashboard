@@ -3466,7 +3466,7 @@ const NationalApp = {
       return;
     }
 
-    const weeks = data.weeks || [];
+    const weeks = [...(data.weeks || [])].reverse();   // newest-first
     const rows = data.rows || [];
     const leaders = data.leaders || 0;
 
@@ -3486,7 +3486,7 @@ const NationalApp = {
       <th class="rt-group-total">Total / Month<br>Overview</th>
     </tr>`;
 
-    // Date header row
+    // Date header row (already reversed)
     html += `<tr class="rt-date-row">
       <th></th>
       <th></th>
@@ -3502,8 +3502,9 @@ const NationalApp = {
       html += `<td>${this._esc(row.label)}</td>`;
       html += `<td class="rt-projected">${this._fmtCell(row.projected, row.isRate)}</td>`;
 
-      // Weekly values with conditional coloring
-      row.values.forEach(val => {
+      // Weekly values with conditional coloring (reversed: newest-first)
+      const vals = [...row.values].reverse();
+      vals.forEach(val => {
         const color = this._cellColor(val, row.projected, row.isRate, ri);
         html += `<td class="${color}">${this._fmtCell(val, row.isRate)}</td>`;
       });
