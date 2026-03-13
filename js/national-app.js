@@ -1447,7 +1447,7 @@ const NationalApp = {
     }
   },
 
-  // ── Render headcount week-over-week bar chart (scrollable, newest-first) ──
+  // ── Render headcount week-over-week bar chart (newest-first, responsive) ──
   _renderHeadcountTrend(owner, ownerIdx) {
     const trendEl = document.getElementById('health-hc-trend');
     if (!trendEl) return;
@@ -1466,15 +1466,31 @@ const NationalApp = {
       return parts.length >= 2 ? parts[0] + '/' + parts[1] : d;
     };
 
-    // ── Layout — fixed bar width, scrollable ──
-    const AXIS_W = 32;           // y-axis label column (separate from scroll area)
-    const PAD_R = 8, PAD_T = 12, PAD_B = 24;
-    const BAR_R = 3;
-    const GAP = 0.15;
-    const SLOT_W = 48;           // fixed slot width per bar
-    const barAreaW = n * SLOT_W + PAD_R;
-    const svgH = 180;
+    // ── Layout ──
+    // Single SVG with viewBox. Fills container width naturally.
+    // If many bars, becomes scrollable with a minimum bar width.
+    const PAD_L = 36, PAD_R = 10, PAD_T = 14, PAD_B = 28;
+    const BAR_R = 4;
+    const GAP = 0.18;
+    const MIN_SLOT = 56;        // bars never narrower than this
+    const IDEAL_SLOT = 72;      // ideal bar slot width at comfortable density
+    const MAX_FIT = 14;         // bars that fit before scrolling kicks in
+
+    // Determine slot width: fill the space when ≤MAX_FIT bars, fixed when more
+    // Use a virtual 700px reference width for the viewBox
+    const REF_W = 700;
+    const plotSpace = REF_W - PAD_L - PAD_R;
+    let slotW;
+    if (n <= MAX_FIT) {
+      slotW = Math.min(IDEAL_SLOT, plotSpace / n);
+    } else {
+      slotW = MIN_SLOT;
+    }
+
+    const svgW = PAD_L + n * slotW + PAD_R;
+    const svgH = 220;
     const plotH = svgH - PAD_T - PAD_B;
+    const needsScroll = svgW > REF_W;
 
     // ── Y-axis scale ──
     const maxVal = Math.max(...hist.map(r => (r.active || 0) + (r.training || 0)), 1);
@@ -1483,8 +1499,8 @@ const NationalApp = {
     const baseY = PAD_T + plotH;
 
     // ── Bar geometry ──
-    const barW = SLOT_W * (1 - GAP);
-    const barOff = (SLOT_W - barW) / 2;
+    const barW = slotW * (1 - GAP);
+    const barOff = (slotW - barW) / 2;
 
     const roundTop = (x, y, w, h, r) => {
       if (h <= 0) return '';
@@ -1493,29 +1509,21 @@ const NationalApp = {
              `L${x + w - cr},${y}Q${x + w},${y} ${x + w},${y + cr}L${x + w},${y + h}Z`;
     };
 
-    // ── Y-axis SVG (fixed, doesn't scroll) ──
-    let yAxisSvg = '';
+    let svg = '';
+
+    // ── Gridlines + Y-axis labels ──
     const ticks = 4;
     for (let t = 0; t <= ticks; t++) {
       const val = Math.round(yMax * t / ticks);
       const y = baseY - val * yScale;
-      yAxisSvg += `<text x="${AXIS_W - 4}" y="${y + 3}" text-anchor="end" fill="#b0b8c4" font-size="9" font-family="Inter,sans-serif">${val}</text>`;
+      svg += `<line x1="${PAD_L}" y1="${y}" x2="${svgW - PAD_R}" y2="${y}" stroke="#e8ecf1" stroke-width="0.7"/>`;
+      svg += `<text x="${PAD_L - 6}" y="${y + 3.5}" text-anchor="end" fill="#b0b8c4" font-size="10" font-family="Inter,sans-serif">${val}</text>`;
     }
-    yAxisSvg += `<text x="${AXIS_W - 4}" y="${baseY + 3}" text-anchor="end" fill="#b0b8c4" font-size="9" font-family="Inter,sans-serif">0</text>`;
+    svg += `<text x="${PAD_L - 6}" y="${baseY + 3.5}" text-anchor="end" fill="#b0b8c4" font-size="10" font-family="Inter,sans-serif">0</text>`;
 
-    // ── Bar area SVG (scrollable) ──
-    let barSvg = '';
-
-    // Gridlines span full bar area
-    for (let t = 0; t <= ticks; t++) {
-      const val = Math.round(yMax * t / ticks);
-      const y = baseY - val * yScale;
-      barSvg += `<line x1="0" y1="${y}" x2="${barAreaW}" y2="${y}" stroke="#e8ecf1" stroke-width="0.5"/>`;
-    }
-
-    // Bars — barIdx maps to reversed array, origIdx maps back to original for tooltip
+    // ── Bars ──
     hist.forEach((r, i) => {
-      const origIdx = rawHist.length - 1 - i; // map back to original array index
+      const origIdx = rawHist.length - 1 - i;
       const active = r.active || 0;
       const leaders = r.leaders || 0;
       const training = r.training || 0;
@@ -1524,7 +1532,7 @@ const NationalApp = {
       const distH = Math.max(dist, 0) * yScale;
       const solidH = active * yScale;
       const trainH = training * yScale;
-      const x = i * SLOT_W + barOff;
+      const x = PAD_L + i * slotW + barOff;
       const solidTop = baseY - solidH;
       const trainTop = solidTop - trainH;
 
@@ -1533,47 +1541,46 @@ const NationalApp = {
       // Leaders (bottom — blue)
       if (leaderH > 0) {
         if (topmost === 'leader') {
-          barSvg += `<path d="${roundTop(x, baseY - leaderH, barW, leaderH, BAR_R)}" fill="#5b9cf6" opacity="0.9"/>`;
+          svg += `<path d="${roundTop(x, baseY - leaderH, barW, leaderH, BAR_R)}" fill="#5b9cf6" opacity="0.9"/>`;
         } else {
-          barSvg += `<rect x="${x}" y="${baseY - leaderH}" width="${barW}" height="${leaderH}" fill="#5b9cf6" opacity="0.9"/>`;
+          svg += `<rect x="${x}" y="${baseY - leaderH}" width="${barW}" height="${leaderH}" fill="#5b9cf6" opacity="0.9"/>`;
         }
       }
 
       // Distributors (middle — teal)
       if (distH > 0) {
         if (topmost === 'dist') {
-          barSvg += `<path d="${roundTop(x, solidTop, barW, distH, BAR_R)}" fill="#0ea5a0" opacity="0.85"/>`;
+          svg += `<path d="${roundTop(x, solidTop, barW, distH, BAR_R)}" fill="#0ea5a0" opacity="0.85"/>`;
         } else {
-          barSvg += `<rect x="${x}" y="${solidTop}" width="${barW}" height="${distH}" fill="#0ea5a0" opacity="0.85"/>`;
+          svg += `<rect x="${x}" y="${solidTop}" width="${barW}" height="${distH}" fill="#0ea5a0" opacity="0.85"/>`;
         }
       }
 
       // Training extension (dashed purple)
       if (trainH > 0) {
-        barSvg += `<path d="${roundTop(x + 0.5, trainTop + 0.5, barW - 1, trainH - 1, BAR_R)}" fill="rgba(139,92,246,0.06)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 2"/>`;
+        svg += `<path d="${roundTop(x + 0.5, trainTop + 0.5, barW - 1, trainH - 1, BAR_R)}" fill="rgba(139,92,246,0.06)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 2"/>`;
       }
 
-      // Hover target — uses origIdx so tooltip reads from original headcountHistory
+      // Hover target
       const totalH = solidH + trainH;
       const topY = trainH > 0 ? trainTop : solidTop;
-      barSvg += `<rect x="${x}" y="${Math.min(topY, baseY - 1)}" width="${barW}" height="${Math.max(totalH, 4)}" fill="transparent" style="cursor:pointer" onmouseenter="NationalApp._showHcTooltip(event,${origIdx},${ownerIdx})" onmouseleave="NationalApp._hideHcTooltip()"/>`;
+      svg += `<rect x="${x}" y="${Math.min(topY, baseY - 1)}" width="${barW}" height="${Math.max(totalH, 4)}" fill="transparent" style="cursor:pointer" onmouseenter="NationalApp._showHcTooltip(event,${origIdx},${ownerIdx})" onmouseleave="NationalApp._hideHcTooltip()"/>`;
 
       // X-axis date label
-      barSvg += `<text x="${x + barW / 2}" y="${svgH - 6}" text-anchor="middle" fill="#8a95a5" font-size="9" font-weight="600" font-family="Inter,sans-serif">${shortDate(r.date)}</text>`;
+      svg += `<text x="${x + barW / 2}" y="${svgH - 8}" text-anchor="middle" fill="#8a95a5" font-size="10" font-weight="600" font-family="Inter,sans-serif">${shortDate(r.date)}</text>`;
     });
 
-    // ── Assemble: Y-axis fixed on left, bar area scrollable, tooltip on outer ──
+    // ── Assemble ──
+    // When bars fit: SVG fills container via viewBox (responsive).
+    // When too many: fixed-width SVG inside scrollable wrapper.
+    const svgAttrs = needsScroll
+      ? `viewBox="0 0 ${svgW} ${svgH}" width="${svgW}" height="${svgH}"`
+      : `viewBox="0 0 ${svgW} ${svgH}" preserveAspectRatio="xMidYMid meet"`;
+
     trendEl.innerHTML = `
       <div class="coaching-label">Week-over-Week Headcount</div>
-      <div class="hc-chart-outer">
-        <svg class="hc-chart-yaxis" viewBox="0 0 ${AXIS_W} ${svgH}" width="${AXIS_W}" height="${svgH}">
-          ${yAxisSvg}
-        </svg>
-        <div class="hc-chart-scroll">
-          <svg viewBox="0 0 ${barAreaW} ${svgH}" width="${barAreaW}" height="${svgH}">
-            ${barSvg}
-          </svg>
-        </div>
+      <div class="hc-chart-wrap${needsScroll ? ' hc-chart-scrollable' : ''}">
+        <svg ${svgAttrs}>${svg}</svg>
         <div class="hc-chart-tooltip" id="hc-chart-tt"></div>
       </div>
       <div class="hc-chart-legend">

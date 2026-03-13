@@ -552,30 +552,29 @@ input, select, textarea { font-family: inherit; }
 }
 .hc-submit-note.show { opacity: 1; }
 
-/* ── Headcount Trend Chart (scrollable, fixed y-axis) ── */
-.hc-chart-outer {
+/* ── Headcount Trend Chart ── */
+.hc-chart-wrap {
   position: relative;
-  display: flex;
-  align-items: flex-start;
   width: 100%;
 }
-.hc-chart-yaxis {
-  flex-shrink: 0;
+.hc-chart-wrap svg {
   display: block;
+  width: 100%;
+  height: auto;
 }
-.hc-chart-scroll {
-  flex: 1;
+/* Scrollable mode: when bars overflow, enable horizontal scroll */
+.hc-chart-wrap.hc-chart-scrollable {
   overflow-x: auto;
   overflow-y: hidden;
-  /* Subtle scrollbar */
   scrollbar-width: thin;
   scrollbar-color: rgba(0,0,0,0.15) transparent;
 }
-.hc-chart-scroll::-webkit-scrollbar { height: 5px; }
-.hc-chart-scroll::-webkit-scrollbar-track { background: transparent; }
-.hc-chart-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 3px; }
-.hc-chart-scroll svg {
-  display: block;
+.hc-chart-wrap.hc-chart-scrollable::-webkit-scrollbar { height: 5px; }
+.hc-chart-wrap.hc-chart-scrollable::-webkit-scrollbar-track { background: transparent; }
+.hc-chart-wrap.hc-chart-scrollable::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 3px; }
+.hc-chart-wrap.hc-chart-scrollable svg {
+  width: auto;        /* use explicit width attr, not 100% */
+  height: auto;
 }
 
 /* Legend */
