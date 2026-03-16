@@ -15,7 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="css/national.css?v=64">
+  <link rel="stylesheet" href="css/national.css?v=65">
 </head>
 <body>
 
@@ -81,12 +81,24 @@
     </div>
   </header>
 
+  <!-- CAMPAIGN LANDING PAGE -->
+  <section id="campaign-landing" class="campaign-landing">
+    <div class="landing-header">
+      <h1 class="landing-title">Campaigns</h1>
+      <p class="landing-subtitle">Select a campaign to view owner coaching data</p>
+    </div>
+    <div id="campaign-cards" class="campaign-cards-grid"></div>
+  </section>
+
   <!-- CAMPAIGN OVERVIEW -->
-  <section class="campaign-overview">
+  <section class="campaign-overview" style="display:none">
     <div class="overview-header">
       <div class="overview-header-top">
         <div>
-          <h1 id="campaign-title">AT&T B2B Campaign</h1>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="back-btn" onclick="NationalApp.backToLanding()" title="Back to campaigns">←</button>
+            <h1 id="campaign-title">AT&T B2B Campaign</h1>
+          </div>
           <p id="campaign-subtitle">Week-over-week owner review</p>
           <div class="overview-date" id="overview-date"></div>
         </div>
@@ -220,7 +232,7 @@
      ═══════════════════════════════════════════════════════ -->
 <script src="js/national-config.js?v=14"></script>
 <script src="js/sheets-api.js?v=10"></script>
-<script src="js/national-app.js?v=85"></script>
+<script src="js/national-app.js?v=86"></script>
 
 </body>
 </html>

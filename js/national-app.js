@@ -30,8 +30,21 @@ const NationalApp = {
     { label: 'New Start Retention', isRate: true }
   ],
 
+  // ── Campaign logo map (key → logo path) ──
+  CAMPAIGN_LOGOS: {
+    'att-b2b':         'references/logos/logo-att.png',
+    'att-nds':         'references/logos/logo-att.png',
+    'att-res':         'references/logos/logo-att.png',
+    'frontier':        'references/logos/logo-frontier.png',
+    'frontier-retail': 'references/logos/logo-frontier.png',
+    'leafguard':       'references/logos/logo-leafguard.png',
+    'rogers':          'references/logos/logo-rogers.png',
+    'truconnect':      'references/logos/logo-truconnect.png',
+    'verizon':         'references/logos/logo-verizon.png'
+  },
+
   state: {
-    campaign: 'att-b2b',
+    campaign: null,
     owners: [],
     selectedOwner: null,
     currentTab: 'health',
@@ -53,22 +66,19 @@ const NationalApp = {
       this._showLogin();
       return;
     }
-    this._showLoading('Loading campaign data...');
     document.getElementById('user-name').textContent = this.state.session.name || this.state.session.email;
 
+    // Fetch recruiting data to discover all campaigns, then show landing page
+    this._showLoading('Loading campaigns...');
     try {
-      await this.loadCampaignData(this.state.campaign);
-      this._hideLoading();
-      document.getElementById('dashboard').style.display = 'block';
-      this.renderCampaignOverview();
-      this.renderOwnersList();
+      // Kick off one recruiting fetch to populate _allCampaignsData
+      await this.loadCampaignData('att-b2b');
     } catch (err) {
-      console.error('[NationalApp] init error:', err);
-      this._hideLoading();
-      document.getElementById('dashboard').style.display = 'block';
-      this.renderCampaignOverview();
-      this.renderOwnersList();
+      console.warn('[NationalApp] Initial campaign fetch failed:', err.message);
     }
+    this._hideLoading();
+    document.getElementById('dashboard').style.display = 'block';
+    this._showLandingPage();
   },
 
   // ══════════════════════════════════════════════════
@@ -1105,15 +1115,65 @@ const NationalApp = {
   },
 
   // ══════════════════════════════════════════════════
-  // CAMPAIGN SWITCHING
+  // CAMPAIGN LANDING PAGE
   // ══════════════════════════════════════════════════
 
-  async switchCampaign(campaignKey) {
+  _showLandingPage() {
+    // Build campaign cards from cached data or config
+    const campaigns = this._allCampaignsData || {};
+    const configCampaigns = NATIONAL_CONFIG.campaigns || {};
+    // Merge: backend campaigns + config campaigns
+    const allKeys = new Set([...Object.keys(campaigns), ...Object.keys(configCampaigns)]);
+
+    const container = document.getElementById('campaign-cards');
+    if (!container) return;
+
+    // Sort by label
+    const sorted = [...allKeys].sort((a, b) => {
+      const la = (campaigns[a]?.label || configCampaigns[a]?.label || a).toLowerCase();
+      const lb = (campaigns[b]?.label || configCampaigns[b]?.label || b).toLowerCase();
+      return la.localeCompare(lb);
+    });
+
+    container.innerHTML = sorted.map(key => {
+      const label = campaigns[key]?.label || configCampaigns[key]?.label || key;
+      const logo = this.CAMPAIGN_LOGOS[key];
+      const ownerCount = campaigns[key]?.owners?.length || 0;
+
+      const logoHtml = logo
+        ? `<img src="${logo}" alt="${this._esc(label)}" class="campaign-card-logo">`
+        : `<div class="campaign-card-logo placeholder">📊</div>`;
+
+      return `
+        <div class="campaign-card" onclick="NationalApp.selectCampaign('${key}')">
+          ${logoHtml}
+          <div class="campaign-card-name">${this._esc(label)}</div>
+          ${ownerCount ? `<div class="campaign-card-owners">${ownerCount} owner${ownerCount !== 1 ? 's' : ''}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    // Show landing, hide campaign detail views
+    document.getElementById('campaign-landing').style.display = '';
+    document.querySelector('.campaign-overview').style.display = 'none';
+    document.querySelector('.owners-section').style.display = 'none';
+    document.getElementById('owner-detail').style.display = 'none';
+  },
+
+  async selectCampaign(campaignKey) {
     this.state.campaign = campaignKey;
     this.state.selectedOwner = null;
-    this._showLoading('Switching campaign...');
+
+    // Update the dropdown to match
+    const select = document.getElementById('campaign-select');
+    if (select) select.value = campaignKey;
+
+    // Hide landing, show campaign view
+    document.getElementById('campaign-landing').style.display = 'none';
+    document.querySelector('.campaign-overview').style.display = '';
+    document.querySelector('.owners-section').style.display = '';
+
+    this._showLoading('Loading campaign data...');
     try {
-      // loadCampaignData will use cached _allCampaignsData if available
       await this.loadCampaignData(campaignKey);
     } catch (err) {
       console.error('Failed to load campaign:', err);
@@ -1121,9 +1181,18 @@ const NationalApp = {
     this._hideLoading();
     this.renderCampaignOverview();
     this.renderOwnersList();
-    document.getElementById('owner-detail').style.display = 'none';
-    document.querySelector('.campaign-overview').style.display = '';
-    document.querySelector('.owners-section').style.display = '';
+  },
+
+  // ── Back to landing page ──
+  backToLanding() {
+    this.state.campaign = null;
+    this.state.selectedOwner = null;
+    this._showLandingPage();
+  },
+
+  // ── Legacy dropdown switcher (still works from top bar) ──
+  async switchCampaign(campaignKey) {
+    await this.selectCampaign(campaignKey);
   },
 
   // ══════════════════════════════════════════════════
