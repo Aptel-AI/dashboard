@@ -1162,10 +1162,17 @@ const NationalApp = {
         ? `<img src="${logo}" alt="${this._esc(label)}" class="campaign-card-logo">`
         : `<div class="campaign-card-logo placeholder">📊</div>`;
 
+      // Extract variant tag if label has "Brand: Variant" format
+      const colonIdx = label.indexOf(':');
+      const variant = colonIdx > 0 ? label.substring(colonIdx + 1).trim() : '';
+      const variantHtml = variant
+        ? `<div class="campaign-card-variant">${this._esc(variant)}</div>`
+        : '';
+
       return `
         <div class="campaign-card" onclick="NationalApp.selectCampaign('${key}')">
           ${logoHtml}
-          <div class="campaign-card-name">${this._esc(label)}</div>
+          ${variantHtml}
           ${ownerCount ? `<div class="campaign-card-owners">${ownerCount} owner${ownerCount !== 1 ? 's' : ''}</div>` : ''}
         </div>`;
     }).join('');
