@@ -473,35 +473,6 @@ const NationalApp = {
     }
   },
 
-  // ── Import NDS headcount data into local sheet ──
-  async importNDSHeadcount() {
-    const btn = document.getElementById('btn-import-nds');
-    if (btn) { btn.disabled = true; btn.textContent = 'Importing NDS...'; }
-
-    try {
-      const resp = await fetch(NATIONAL_CONFIG.appsScriptUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          key: NATIONAL_CONFIG.apiKey,
-          action: 'importNDSHeadcount'
-        })
-      });
-      const result = await resp.json();
-      if (result.error) throw new Error(result.error);
-
-      console.log('[NationalApp] NDS import complete:', result);
-      if (btn) { btn.textContent = `Imported ${result.ownersImported} owners (${result.rowsWritten} rows)`; }
-
-      // Reload to pick up the freshly imported data
-      await this.loadCampaignData(this.state.campaign);
-      this.renderDashboard();
-    } catch (err) {
-      console.error('[NationalApp] NDS import failed:', err);
-      if (btn) { btn.disabled = false; btn.textContent = 'Import Failed — Retry'; }
-    }
-  },
-
   // ── Enrich B2B owners with NLR headcount/production data ──
   // Uses fuzzy name matching: NLR tabs have full names (e.g., "Alex Badawi"),
   // while recruiting data may have short names (e.g., "Jay T", "Mason").
@@ -1286,13 +1257,6 @@ const NationalApp = {
     document.getElementById('kpi-starts').textContent = t.newStarts || '—';
     document.getElementById('kpi-retention').textContent = t.retention || '—';
     document.getElementById('kpi-production').textContent = t.production || '—';
-
-    // Show/hide NDS import button based on campaign
-    const ndsBtn = document.getElementById('btn-import-nds');
-    if (ndsBtn) {
-      const isNDS = this.state.campaign.indexOf('nds') >= 0 || this.state.campaign.indexOf('NDS') >= 0;
-      ndsBtn.style.display = isNDS ? '' : 'none';
-    }
   },
 
   // ══════════════════════════════════════════════════
