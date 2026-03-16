@@ -38,6 +38,7 @@ const NationalApp = {
     'frontier':        'references/logos/logo-frontier.png',
     'frontier-retail': 'references/logos/logo-frontier.png',
     'leafguard':       'references/logos/logo-leafguard.png',
+    'lumen':           'references/logos/logo-lumen.png',
     'rogers':          'references/logos/logo-rogers.png',
     'truconnect':      'references/logos/logo-truconnect.png',
     'verizon':         'references/logos/logo-verizon.png'

@@ -1041,6 +1041,7 @@ var CAMPAIGN_DISPLAY_NAMES = {
   'frontier-retail':  'Frontier: Retail',
   'leafguard':        'LeafGuard',
   'rogers':           'Rogers',
+  'lumen':            'Lumen',
   'truconnect':       'TruConnect',
   'verizon':          'Verizon'
 };
@@ -1059,6 +1060,7 @@ function _campaignSlug(label) {
   if (lower.indexOf('rogers') >= 0) return 'rogers';
   if (lower.indexOf('leafguard') >= 0 || lower.indexOf('leaf guard') >= 0) return 'leafguard';
   if (lower.indexOf('truconnect') >= 0) return 'truconnect';
+  if (lower.indexOf('lumen') >= 0) return 'lumen';
   if (lower.indexOf('verizon') >= 0) return 'verizon';
   // Fallback: slugify
   var s = lower
