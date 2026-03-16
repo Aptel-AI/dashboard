@@ -2548,42 +2548,84 @@ function migrateFromExternal(body, ss) {
   log.push('[Migration] Source Order Log: ' + sourceRowCount + ' data rows');
 
   if (sourceRowCount > 0) {
-    // Ignite source column indices (0-based, 38 columns A–AL)
+    // ── Auto-detect column mapping from header row ──
+    var headers = sourceData[0].map(function(h) { return String(h).trim().toLowerCase(); });
+    log.push('[Migration] Source headers (' + headers.length + ' cols): ' + headers.slice(0, 10).join(', ') + '...');
+
+    // Build index map: find columns by header keywords
+    function findCol(keywords) {
+      for (var h = 0; h < headers.length; h++) {
+        var hdr = headers[h];
+        for (var k = 0; k < keywords.length; k++) {
+          if (hdr.indexOf(keywords[k]) >= 0) return h;
+        }
+      }
+      return -1;
+    }
+
     var IGN = {
-      PRODUCTION_POST: 0,
-      TIMESTAMP: 1,
-      EMAIL: 2,
-      DATE_OF_SALE: 3,
-      REP_NAME: 4,
-      TRAINEE: 5,           // "Did you train someone?" Yes/No
-      TRAINEE_NAME: 6,
-      CAMPAIGN: 7,           // "Which Campaign?" e.g. "AT&T: B2B", "Ooma"
-      DSI: 8,
-      ACCOUNT_NOTES: 9,
-      ACCOUNT_TYPE: 10,      // "Type of Account" Consumer/Business
-      AIR_SOLD: 11,          // "Was Internet Air Sold?" Yes/No
-      WIRELESS_SOLD: 12,     // "Were Wireless Lines Sold?" Yes/No
-      NEW_PHONES: 13,        // Quantity of New Phones
-      BYODS: 14,             // Quantity of BYODs
-      FIBER_SOLD: 15,        // "Was Fiber Optic Internet Sold?" Yes/No
-      FIBER_PACKAGE: 16,     // "Which Package Was Sold?"
-      INSTALL_DATE: 17,
-      VOIP_SOLD: 18,         // "Were VoIP Lines Sold?" Yes/No
-      VOIP_QTY: 19,          // Quantity Sold (VoIP)
-      DTV_SOLD: 20,          // "Was DIRECTV Sold?" Yes/No
-      DTV_PACKAGE: 21,       // Package Sold (DTV)
-      CLIENT_NAME: 22,
-      OOMA_PACKAGE: 23,      // Which Ooma package?
-      // 24-29: computed/display columns (not used)
-      FIBER_COUNTER: 30,     // 0/1
-      AIR_COUNTER: 31,       // 0/1
-      DTV_COUNTER: 32,       // 0/1
-      YES_COUNTER: 33,       // total yeses
-      NUM_LINES: 34,         // # of wireless lines
-      VOIP_COUNTER: 35,      // VoIP qty (may equal VOIP_QTY)
-      UNITS: 36,             // total units
-      UNITS_TODAY: 37        // units for today (not migrated)
+      PRODUCTION_POST: findCol(['production post']),
+      TIMESTAMP:       findCol(['timestamp']),
+      EMAIL:           findCol(['email']),
+      DATE_OF_SALE:    findCol(['date of sale']),
+      REP_NAME:        findCol(["representative's name", 'rep name', "representative"]),
+      TRAINEE:         findCol(['train someone', 'someone else', 'under someone']),
+      TRAINEE_NAME:    findCol(['whose codes', 'trainee name']),
+      CAMPAIGN:        findCol(['which campaign', 'campaign']),
+      DSI:             findCol(['dsi']),
+      ACCOUNT_NOTES:   findCol(['account notes', 'additional account']),
+      ACCOUNT_TYPE:    findCol(['type of account', 'account type']),
+      AIR_SOLD:        findCol(['internet air sold', 'air sold']),
+      WIRELESS_SOLD:   findCol(['wireless lines sold']),
+      NEW_PHONES:      findCol(['new phones', 'quantity of new']),
+      BYODS:           findCol(['byod']),
+      FIBER_SOLD:      findCol(['fiber optic internet sold', 'fiber sold']),
+      FIBER_PACKAGE:   findCol(['which package was sold', 'fiber package']),
+      INSTALL_DATE:    findCol(['install date']),
+      VOIP_SOLD:       findCol(['voip lines sold', 'voip sold']),
+      VOIP_QTY:        findCol(['quantity sold']),
+      DTV_SOLD:        findCol(['directv sold', 'dtv sold']),
+      DTV_PACKAGE:     findCol(['package sold']),
+      CLIENT_NAME:     findCol(['client name']),
+      OOMA_PACKAGE:    findCol(['ooma', 'which package was sold']),
+      FIBER_COUNTER:   findCol(['fiber counter']),
+      AIR_COUNTER:     findCol(['air counter']),
+      DTV_COUNTER:     findCol(['dtv counter']),
+      YES_COUNTER:     findCol(['yes counter']),
+      NUM_LINES:       findCol(['wireless counter', 'num lines', '# of lines']),
+      VOIP_COUNTER:    findCol(['voip counter', 'voip qty counter']),
+      UNITS:           findCol(['units']),         // matches first "units" column (not "units today")
+      UNITS_TODAY:     findCol(['units today'])
     };
+
+    // Fix: UNITS might match "Units Today" first — ensure it's the standalone "Units" column
+    if (IGN.UNITS >= 0 && IGN.UNITS === IGN.UNITS_TODAY) {
+      // Find the other "units" column that is NOT "units today"
+      for (var u = 0; u < headers.length; u++) {
+        if (headers[u] === 'units' || (headers[u].indexOf('units') >= 0 && headers[u].indexOf('today') < 0)) {
+          IGN.UNITS = u;
+          break;
+        }
+      }
+    }
+
+    // Fix: OOMA_PACKAGE and FIBER_PACKAGE may both match "which package was sold"
+    // OOMA is typically the later one (col 23+), FIBER is the earlier one (col 16-17)
+    if (IGN.OOMA_PACKAGE === IGN.FIBER_PACKAGE && IGN.OOMA_PACKAGE >= 0) {
+      // Find second occurrence
+      for (var op = IGN.FIBER_PACKAGE + 1; op < headers.length; op++) {
+        if (headers[op].indexOf('package') >= 0 && headers[op].indexOf('ooma') >= 0) {
+          IGN.OOMA_PACKAGE = op;
+          break;
+        }
+      }
+    }
+
+    log.push('[Migration] Column map: EMAIL=' + IGN.EMAIL + ', DATE=' + IGN.DATE_OF_SALE +
+      ', UNITS=' + IGN.UNITS + ', YES=' + IGN.YES_COUNTER +
+      ', AIR=' + IGN.AIR_COUNTER + ', FIBER=' + IGN.FIBER_COUNTER +
+      ', DTV=' + IGN.DTV_COUNTER + ', VOIP=' + IGN.VOIP_COUNTER +
+      ', CELL/LINES=' + IGN.NUM_LINES);
 
     var newRows = [];
     for (var i = 1; i < sourceData.length; i++) {
@@ -2591,48 +2633,56 @@ function migrateFromExternal(body, ss) {
       var email = String(src[IGN.EMAIL] || '').trim();
       if (!email) continue;  // skip blank rows
 
+      // Safe accessor — returns '' for missing columns (index = -1)
+      function g(idx) { return idx >= 0 ? (src[idx] || '') : ''; }
+      function gn(idx) { return idx >= 0 ? (Number(src[idx]) || 0) : 0; }
+
       // Normalize campaign: "AT&T: B2B" / "AT&T B2B" → "attb2b", "Ooma" → "ooma"
-      var rawCampaign = String(src[IGN.CAMPAIGN] || '').trim().toLowerCase();
+      var rawCampaign = String(g(IGN.CAMPAIGN)).trim().toLowerCase();
       var campaign = 'attb2b';
       if (rawCampaign.indexOf('ooma') >= 0) campaign = 'ooma';
 
-      var newPhones = Number(src[IGN.NEW_PHONES]) || 0;
-      var byods = Number(src[IGN.BYODS]) || 0;
+      var newPhones = gn(IGN.NEW_PHONES);
+      var byods = gn(IGN.BYODS);
       var cell = newPhones + byods;
 
       // Use counter columns for binary flags (0/1)
-      var air = Number(src[IGN.AIR_COUNTER]) || 0;
-      var fiber = Number(src[IGN.FIBER_COUNTER]) || 0;
-      var dtv = Number(src[IGN.DTV_COUNTER]) || 0;
-      var voipQty = Number(src[IGN.VOIP_COUNTER]) || Number(src[IGN.VOIP_QTY]) || 0;
+      var air = gn(IGN.AIR_COUNTER);
+      var fiber = gn(IGN.FIBER_COUNTER);
+      var dtv = gn(IGN.DTV_COUNTER);
+      var voipQty = gn(IGN.VOIP_COUNTER) || gn(IGN.VOIP_QTY);
+
+      // If no dedicated wireless/cell counter, fall back to newPhones + byods
+      var cellFromCounter = gn(IGN.NUM_LINES);
+      if (cellFromCounter > 0 && cell === 0) cell = cellFromCounter;
 
       newRows.push([
-        src[IGN.TIMESTAMP] || '',                                  // 0  Timestamp
+        g(IGN.TIMESTAMP),                                           // 0  Timestamp
         email.toLowerCase(),                                        // 1  Email
-        String(src[IGN.REP_NAME] || '').trim(),                    // 2  Rep Name
-        src[IGN.DATE_OF_SALE] || '',                               // 3  Date of Sale
+        String(g(IGN.REP_NAME)).trim(),                            // 2  Rep Name
+        g(IGN.DATE_OF_SALE),                                       // 3  Date of Sale
         campaign,                                                   // 4  Campaign
-        String(src[IGN.DSI] || '').trim(),                         // 5  DSI
-        String(src[IGN.ACCOUNT_TYPE] || '').trim(),                // 6  Account Type
-        String(src[IGN.CLIENT_NAME] || '').trim(),                 // 7  Client Name
-        String(src[IGN.TRAINEE] || '').trim(),                     // 8  Trainee
-        String(src[IGN.TRAINEE_NAME] || '').trim(),                // 9  Trainee Name
+        String(g(IGN.DSI)).trim(),                                 // 5  DSI
+        String(g(IGN.ACCOUNT_TYPE)).trim(),                        // 6  Account Type
+        String(g(IGN.CLIENT_NAME)).trim(),                         // 7  Client Name
+        String(g(IGN.TRAINEE)).trim(),                             // 8  Trainee
+        String(g(IGN.TRAINEE_NAME)).trim(),                        // 9  Trainee Name
         air,                                                        // 10 Air
         newPhones,                                                  // 11 New Phones
         byods,                                                      // 12 BYODs
         cell,                                                       // 13 Cell
         fiber,                                                      // 14 Fiber
-        String(src[IGN.FIBER_PACKAGE] || '').trim(),               // 15 Fiber Package
-        src[IGN.INSTALL_DATE] || '',                                // 16 Install Date
+        String(g(IGN.FIBER_PACKAGE)).trim(),                       // 15 Fiber Package
+        g(IGN.INSTALL_DATE),                                       // 16 Install Date
         voipQty,                                                    // 17 VoIP Qty
         dtv,                                                        // 18 DTV
-        String(src[IGN.DTV_PACKAGE] || '').trim(),                 // 19 DTV Package
-        String(src[IGN.OOMA_PACKAGE] || '').trim(),                // 20 Ooma Package
-        String(src[IGN.ACCOUNT_NOTES] || '').trim(),               // 21 Account Notes
+        String(g(IGN.DTV_PACKAGE)).trim(),                         // 19 DTV Package
+        String(g(IGN.OOMA_PACKAGE)).trim(),                        // 20 Ooma Package
+        String(g(IGN.ACCOUNT_NOTES)).trim(),                       // 21 Account Notes
         '',                                                         // 22 Activation Support
         '',                                                         // 23 Team Emoji
-        Number(src[IGN.YES_COUNTER]) || 0,                         // 24 Yeses
-        Number(src[IGN.UNITS]) || 0,                               // 25 Units
+        gn(IGN.YES_COUNTER),                                       // 24 Yeses
+        gn(IGN.UNITS),                                             // 25 Units
         'Pending',                                                  // 26 Status
         '',                                                         // 27 Notes
         '',                                                         // 28 Paid Out
