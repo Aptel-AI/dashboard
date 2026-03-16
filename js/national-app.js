@@ -3166,7 +3166,7 @@ const NationalApp = {
     const repsEl = document.getElementById('sales-reps-table');
     if (s.reps.length) {
       const repHeaders = isNDS
-        ? `<th>Rep Name</th>
+        ? `<th style="width:30px"></th><th>Rep Name</th>
            <th class="num">New/Ports</th>
            <th class="num">Orders</th>
            <th class="num">Cancel %</th>
@@ -3180,7 +3180,7 @@ const NationalApp = {
            <th class="num">Away %</th>
            <th class="num">Before 3 %</th>
            <th class="num">After 7:30 %</th>`
-        : `<th>Rep Name</th>
+        : `<th style="width:30px"></th><th>Rep Name</th>
            <th class="num">Volume</th>
            <th class="num">Orders</th>
            <th class="num">Sales/Rep</th>
@@ -3196,8 +3196,9 @@ const NationalApp = {
            <th class="num">BYOD %</th>`;
 
       const repRows = isNDS
-        ? s.reps.map(rep => `
-            <tr>
+        ? s.reps.map((rep, ri) => `
+            <tr id="sales-rep-row-${ri}">
+              <td><input type="checkbox" class="rep-highlight-cb" onchange="NationalApp._toggleRepHighlight(${ri}, this.checked)"></td>
               <td class="bold">${this._esc(rep.name)}</td>
               <td class="num">${rep.newPorts || rep.totalVolume}</td>
               <td class="num">${rep.orderCount}</td>
@@ -3213,8 +3214,9 @@ const NationalApp = {
               <td class="num">${this._pct(rep.before3pmPct)}</td>
               <td class="num">${this._pct(rep.after730pmPct)}</td>
             </tr>`).join('')
-        : s.reps.map(rep => `
-            <tr>
+        : s.reps.map((rep, ri) => `
+            <tr id="sales-rep-row-${ri}">
+              <td><input type="checkbox" class="rep-highlight-cb" onchange="NationalApp._toggleRepHighlight(${ri}, this.checked)"></td>
               <td class="bold">${this._esc(rep.name)}</td>
               <td class="num">${rep.totalVolume}</td>
               <td class="num">${rep.orderCount}</td>
@@ -3251,6 +3253,19 @@ const NationalApp = {
             <div class="empty-state-text">No rep data yet. Click "Import Recruiting" to pull sales data from NLR.</div>
           </div>
         </div>`;
+    }
+  },
+
+  // ── Toggle rep row highlight (checkbox in sales table) ──
+  _toggleRepHighlight(rowIdx, checked) {
+    const row = document.getElementById('sales-rep-row-' + rowIdx);
+    if (!row) return;
+    if (checked) {
+      row.style.background = 'rgba(0, 200, 255, 0.12)';
+      row.style.fontWeight = '600';
+    } else {
+      row.style.background = '';
+      row.style.fontWeight = '';
     }
   },
 
