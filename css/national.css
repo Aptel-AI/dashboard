@@ -1587,11 +1587,18 @@ td.cell-red    { background: #e53935 !important; color: #000 !important; font-we
   text-decoration: underline;
 }
 .bis-section-banner .bis-link {
-  color: #ffffff;
-  margin-left: 4px;
+  color: var(--sc-cyan, #00c8ff);
+  margin-left: 6px;
+  font-size: 0.85em;
+  padding: 2px 8px;
+  border: 1px solid rgba(0, 200, 255, 0.5);
+  border-radius: 4px;
+  text-decoration: none;
 }
 .bis-section-banner .bis-link:hover {
-  color: var(--sc-cyan, #00c8ff);
+  background: rgba(0, 200, 255, 0.2);
+  color: #ffffff;
+  border-color: var(--sc-cyan, #00c8ff);
 }
 
 /* Sub-headers for website section */
