@@ -390,6 +390,7 @@ const Roster = {
           .filter(([key, val]) => {
             if (key === 'superadmin') return false;  // never assignable
             if (key === 'owner') return false;        // sourced from admin portal
+            if (key === 'qc') return false;            // assigned by QC Manager from admin portal only
             if (key === 'admin') return myRole === 'owner' || myRole === 'admin' || myRole === 'superadmin';
             return val.rank < myRank || myRole === 'superadmin';
           })
