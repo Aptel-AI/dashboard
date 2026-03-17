@@ -4458,7 +4458,15 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
       var healthRows = extractHealthRows_(data, sections.section1Start, sections.section1End, displayData);
 
       // Extract recruiting rows (Section 2 — transposed): [{date, metrics[12]}]
-      var recruitingRows = extractRecruitingRows_(data, sections.section2Start, sections.section2End);
+      // Fallback: if transposed Section 2 yields nothing, try horizontal columns in Section 1
+      var recruitingRows = [];
+      if (sections.section2Start >= 0) {
+        recruitingRows = extractRecruitingRows_(data, sections.section2Start, sections.section2End);
+      }
+      if (recruitingRows.length === 0) {
+        recruitingRows = extractHorizontalRecruitingRows_(data, sections.section1Start, sections.section1End);
+      }
+      Logger.log('consolidateCampaign_ ' + ownerName + ': s2Start=' + sections.section2Start + ', recruitingRows=' + recruitingRows.length + ', healthRows=' + healthRows.length);
 
       // Merge by date → flat output rows (campaign-aware product splitting)
       var merged = mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignKey);
@@ -4551,6 +4559,97 @@ function extractHealthRows_(data, start, end, displayData) {
 }
 
 /**
+ * Extract recruiting data from HORIZONTAL columns in Section 1 (same row as health data).
+ * Used when there is no separate Section 2 (e.g. Frontier tabs).
+ * Returns: [{ date: Date, metrics: [12 values matching CONSOLIDATED_RECRUITING_HEADERS order] }]
+ *
+ * Expected source columns (after health columns):
+ *   Calls Received / Applies Received, Sent to Call List / Sent to List,
+ *   1st Rounds Booked, 1st Rounds Showed, Turned to 2nd / Retention, Conversion,
+ *   2nd Rounds Booked, 2nd Rounds Showed, Retention,
+ *   New Start Scheduled / NS Booked, New Starts Showed / NS Showed, Retention
+ */
+function extractHorizontalRecruitingRows_(data, start, end) {
+  if (start < 0 || end < start) return [];
+
+  var headers = data[start].map(function(h) { return String(h).toLowerCase().trim(); });
+
+  Logger.log('extractHorizontalRecruiting_ headers: ' + JSON.stringify(headers));
+
+  // Find recruiting columns by header name
+  // Use nth-occurrence logic for "retention" (appears 3 times)
+  var colCalls = findCol(headers, ['calls received', 'applies received', 'applies']);
+  var colSentToList = findCol(headers, ['sent to call list', 'sent to list', 'no list']);
+  var col1stBooked = findCol(headers, ['1st rounds booked', '1st booked']);
+  var col1stShowed = findCol(headers, ['1st rounds showed', '1st showed']);
+  var colConversion = findCol(headers, ['conversion', 'turned to 2nd']);
+
+  // Find 2nd round columns (must contain "2nd")
+  var col2ndBooked = -1, col2ndShowed = -1;
+  for (var i = 0; i < headers.length; i++) {
+    if (headers[i].indexOf('2nd') >= 0 && headers[i].indexOf('book') >= 0) col2ndBooked = i;
+    if (headers[i].indexOf('2nd') >= 0 && headers[i].indexOf('show') >= 0) col2ndShowed = i;
+  }
+
+  // Find NS columns
+  var colNSBooked = -1, colNSShowed = -1;
+  for (var i = 0; i < headers.length; i++) {
+    if ((headers[i].indexOf('new start') >= 0 && (headers[i].indexOf('schedul') >= 0 || headers[i].indexOf('book') >= 0)) ||
+        (headers[i].indexOf('ns') >= 0 && headers[i].indexOf('book') >= 0)) colNSBooked = i;
+    if ((headers[i].indexOf('new start') >= 0 && headers[i].indexOf('show') >= 0) ||
+        (headers[i].indexOf('ns') >= 0 && headers[i].indexOf('show') >= 0)) colNSShowed = i;
+  }
+
+  // Find retention columns (up to 3 occurrences in order)
+  var retentionCols = [];
+  for (var i = 0; i < headers.length; i++) {
+    if (headers[i].indexOf('retention') >= 0) retentionCols.push(i);
+  }
+  var colRetention1 = retentionCols.length > 0 ? retentionCols[0] : -1;
+  var colRetention2 = retentionCols.length > 1 ? retentionCols[1] : -1;
+  var colRetention3 = retentionCols.length > 2 ? retentionCols[2] : -1;
+
+  // Check if we found any recruiting columns at all
+  var hasAny = col1stBooked >= 0 || col1stShowed >= 0 || col2ndBooked >= 0 || colNSBooked >= 0;
+  Logger.log('extractHorizontalRecruiting_ cols: 1stBooked=' + col1stBooked + ' 1stShowed=' + col1stShowed + ' conv=' + colConversion + ' 2ndBooked=' + col2ndBooked + ' hasAny=' + hasAny);
+  if (!hasAny) return [];
+
+  var dateCol = findCol(headers, ['dates', 'date']);
+  if (dateCol < 0) return [];
+
+  var result = [];
+  for (var i = start + 1; i <= end; i++) {
+    var row = data[i];
+    var dateVal = row[dateCol];
+    if (!dateVal) continue;
+    var d = (dateVal instanceof Date) ? dateVal : _parseTabDate(String(dateVal));
+    if (!d) continue;
+
+    var metrics = [
+      num(colCalls >= 0 ? row[colCalls] : 0),           // Calls Received
+      num(colSentToList >= 0 ? row[colSentToList] : 0),  // Sent to List
+      num(col1stBooked >= 0 ? row[col1stBooked] : 0),    // 1st Booked
+      num(col1stShowed >= 0 ? row[col1stShowed] : 0),    // 1st Showed
+      _pctNum(colRetention1 >= 0 ? row[colRetention1] : 0), // 1st Retention
+      _pctNum(colConversion >= 0 ? row[colConversion] : 0), // Conversion
+      num(col2ndBooked >= 0 ? row[col2ndBooked] : 0),    // 2nd Booked
+      num(col2ndShowed >= 0 ? row[col2ndShowed] : 0),    // 2nd Showed
+      _pctNum(colRetention2 >= 0 ? row[colRetention2] : 0), // 2nd Retention
+      num(colNSBooked >= 0 ? row[colNSBooked] : 0),      // NS Booked
+      num(colNSShowed >= 0 ? row[colNSShowed] : 0),      // NS Showed
+      _pctNum(colRetention3 >= 0 ? row[colRetention3] : 0)  // NS Retention
+    ];
+
+    var hasData = metrics.some(function(v) { return v !== 0; });
+    if (hasData) {
+      result.push({ date: d, metrics: metrics });
+    }
+  }
+
+  return result;
+}
+
+/**
  * Extract recruiting (Section 2) data by transposing metric-rows × date-columns.
  * Returns: [{ date: Date, metrics: [12 values matching RECRUITING_LABELS order] }]
  *
@@ -4597,7 +4696,7 @@ function extractRecruitingRows_(data, start, end) {
     if (!label) continue;
 
     if (label.indexOf('calls received') >= 0 || label.indexOf('applies') >= 0) metricsMap.callsReceived = data[i];
-    else if (label.indexOf('no list') >= 0 || label.indexOf('sent to list') >= 0) metricsMap.noList = data[i];
+    else if (label.indexOf('no list') >= 0 || label.indexOf('sent to call') >= 0 || label.indexOf('sent to list') >= 0) metricsMap.noList = data[i];
     else if ((label === 'booked' || (label.indexOf('1st') >= 0 && label.indexOf('book') >= 0)) && !metricsMap.booked) metricsMap.booked = data[i];
     else if ((label === 'showed' || (label.indexOf('1st') >= 0 && label.indexOf('show') >= 0)) && !metricsMap.showed) metricsMap.showed = data[i];
     else if (label.indexOf('retention') >= 0 && !metricsMap.retention1) metricsMap.retention1 = data[i];
@@ -4605,7 +4704,7 @@ function extractRecruitingRows_(data, start, end) {
     else if (label.indexOf('2nd') >= 0 && label.indexOf('book') >= 0) metricsMap.booked2 = data[i];
     else if (label.indexOf('2nd') >= 0 && label.indexOf('show') >= 0) metricsMap.showed2 = data[i];
     else if (label.indexOf('retention') >= 0 && metricsMap.retention1 && !metricsMap.retention2) metricsMap.retention2 = data[i];
-    else if (label.indexOf('start') >= 0 && label.indexOf('book') >= 0) metricsMap.startsBooked = data[i];
+    else if (label.indexOf('start') >= 0 && (label.indexOf('book') >= 0 || label.indexOf('schedul') >= 0)) metricsMap.startsBooked = data[i];
     else if (label.indexOf('start') >= 0 && label.indexOf('show') >= 0) metricsMap.startsShowed = data[i];
     else if (label.indexOf('start') >= 0 && label.indexOf('retention') >= 0) metricsMap.startRetention = data[i];
     else if (label.indexOf('retention') >= 0 && metricsMap.retention1 && metricsMap.retention2 && !metricsMap.retention3) metricsMap.retention3 = data[i];
@@ -4924,8 +5023,8 @@ function readConsolidatedRecruiting(weekCount, campaignFilter) {
         };
       }
 
-      // 12-value recruiting array
-      var recruitVals = [
+      // 12-value recruiting metrics
+      var metrics = [
         num(row[colCalls]),
         num(row[colSTL]),
         num(row[col1B]),
@@ -4969,17 +5068,19 @@ function readConsolidatedRecruiting(weekCount, campaignFilter) {
         }
       }
 
-      // Attach health data as extra property
-      recruitVals.health = {
-        active: num(row[colHC]),
-        leaders: num(row[colLeaders]),
-        dist: num(row[colDist]),
-        training: num(row[colTraining]),
-        production: productionData,
-        goals: productionData  // same object, keyed by product
+      // Store as object so health survives JSON.stringify
+      // (array properties are silently dropped by JSON.stringify)
+      weekMap[dateKey].data[owner] = {
+        metrics: metrics,
+        health: {
+          active: num(row[colHC]),
+          leaders: num(row[colLeaders]),
+          dist: num(row[colDist]),
+          training: num(row[colTraining]),
+          production: productionData,
+          goals: productionData
+        }
       };
-
-      weekMap[dateKey].data[owner] = recruitVals;
     }
 
     // Sort by date descending, limit to weekCount

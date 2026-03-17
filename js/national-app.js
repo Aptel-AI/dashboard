@@ -870,13 +870,22 @@ const NationalApp = {
     const allLabels = allWeeksChron.map(w => w.tabName);
 
     this.state.owners = ownerNames.map(name => {
+      // Helper: extract metrics array from owner data
+      // Handles both new format {metrics:[...], health:{...}} and legacy array format
+      const _getMetrics = (ownerData) => {
+        if (!ownerData) return new Array(12).fill(0);
+        if (Array.isArray(ownerData)) return ownerData; // legacy array format
+        if (ownerData.metrics) return ownerData.metrics; // new object format
+        return new Array(12).fill(0);
+      };
+
       // Campaign-level actuals (4 weeks) for aggregation
       const actuals4 = Array.from({ length: 12 }, () => []);
       for (let wi = 0; wi < campaignWeeks.length; wi++) {
         const weekData = campaignWeeks[wi].data || {};
-        const ownerVals = weekData[name] || new Array(12).fill(0);
+        const metrics = _getMetrics(weekData[name]);
         for (let ri = 0; ri < 12; ri++) {
-          actuals4[ri].push(ownerVals[ri] || 0);
+          actuals4[ri].push(metrics[ri] || 0);
         }
       }
 
@@ -884,24 +893,25 @@ const NationalApp = {
       const actualsFull = Array.from({ length: 12 }, () => []);
       for (let wi = 0; wi < allWeeksChron.length; wi++) {
         const weekData = allWeeksChron[wi].data || {};
-        const ownerVals = weekData[name] || new Array(12).fill(0);
+        const metrics = _getMetrics(weekData[name]);
         for (let ri = 0; ri < 12; ri++) {
-          actualsFull[ri].push(ownerVals[ri] || 0);
+          actualsFull[ri].push(metrics[ri] || 0);
         }
       }
 
-      // ── Extract health data (Section 1) from week data ──
-      // Health is attached to each week's owner vals as .health
-      // Use the most recent week's health for current values
+      // ── Extract health data from week data ──
+      // New format: ownerData is {metrics:[...], health:{...}}
+      // Legacy format: ownerData is array with .health property (lost in JSON)
       let latestHealth = {};
       const hcHistory = [];
       const prodHistory = [];
       // allWeeks is newest-first; allWeeksChron is oldest-first
       for (let wi = 0; wi < allWeeksChron.length; wi++) {
         const weekData = allWeeksChron[wi].data || {};
-        const ownerVals = weekData[name];
-        if (ownerVals && ownerVals.health) {
-          const h = ownerVals.health;
+        const ownerData = weekData[name];
+        const health = ownerData && (ownerData.health || null);
+        if (health) {
+          const h = health;
           latestHealth = h; // keep overwriting — last one is most recent
           hcHistory.push({
             date: allWeeksChron[wi].tabName,
