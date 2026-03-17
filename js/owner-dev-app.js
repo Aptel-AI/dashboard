@@ -1076,7 +1076,7 @@ const OwnerDev = {
       } else {
         const tabMapping = this._findCampaignTabMap(row.campaign, row.ownerName);
         const val = tabMapping?.tabName || '';
-        html += `<td class="cell-readonly">${val ? '<span class="readonly-value">' + this._esc(val) + '</span>' : '<span class="input-needed">Input Needed from Maddie</span>'}</td>`;
+        html += `<td class="cell-readonly">${val ? '<span class="readonly-value">' + this._esc(val) + '</span>' : '<span class="input-needed">Input Needed from Maddy</span>'}</td>`;
       }
 
       // Cam's Company column
