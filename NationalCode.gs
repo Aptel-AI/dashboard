@@ -3968,28 +3968,33 @@ function odLogin(email, pin, createPin) {
  */
 function odGetCamCompanies() {
   var ss = SpreadsheetApp.openById(SHEETS.PERFORMANCE_AUDIT);
-  var sheets = ss.getSheets();
-  if (!sheets.length) return { success: true, companies: [] };
 
-  var sheet = sheets[0];
+  // Use 'vlookup' tab (same as readOnlinePresence), fall back to first sheet
+  var sheet = ss.getSheetByName('vlookup') || ss.getSheets()[0];
+  if (!sheet) return { success: true, companies: [] };
+
   var data = sheet.getDataRange().getValues();
   if (data.length < 2) return { success: true, companies: [] };
 
-  // Find "Client Name" column by header text
-  var headers = data[0];
+  // Scan first 5 rows for "Client Name" header (header row may not be row 1)
+  var headerRowIdx = -1;
   var clientCol = -1;
-  for (var c = 0; c < headers.length; c++) {
-    var h = String(headers[c]).trim().toLowerCase();
-    if (h === 'client name') {
-      clientCol = c;
-      break;
+  for (var r = 0; r < Math.min(5, data.length); r++) {
+    for (var c = 0; c < data[r].length; c++) {
+      var h = String(data[r][c]).trim().toLowerCase();
+      if (h === 'client name') {
+        headerRowIdx = r;
+        clientCol = c;
+        break;
+      }
     }
+    if (headerRowIdx >= 0) break;
   }
   if (clientCol < 0) return { success: true, companies: [] };
 
   var seen = {};
   var companies = [];
-  for (var i = 1; i < data.length; i++) {
+  for (var i = headerRowIdx + 1; i < data.length; i++) {
     var val = String(data[i][clientCol] || '').trim();
     if (val && !seen[val]) {
       seen[val] = true;
