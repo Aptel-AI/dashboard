@@ -360,6 +360,13 @@ const NationalApp = {
     if (result.campaigns) {
       this._allCampaignsData = result.campaigns;
       console.log('[NationalApp] Cached campaigns:', Object.keys(result.campaigns), 'looking for:', campaignKey);
+      // DEBUG: Log per-campaign week counts and sample health data
+      for (const [ck, cv] of Object.entries(result.campaigns)) {
+        const wks = cv.weeks || [];
+        const sampleOwner = wks.length > 0 ? Object.keys(wks[0].data || {})[0] : null;
+        const sampleData = sampleOwner && wks[0].data[sampleOwner];
+        console.log(`[NationalApp] DEBUG ${ck}: ${cv.owners?.length || 0} owners, ${wks.length} weeks, sample health:`, sampleData?.health || 'none');
+      }
       // Dynamically populate campaign selector and config
       this._populateCampaignSelector(result.campaigns);
     }
