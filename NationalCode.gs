@@ -238,6 +238,9 @@ function doPost(e) {
       case 'odSaveMapping':
         result = odSaveMapping(body);
         break;
+      case 'odBatchSaveMappings':
+        result = odBatchSaveMappings(body);
+        break;
       case 'odSaveUser':
         result = odSaveUser(body);
         break;
@@ -4113,6 +4116,89 @@ function odSaveMapping(body) {
   }
 
   return { success: true };
+}
+
+/**
+ * action: 'odBatchSaveMappings'
+ * body: { mappings: [{ campaign, ownerName, camCompany?, nlrWorkbookId?, nlrWorkbookName?, nlrTab?, updatedBy }] }
+ * Efficiently saves multiple mappings in one call using batch sheet writes.
+ */
+function odBatchSaveMappings(body) {
+  var items = body.mappings;
+  if (!items || !items.length) return { success: true, saved: 0 };
+
+  var tabHeaders = ['campaign', 'ownerName', 'camCompany', 'nlrWorkbookId', 'nlrWorkbookName', 'nlrTab', 'updatedBy', 'updatedAt'];
+  var sheet = odGetOrCreateTab('_OD_Mappings', tabHeaders);
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+
+  // Build column index map
+  var colMap = {};
+  for (var c = 0; c < headers.length; c++) {
+    colMap[String(headers[c]).trim()] = c;
+  }
+
+  // Index existing rows by campaign|ownerName (lowercase) for fast lookup
+  var existingIndex = {};
+  for (var i = 1; i < data.length; i++) {
+    var key = String(data[i][colMap['campaign']] || '').trim().toLowerCase() + '|' +
+              String(data[i][colMap['ownerName']] || '').trim().toLowerCase();
+    existingIndex[key] = i + 1; // 1-based row number
+  }
+
+  var now = new Date().toISOString();
+  var newRows = [];
+  var updates = []; // [{ row, col, value }]
+
+  for (var j = 0; j < items.length; j++) {
+    var item = items[j];
+    var campaign = String(item.campaign || '').trim();
+    var ownerName = String(item.ownerName || '').trim();
+    if (!campaign || !ownerName) continue;
+
+    var key = campaign.toLowerCase() + '|' + ownerName.toLowerCase();
+    var updatedBy = String(item.updatedBy || 'auto-map').trim();
+
+    if (existingIndex[key]) {
+      // Update existing row
+      var rowNum = existingIndex[key];
+      if (item.camCompany !== undefined) updates.push({ row: rowNum, col: colMap['camCompany'] + 1, value: item.camCompany });
+      if (item.nlrWorkbookId !== undefined) updates.push({ row: rowNum, col: colMap['nlrWorkbookId'] + 1, value: item.nlrWorkbookId });
+      if (item.nlrWorkbookName !== undefined) updates.push({ row: rowNum, col: colMap['nlrWorkbookName'] + 1, value: item.nlrWorkbookName });
+      if (item.nlrTab !== undefined) updates.push({ row: rowNum, col: colMap['nlrTab'] + 1, value: item.nlrTab });
+      updates.push({ row: rowNum, col: colMap['updatedBy'] + 1, value: updatedBy });
+      updates.push({ row: rowNum, col: colMap['updatedAt'] + 1, value: now });
+    } else {
+      // New row
+      var newRow = [
+        campaign,
+        ownerName,
+        item.camCompany || '',
+        item.nlrWorkbookId || '',
+        item.nlrWorkbookName || '',
+        item.nlrTab || '',
+        updatedBy,
+        now
+      ];
+      newRows.push(newRow);
+      // Mark as existing in case of duplicates in same batch
+      existingIndex[key] = -1;
+    }
+  }
+
+  // Apply cell updates
+  for (var u = 0; u < updates.length; u++) {
+    sheet.getRange(updates[u].row, updates[u].col).setValue(updates[u].value);
+  }
+
+  // Append new rows in bulk
+  if (newRows.length > 0) {
+    var lastRow = sheet.getLastRow();
+    sheet.getRange(lastRow + 1, 1, newRows.length, tabHeaders.length).setValues(newRows);
+  }
+
+  SpreadsheetApp.flush();
+  return { success: true, saved: items.length, updated: updates.length > 0 ? 'yes' : 'no', appended: newRows.length };
 }
 
 /**

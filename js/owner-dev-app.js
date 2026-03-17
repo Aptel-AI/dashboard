@@ -500,21 +500,20 @@ const OwnerDev = {
       }
     }
 
-    // Save all auto-mapped values to backend (fire-and-forget, don't block UI)
+    // Batch-save all auto-mapped values in a single POST
     if (toSave.length > 0) {
       console.log(`[OwnerDev] Auto-mapped ${toSave.length} owners to Cam companies`);
       this._toast(`Auto-mapped ${toSave.length} owner${toSave.length > 1 ? 's' : ''} to companies`, 'success');
 
-      // Save in background (don't await all — just fire them)
-      for (const item of toSave) {
-        this._post('odSaveMapping', {
-          campaign: item.campaign,
-          ownerName: item.ownerName,
-          field: 'camCompany',
-          value: item.value,
-          updatedBy: 'auto-map'
-        }).catch(err => console.warn('[OwnerDev] Auto-map save error:', err.message));
-      }
+      const mappings = toSave.map(item => ({
+        campaign: item.campaign,
+        ownerName: item.ownerName,
+        camCompany: item.value,
+        updatedBy: 'auto-map'
+      }));
+      this._post('odBatchSaveMappings', { mappings })
+        .then(res => console.log('[OwnerDev] Batch save Cam result:', res))
+        .catch(err => console.warn('[OwnerDev] Batch save Cam error:', err.message));
     }
 
     return autoMapped;
@@ -574,18 +573,17 @@ const OwnerDev = {
     if (toSave.length > 0) {
       console.log(`[OwnerDev] Auto-mapped ${toSave.length} owners to NLR files`);
 
-      for (const item of toSave) {
-        // Save workbook
-        this._post('odSaveMapping', {
-          campaign: item.campaign,
-          ownerName: item.ownerName,
-          field: 'nlrWorkbook',
-          nlrWorkbookId: item.nlrWorkbookId,
-          nlrWorkbookName: item.nlrWorkbookName,
-          nlrTab: item.nlrTab,
-          updatedBy: 'auto-map'
-        }).catch(err => console.warn('[OwnerDev] Auto-map NLR save error:', err.message));
-      }
+      const mappings = toSave.map(item => ({
+        campaign: item.campaign,
+        ownerName: item.ownerName,
+        nlrWorkbookId: item.nlrWorkbookId,
+        nlrWorkbookName: item.nlrWorkbookName,
+        nlrTab: item.nlrTab,
+        updatedBy: 'auto-map'
+      }));
+      this._post('odBatchSaveMappings', { mappings })
+        .then(res => console.log('[OwnerDev] Batch save NLR result:', res))
+        .catch(err => console.warn('[OwnerDev] Batch save NLR error:', err.message));
     }
 
     return autoMapped;
