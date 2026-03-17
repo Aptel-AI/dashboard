@@ -2361,6 +2361,20 @@ const NationalApp = {
     const el = document.getElementById('owner-indeed-costs');
     if (!el) return;
 
+    // Check if owner is Non-Partner or unmapped for NLR
+    if (this._isNonPartner(owner.name, 'nlrWorkbookId') || this._isUnmapped(owner.name, 'nlrWorkbookId')) {
+      const bannerEl = document.getElementById('recruiting-banner');
+      if (bannerEl) bannerEl.innerHTML = '';
+      el.innerHTML = `
+        <div class="empty-state" style="padding:40px 20px;">
+          <div class="empty-state-icon">🚫</div>
+          <div class="empty-state-text" style="font-size:1.1rem;color:#4a7090;">
+            Not Utilizing NLR Services
+          </div>
+        </div>`;
+      return;
+    }
+
     // Render NLR banner above cost section
     this._renderNlrBanner();
 
@@ -2932,20 +2946,7 @@ const NationalApp = {
   },
 
   renderSalesTab(owner) {
-    // Check if owner is Non-Partner for NLR
-    if (this._isNonPartner(owner.name, 'nlrWorkbookId')) {
-      const summaryEl = document.getElementById('sales-summary');
-      if (summaryEl) summaryEl.innerHTML = `
-        <div class="empty-state" style="padding:40px 20px;">
-          <div class="empty-state-icon">🚫</div>
-          <div class="empty-state-text" style="font-size:1.1rem;color:#4a7090;">
-            Not Utilizing NLR Services
-          </div>
-        </div>`;
-      const detailEl = document.getElementById('sales-detail');
-      if (detailEl) detailEl.innerHTML = '';
-      return;
-    }
+    // Sales data comes from Tableau — no Non-Partner gate needed here
 
     const s = owner.sales;
     const sm = s.summary;
@@ -3125,7 +3126,7 @@ const NationalApp = {
         <div class="coaching-section">
           <div class="coaching-label">Rep Breakdown</div>
           <div class="empty-state">
-            <div class="empty-state-text">No rep data yet. Click "Import Recruiting" to pull sales data from NLR.</div>
+            <div class="empty-state-text">No rep data yet. Click "Refresh Data" to pull sales data from Tableau.</div>
           </div>
         </div>`;
     }
@@ -3165,13 +3166,31 @@ const NationalApp = {
     return (mapping[field] || '').toLowerCase() === 'non-partner';
   },
 
+  /**
+   * Check if an owner has NO mapping value for a specific column (not yet filled in).
+   * @param {string} ownerName
+   * @param {string} field - 'camCompany', 'nlrWorkbookId', or 'nlrTab'
+   * @returns {boolean}
+   */
+  _isUnmapped(ownerName, field) {
+    if (typeof OwnerDev === 'undefined' || !OwnerDev.state?.mappings) return true;
+    const campaign = this.state.campaign || '';
+    const mapping = OwnerDev.state.mappings.find(
+      m => m.campaign === campaign && (m.ownerName || '').toLowerCase() === (ownerName || '').toLowerCase()
+    );
+    if (!mapping) return true;
+    return !(mapping[field] || '').trim();
+  },
+
   renderAuditTab(owner) {
     const a = owner.audit;
     const bizList = a.businesses || [];
     const total = bizList.length;
 
-    // ── Check if owner is Non-Partner for BIS ──
-    if (this._isNonPartner(owner.name, 'camCompany')) {
+    // ── Check if owner is Non-Partner or unmapped for BIS ──
+    const bisNonPartner = this._isNonPartner(owner.name, 'camCompany');
+    const bisUnmapped = this._isUnmapped(owner.name, 'camCompany');
+    if (bisNonPartner || (bisUnmapped && !bizList.length)) {
       const grades = document.getElementById('audit-grades');
       grades.innerHTML = `
         <div class="bis-report-header">
