@@ -1237,12 +1237,31 @@ const NationalApp = {
         return null;
       }
       if (!data.owners || !data.owners.length) return null;
+      // Reject stale caches where owners have no real health data
+      const hasRealData = data.owners.some(o =>
+        (o.headcountHistory && o.headcountHistory.length > 0) ||
+        (o.headcount && o.headcount.active > 0)
+      );
+      if (!hasRealData) {
+        console.warn('[NationalApp] Rejecting stale coach cache (no health data):', campaignKey);
+        localStorage.removeItem('coach_cache_' + campaignKey);
+        return null;
+      }
       return data;
     } catch { return null; }
   },
 
   _writeCoachCampaignCache(campaignKey) {
     try {
+      // Only cache if owners have real data (not empty-weeks placeholders)
+      const hasRealData = this.state.owners.some(o =>
+        (o.headcountHistory && o.headcountHistory.length > 0) ||
+        (o.headcount && o.headcount.active > 0)
+      );
+      if (!hasRealData) {
+        console.warn('[NationalApp] Skipping coach cache write (no health data):', campaignKey);
+        return;
+      }
       localStorage.setItem('coach_cache_' + campaignKey, JSON.stringify({
         _ts: Date.now(),
         owners: this.state.owners,
