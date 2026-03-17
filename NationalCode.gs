@@ -3684,11 +3684,17 @@ function odGetCampaignOwners() {
       if (!sheets.length) continue;
       var firstTab = sheets[0];
       var data = firstTab.getDataRange().getValues();
-      // Skip header (row 0) and last row
+      // Skip header row, totals/sum/footer rows
       var owners = [];
-      for (var i = 1; i < data.length - 1; i++) {
+      for (var i = 1; i < data.length; i++) {
         var val = String(data[i][0] || '').trim();
-        if (val) owners.push(val);
+        if (!val) continue;
+        var valLower = val.toLowerCase();
+        if (valLower.indexOf('total') >= 0 || valLower.indexOf('template') >= 0 ||
+            valLower.indexOf('campaign') >= 0 || valLower.indexOf('summary') >= 0 ||
+            valLower.indexOf('sum') >= 0 || valLower.indexOf('***') >= 0 ||
+            valLower.indexOf('header') >= 0 || valLower.indexOf('average') >= 0) continue;
+        owners.push(val);
       }
       // Also collect all tab names (for campaign tab mapping dropdown)
       var tabNames = [];
@@ -4354,7 +4360,9 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
       if (!v) continue;
       var vLower = v.toLowerCase();
       if (vLower.indexOf('total') >= 0 || vLower.indexOf('template') >= 0 ||
-          vLower.indexOf('campaign') >= 0 || vLower.indexOf('summary') >= 0) continue;
+          vLower.indexOf('campaign') >= 0 || vLower.indexOf('summary') >= 0 ||
+          vLower.indexOf('sum') >= 0 || vLower.indexOf('***') >= 0 ||
+          vLower.indexOf('header') >= 0 || vLower.indexOf('average') >= 0) continue;
       ownerNames.push(v);
     }
   }
