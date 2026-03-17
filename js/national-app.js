@@ -33,7 +33,7 @@ const NationalApp = {
   // ── Campaign logo map (key → logo path) ──
   CAMPAIGN_LOGOS: {
     'att-b2b':         'references/logos/logo-att.png',
-    'att-nds':         'references/logos/logo-att.png',
+    'att-nds':         ['references/logos/logo-att.png', 'references/logos/logo-verizon.png'],
     'att-res':         'references/logos/logo-att.png',
     'frontier':        'references/logos/logo-frontier.png',
     'frontier-retail': 'references/logos/logo-frontier.png',
@@ -41,7 +41,8 @@ const NationalApp = {
     'lumen':           'references/logos/logo-lumen.png',
     'rogers':          'references/logos/logo-rogers.png',
     'truconnect':      'references/logos/logo-truconnect.png',
-    'verizon':         'references/logos/logo-verizon.png'
+    'verizon':         'references/logos/logo-verizon.png',
+    'verizon-fios':    'references/logos/logo-verizon.png'
   },
 
   state: {
@@ -986,9 +987,16 @@ const NationalApp = {
       const logo = this.CAMPAIGN_LOGOS[key];
       const ownerCount = campaigns[key]?.owners?.length || 0;
 
-      const logoHtml = logo
-        ? `<img src="${logo}" alt="${this._esc(label)}" class="campaign-card-logo">`
-        : `<div class="campaign-card-logo placeholder">📊</div>`;
+      let logoHtml;
+      if (Array.isArray(logo)) {
+        logoHtml = `<div class="campaign-card-logo-dual">${logo.map(l =>
+          `<img src="${l}" alt="" class="campaign-card-logo-half">`
+        ).join('<span class="logo-divider">×</span>')}</div>`;
+      } else if (logo) {
+        logoHtml = `<img src="${logo}" alt="${this._esc(label)}" class="campaign-card-logo">`;
+      } else {
+        logoHtml = `<div class="campaign-card-logo placeholder">📊</div>`;
+      }
 
       // Extract variant tag if label has "Brand: Variant" format
       const colonIdx = label.indexOf(':');
