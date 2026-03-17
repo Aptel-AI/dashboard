@@ -149,34 +149,35 @@ const OwnerDev = {
             loginEmail = OD_CONFIG.loginAliases[loginEmail].toLowerCase();
           }
 
-          // Check if superadmin — bypass _OD_Users check
+          // Check if superadmin — skip _OD_Users lookup but still require PIN
           const isSA = (OD_CONFIG.superadmins || []).some(e => e.toLowerCase() === loginEmail);
-          if (isSA) {
-            // Superadmins get instant access with a simple PIN prompt
-            const name = loginEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            this.state.session = this._saveSession({
-              email: loginEmail,
-              name: name,
-              team: 'maddie', // default team — View-As lets them switch
-              role: 'manager'
-            });
-            screen.style.display = 'none';
-            this.init();
-            return;
-          }
 
-          const res = await this._post('odCheckUser', { email: loginEmail });
-          if (!res.success) {
-            error.textContent = res.message || 'Contact your team manager to get added.';
-            btn.disabled = false;
-            return;
+          if (!isSA) {
+            // Normal users: verify they exist in _OD_Users
+            const res = await this._post('odCheckUser', { email: loginEmail });
+            if (!res.success) {
+              error.textContent = res.message || 'Contact your team manager to get added.';
+              btn.disabled = false;
+              return;
+            }
+            this._loginHasPin = res.hasPin;
+          } else {
+            // Superadmins: check if they have a PIN set already via odCheckUser
+            // (may not exist in _OD_Users yet — that's fine, treat as first-time)
+            try {
+              const res = await this._post('odCheckUser', { email: loginEmail });
+              this._loginHasPin = res.success && res.hasPin;
+            } catch {
+              this._loginHasPin = false;
+            }
           }
+          this._loginIsSA = isSA;
 
           // Move to PIN step
           emailWrap.style.display = 'none';
           backLink.style.display = '';
 
-          if (res.hasPin) {
+          if (this._loginHasPin) {
             loginStep = 'pin';
             pinWrap.style.display = '';
             btn.textContent = 'Sign In';
@@ -201,12 +202,13 @@ const OwnerDev = {
             return;
           }
 
-          // Login success
+          // Login success — superadmins get elevated session
+          const saName = loginEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
           this.state.session = this._saveSession({
             email: res.email || loginEmail,
-            name: res.name || loginEmail.split('@')[0],
-            team: res.team,
-            role: res.role || 'member'
+            name: res.name || saName,
+            team: this._loginIsSA ? 'maddie' : res.team,
+            role: this._loginIsSA ? 'manager' : (res.role || 'member')
           });
           screen.style.display = 'none';
           this.init();
@@ -218,6 +220,17 @@ const OwnerDev = {
           if (!pin1 || pin1.length < 4) { error.textContent = 'PIN must be 4-6 digits'; btn.disabled = false; return; }
           if (pin1 !== pin2) { error.textContent = 'PINs do not match'; btn.disabled = false; return; }
 
+          if (this._loginIsSA) {
+            // Superadmin first login: create user in _OD_Users via odSaveUser, then login
+            await this._post('odSaveUser', {
+              email: loginEmail,
+              name: loginEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+              team: 'maddie',
+              role: 'manager',
+              pin: pin1
+            });
+          }
+
           const res = await this._post('odLogin', { email: loginEmail, pin: pin1, createPin: true });
           if (!res.success) {
             error.textContent = res.message || 'Failed to create PIN.';
@@ -226,11 +239,12 @@ const OwnerDev = {
           }
 
           // Login success
+          const saName2 = loginEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
           this.state.session = this._saveSession({
             email: res.email || loginEmail,
-            name: res.name || loginEmail.split('@')[0],
-            team: res.team,
-            role: res.role || 'member'
+            name: res.name || saName2,
+            team: this._loginIsSA ? 'maddie' : res.team,
+            role: this._loginIsSA ? 'manager' : (res.role || 'member')
           });
           screen.style.display = 'none';
           this.init();
