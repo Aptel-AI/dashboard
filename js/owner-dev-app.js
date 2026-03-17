@@ -959,12 +959,11 @@ const OwnerDev = {
   _renderSearchDropdown(cellId, displayVal, placeholder, disabled, onClickFn, onClearFn) {
     const hasVal = displayVal ? ' has-value' : '';
     const disabledClass = disabled ? ' disabled' : '';
-    const clearBtn = displayVal ? `<span class="sd-clear" onclick="event.stopPropagation();${onClearFn}" title="Clear">&times;</span>` : '';
 
     return `<div class="sd-wrap" id="sd-wrap-${cellId}">
       <div class="sd-trigger${hasVal}${disabledClass}" onclick="if(!this.classList.contains('disabled')){${onClickFn}}">
         <span style="overflow:hidden;text-overflow:ellipsis">${displayVal ? this._esc(displayVal) : placeholder}</span>
-        ${clearBtn}
+        <span class="sd-clear" onclick="event.stopPropagation();${onClearFn}" title="Clear">&times;</span>
         <span class="sd-arrow">▾</span>
       </div>
       <div class="sd-dropdown" id="sd-dd-${cellId}"></div>

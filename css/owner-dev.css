@@ -626,7 +626,9 @@ input, select, textarea { font-family: inherit; }
 .sd-trigger .sd-clear {
   font-size: 14px; color: var(--gray-400); cursor: pointer;
   padding: 0 2px; flex-shrink: 0; line-height: 1;
+  display: none;
 }
+.sd-trigger.has-value .sd-clear { display: inline; }
 .sd-trigger .sd-clear:hover { color: var(--red); }
 
 .sd-dropdown {
