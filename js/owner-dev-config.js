@@ -33,7 +33,7 @@ const OD_CONFIG = {
   // Each team has a label, accent color, and icon.
   teams: {
     maddie: { label: "Maddie's Team", color: '#8b5cf6', icon: '\u{1F451}' },
-    cam:    { label: "Cam's Team",    color: '#3b82f6', icon: '\u{1F517}' },
+    cam:    { label: "Better Image Solutions",    color: '#3b82f6', icon: '\u{1F517}' },
     nlr:    { label: 'NLR Team',      color: '#0ea5a0', icon: '\u{1F4CB}' }
   },
 
