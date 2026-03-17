@@ -4211,6 +4211,69 @@ function odDeleteUser(body) {
 // ══════════════════════════════════════════════════════════════
 
 // Headers for consolidated per-campaign tabs
+// ── Per-campaign production product config ──
+// Products tracked in the Production LW / Goals columns of Section 1.
+// Combined cells use "/" separator (e.g. "5/3/2" = Frontier/Cell/TV).
+// Order matters: values are split in this order. If fewer values than products,
+// missing ones get 0. "TV" wasn't always tracked so Frontier may have 2 or 3 values.
+var CAMPAIGN_PRODUCTS = {
+  'frontier':     ['Frontier', 'Cell', 'TV'],
+  'verizon-fios': ['Fios'],       // single product — will update when we learn the real breakdown
+  'att-nds':      ['NDS'],        // single product — will update
+  'att-res':      ['Residential'],// single product — will update
+  'rogers':       ['Rogers'],     // single product — will update
+  'leafguard':    ['Leafguard'],
+  'lumen':        ['Lumen']
+};
+
+// ── Build consolidated headers dynamically per campaign ──
+// Base columns before production: Week, Owner, Active HC, Leaders, Dist, Training
+// Then per-product: "Prod: <Product>" and "Goal: <Product>" pairs
+// Then recruiting columns (Section 2)
+var CONSOLIDATED_BASE_HEADERS = [
+  'Week',            // 0
+  'Owner',           // 1
+  'Active HC',       // 2
+  'Leaders',         // 3
+  'Dist',            // 4
+  'Training'         // 5
+];
+
+var CONSOLIDATED_RECRUITING_HEADERS = [
+  'Calls Received',  // from Section 2 (applies)
+  'Sent to List',    // from Section 2 (no list)
+  '1st Booked',
+  '1st Showed',
+  '1st Retention',
+  'Conversion',
+  '2nd Booked',
+  '2nd Showed',
+  '2nd Retention',
+  'NS Booked',
+  'NS Showed',
+  'NS Retention'
+];
+
+/**
+ * Build full header row for a given campaign.
+ * Layout: [base...] + [Prod: X, Goal: X, Prod: Y, Goal: Y, ...] + [recruiting...]
+ */
+function getConsolidatedHeaders_(campaignKey) {
+  var products = CAMPAIGN_PRODUCTS[campaignKey] || ['Total'];
+  var headers = CONSOLIDATED_BASE_HEADERS.slice();
+  for (var p = 0; p < products.length; p++) {
+    headers.push('Prod: ' + products[p]);
+    headers.push('Goal: ' + products[p]);
+  }
+  // Also add totals if more than one product
+  if (products.length > 1) {
+    headers.push('Prod: Total');
+    headers.push('Goal: Total');
+  }
+  return headers.concat(CONSOLIDATED_RECRUITING_HEADERS);
+}
+
+// Legacy single-column headers (kept for readConsolidatedRecruiting compatibility)
 var CONSOLIDATED_HEADERS = [
   'Week',            // 0: date (from Section 1 or Section 2)
   'Owner',           // 1: owner name (tab name in source sheet)
@@ -4350,8 +4413,8 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
       // Extract recruiting rows (Section 2 — transposed): [{date, metrics[12]}]
       var recruitingRows = extractRecruitingRows_(data, sections.section2Start, sections.section2End);
 
-      // Merge by date → flat output rows
-      var merged = mergeHealthRecruiting_(ownerName, healthRows, recruitingRows);
+      // Merge by date → flat output rows (campaign-aware product splitting)
+      var merged = mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignKey);
 
       for (var r = 0; r < merged.length; r++) {
         rows.push(merged[r]);
@@ -4367,9 +4430,12 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
     destTab = destSS.insertSheet(campaign.label);
   }
 
+  // Build campaign-specific headers
+  var campaignHeaders = getConsolidatedHeaders_(campaignKey);
+
   // Clear and write
   destTab.clear();
-  destTab.getRange(1, 1, 1, CONSOLIDATED_HEADERS.length).setValues([CONSOLIDATED_HEADERS]);
+  destTab.getRange(1, 1, 1, campaignHeaders.length).setValues([campaignHeaders]);
 
   if (rows.length > 0) {
     // Sort by date descending, then owner ascending
@@ -4379,7 +4445,7 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
       if (dateA !== dateB) return dateB - dateA;
       return String(a[1]).localeCompare(String(b[1]));
     });
-    destTab.getRange(2, 1, rows.length, CONSOLIDATED_HEADERS.length).setValues(rows);
+    destTab.getRange(2, 1, rows.length, campaignHeaders.length).setValues(rows);
   }
 
   return rows.length;
@@ -4412,14 +4478,16 @@ function extractHealthRows_(data, start, end) {
     var d = (dateVal instanceof Date) ? dateVal : _parseTabDate(String(dateVal));
     if (!d) continue;
 
+    // Keep production and goals as RAW strings — they may contain "/" separated values
+    // e.g. "5/3/2" for Frontier/Cell/TV. Splitting happens in mergeHealthRecruiting_.
     result.push({
       date: d,
       active: num(row[colMap.active]),
       leaders: num(row[colMap.leaders]),
       dist: num(row[colMap.dist]),
       training: num(row[colMap.training]),
-      production: num(row[colMap.production]),
-      goals: num(row[colMap.goals])
+      productionRaw: row[colMap.production],
+      goalsRaw: row[colMap.goals]
     });
   }
   return result;
@@ -4519,10 +4587,30 @@ function extractRecruitingRows_(data, start, end) {
 }
 
 /**
- * Merge health rows and recruiting rows by date.
- * Produces flat arrays matching CONSOLIDATED_HEADERS.
+ * Split a "/" separated cell value into an array of numbers.
+ * e.g. "5/3/2" → [5, 3, 2],  "10" → [10],  "" → [0]
+ * Handles numbers stored as actual numbers (not strings).
  */
-function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows) {
+function _splitSlashValues(raw) {
+  if (raw === null || raw === undefined || raw === '') return [0];
+  // If it's a plain number, return as single element
+  if (typeof raw === 'number') return [raw];
+  var str = String(raw).trim();
+  if (!str) return [0];
+  // Check if it contains "/" separator
+  if (str.indexOf('/') >= 0) {
+    return str.split('/').map(function(v) { return num(v.trim()); });
+  }
+  return [num(str)];
+}
+
+/**
+ * Merge health rows and recruiting rows by date.
+ * campaignKey determines how many product columns to produce.
+ * Produces flat arrays matching getConsolidatedHeaders_(campaignKey).
+ */
+function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignKey) {
+  var products = CAMPAIGN_PRODUCTS[campaignKey] || ['Total'];
   var dateMap = {};
 
   for (var i = 0; i < healthRows.length; i++) {
@@ -4559,28 +4647,42 @@ function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows) {
     var h = entry.health || {};
     var r = entry.recruiting ? entry.recruiting.metrics : [0,0,0,0,0,0,0,0,0,0,0,0];
 
-    result.push([
+    // ── Split production/goals by "/" into per-product values ──
+    var prodParts = _splitSlashValues(h.productionRaw);
+    var goalParts = _splitSlashValues(h.goalsRaw);
+
+    // Build the row: base columns first
+    var row = [
       entry.date,          // 0: Week
       ownerName,           // 1: Owner
       h.active || 0,       // 2: Active HC
       h.leaders || 0,      // 3: Leaders
       h.dist || 0,         // 4: Dist
-      h.training || 0,     // 5: Training
-      h.production || 0,   // 6: Production
-      h.goals || 0,        // 7: Goals
-      r[0],                // 8: Calls Received
-      r[1],                // 9: Sent to List
-      r[2],                // 10: 1st Booked
-      r[3],                // 11: 1st Showed
-      r[4],                // 12: 1st Retention
-      r[5],                // 13: Conversion
-      r[6],                // 14: 2nd Booked
-      r[7],                // 15: 2nd Showed
-      r[8],                // 16: 2nd Retention
-      r[9],                // 17: NS Booked
-      r[10],               // 18: NS Showed
-      r[11]                // 19: NS Retention
-    ]);
+      h.training || 0      // 5: Training
+    ];
+
+    // Per-product Prod/Goal pairs
+    var prodTotal = 0, goalTotal = 0;
+    for (var p = 0; p < products.length; p++) {
+      var prodVal = (p < prodParts.length) ? prodParts[p] : 0;
+      var goalVal = (p < goalParts.length) ? goalParts[p] : 0;
+      row.push(prodVal);
+      row.push(goalVal);
+      prodTotal += prodVal;
+      goalTotal += goalVal;
+    }
+    // Add totals if multiple products
+    if (products.length > 1) {
+      row.push(prodTotal);
+      row.push(goalTotal);
+    }
+
+    // Recruiting metrics
+    for (var ri = 0; ri < 12; ri++) {
+      row.push(r[ri]);
+    }
+
+    result.push(row);
   }
 
   return result;
@@ -4650,8 +4752,25 @@ function readConsolidatedRecruiting(weekCount, campaignFilter) {
     var colLeaders = findCol(headers, ['leaders']);
     var colDist = findCol(headers, ['dist']);
     var colTraining = findCol(headers, ['training']);
-    var colProd = findCol(headers, ['production']);
-    var colGoals = findCol(headers, ['goals']);
+    // ── Find per-product production/goal columns ──
+    // New format: "prod: frontier", "goal: frontier", "prod: cell", etc.
+    // Fallback: old single "production" / "goals" columns
+    var products = CAMPAIGN_PRODUCTS[key] || ['Total'];
+    var prodCols = []; // [{product, prodCol, goalCol}]
+    for (var pi = 0; pi < products.length; pi++) {
+      var pName = products[pi].toLowerCase();
+      var pc = findCol(headers, ['prod: ' + pName]);
+      var gc = findCol(headers, ['goal: ' + pName]);
+      if (pc >= 0 || gc >= 0) {
+        prodCols.push({ product: products[pi], prodCol: pc, goalCol: gc });
+      }
+    }
+    // Also look for totals column if multi-product
+    var prodTotalCol = findCol(headers, ['prod: total']);
+    var goalTotalCol = findCol(headers, ['goal: total']);
+    // Fallback: old single-column format
+    var colProdLegacy = findCol(headers, ['production']);
+    var colGoalsLegacy = findCol(headers, ['goals']);
 
     // Group by week date
     var weekMap = {};
@@ -4690,14 +4809,43 @@ function readConsolidatedRecruiting(weekCount, campaignFilter) {
         _pctNum(row[colNSR])
       ];
 
+      // Build per-product production/goals object
+      var productionData = {};
+      if (prodCols.length > 0) {
+        // New per-product columns
+        for (var pi = 0; pi < prodCols.length; pi++) {
+          var p = prodCols[pi];
+          productionData[p.product] = {
+            production: p.prodCol >= 0 ? num(row[p.prodCol]) : 0,
+            goals: p.goalCol >= 0 ? num(row[p.goalCol]) : 0
+          };
+        }
+        if (prodTotalCol >= 0 || goalTotalCol >= 0) {
+          productionData['Total'] = {
+            production: prodTotalCol >= 0 ? num(row[prodTotalCol]) : 0,
+            goals: goalTotalCol >= 0 ? num(row[goalTotalCol]) : 0
+          };
+        }
+      } else if (colProdLegacy >= 0 || colGoalsLegacy >= 0) {
+        // Legacy single-column: try splitting "/" values
+        var prodParts = _splitSlashValues(row[colProdLegacy >= 0 ? colProdLegacy : 0]);
+        var goalParts = _splitSlashValues(row[colGoalsLegacy >= 0 ? colGoalsLegacy : 0]);
+        for (var pi = 0; pi < products.length; pi++) {
+          productionData[products[pi]] = {
+            production: pi < prodParts.length ? prodParts[pi] : 0,
+            goals: pi < goalParts.length ? goalParts[pi] : 0
+          };
+        }
+      }
+
       // Attach health data as extra property
       recruitVals.health = {
         active: num(row[colHC]),
         leaders: num(row[colLeaders]),
         dist: num(row[colDist]),
         training: num(row[colTraining]),
-        production: num(row[colProd]),
-        goals: num(row[colGoals])
+        production: productionData,
+        goals: productionData  // same object, keyed by product
       };
 
       weekMap[dateKey].data[owner] = recruitVals;
@@ -4717,7 +4865,8 @@ function readConsolidatedRecruiting(weekCount, campaignFilter) {
     campaigns[key] = {
       label: campaign.label,
       owners: Object.keys(ownerSet).sort(),
-      weeks: weekEntries
+      weeks: weekEntries,
+      products: CAMPAIGN_PRODUCTS[key] || ['Total']
     };
   }
 

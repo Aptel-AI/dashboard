@@ -782,6 +782,9 @@ const NationalApp = {
     const ownerNames = sheetData.owners;
     const allWeeks = sheetData.weeks || [];
 
+    // Store campaign product list for rendering
+    this.state.campaignProducts = sheetData.products || ['Total'];
+
     // Campaign table: 4 most recent weeks, left-to-right chronological
     const campaignWeeks = allWeeks.slice(0, 4).reverse();
     const campaignLabels = campaignWeeks.map(w => w.tabName);
@@ -811,24 +814,99 @@ const NationalApp = {
         }
       }
 
+      // ── Extract health data (Section 1) from week data ──
+      // Health is attached to each week's owner vals as .health
+      // Use the most recent week's health for current values
+      let latestHealth = {};
+      const hcHistory = [];
+      const prodHistory = [];
+      // allWeeks is newest-first; allWeeksChron is oldest-first
+      for (let wi = 0; wi < allWeeksChron.length; wi++) {
+        const weekData = allWeeksChron[wi].data || {};
+        const ownerVals = weekData[name];
+        if (ownerVals && ownerVals.health) {
+          const h = ownerVals.health;
+          latestHealth = h; // keep overwriting — last one is most recent
+          hcHistory.push({
+            date: allWeeksChron[wi].tabName,
+            active: h.active || 0,
+            leaders: h.leaders || 0,
+            training: h.training || 0
+          });
+          // Production history — handle both old format (single numbers) and new format (per-product objects)
+          const prod = h.production;
+          if (prod && typeof prod === 'object' && !Array.isArray(prod)) {
+            // New per-product format: { Frontier: {production, goals}, Cell: {production, goals}, ... }
+            let totalProd = 0, totalGoal = 0;
+            const entry = { date: allWeeksChron[wi].tabName, products: {} };
+            for (const pName in prod) {
+              if (pName === 'Total') continue;
+              const pv = prod[pName];
+              entry.products[pName] = { actual: pv.production || 0, goal: pv.goals || 0 };
+              totalProd += pv.production || 0;
+              totalGoal += pv.goals || 0;
+            }
+            // Use explicit total if available, otherwise sum
+            if (prod.Total) {
+              entry.tA = prod.Total.production || 0;
+              entry.tG = prod.Total.goals || 0;
+            } else {
+              entry.tA = totalProd;
+              entry.tG = totalGoal;
+            }
+            prodHistory.push(entry);
+          } else {
+            // Legacy single-value format
+            prodHistory.push({
+              date: allWeeksChron[wi].tabName,
+              tA: (typeof prod === 'number') ? prod : 0,
+              tG: (typeof h.goals === 'number') ? h.goals : 0,
+              products: {}
+            });
+          }
+        }
+      }
+
+      // Build current production from latest health
+      let currentProd = { totalGoal: 0, totalActual: 0, wirelessGoal: 0, wirelessActual: 0, products: {} };
+      const lp = latestHealth.production;
+      if (lp && typeof lp === 'object' && !Array.isArray(lp)) {
+        let totalP = 0, totalG = 0;
+        for (const pName in lp) {
+          if (pName === 'Total') continue;
+          currentProd.products[pName] = { actual: lp[pName].production || 0, goal: lp[pName].goals || 0 };
+          totalP += lp[pName].production || 0;
+          totalG += lp[pName].goals || 0;
+        }
+        currentProd.totalActual = lp.Total ? lp.Total.production : totalP;
+        currentProd.totalGoal = lp.Total ? lp.Total.goals : totalG;
+      } else if (typeof lp === 'number') {
+        currentProd.totalActual = lp;
+        currentProd.totalGoal = (typeof latestHealth.goals === 'number') ? latestHealth.goals : 0;
+      }
+
       return {
         name: name,
         tab: name,
         statusCode: null,
-        headcount: { active: 0, leaders: 0, training: 0 },
-        headcountHistory: [],
-        production: { totalGoal: 0, totalActual: 0, wirelessGoal: 0, wirelessActual: 0 },
-        productionHistory: [],
+        headcount: {
+          active: latestHealth.active || 0,
+          leaders: latestHealth.leaders || 0,
+          training: latestHealth.training || 0
+        },
+        headcountHistory: hcHistory,
+        production: currentProd,
+        productionHistory: prodHistory,
         nextGoals: { totalUnits: 0, wirelessUnits: 0 },
         recruiting: {
-          leaders: 0,
+          leaders: latestHealth.leaders || 0,
           weeks: campaignLabels,
-          rows: this._buildRows(0, actuals4)
+          rows: this._buildRows(latestHealth.leaders || 0, actuals4)
         },
         recruitingFull: {
-          leaders: 0,
+          leaders: latestHealth.leaders || 0,
           weeks: allLabels,
-          rows: this._buildRows(0, actualsFull)
+          rows: this._buildRows(latestHealth.leaders || 0, actualsFull)
         },
         sales: {
           summary: null,
@@ -1351,37 +1429,58 @@ const NationalApp = {
     // ── Headcount Trend Table ──
     this._renderHeadcountTrend(owner, ownerIdx);
 
-    // ── Section 2: Production Review (two side-by-side cards) ──
+    // ── Section 2: Production Review (per-product cards) ──
     const prodEl = document.getElementById('health-production');
-    const hideWireless = this.state.campaign === 'att-b2b' || (this.state.campaign || '').indexOf('nds') >= 0;
+    let prodCardsHtml = '';
+    const productEntries = prod.products || {};
+    const productNames = Object.keys(productEntries);
+    if (productNames.length > 0) {
+      // Show per-product cards + total if multiple products
+      for (const pName of productNames) {
+        const pData = productEntries[pName];
+        prodCardsHtml += this._prodCard(pName, pData.actual, pData.goal);
+      }
+      if (productNames.length > 1) {
+        prodCardsHtml += this._prodCard('Total', prod.totalActual, prod.totalGoal);
+      }
+    } else {
+      // Fallback: single total card
+      prodCardsHtml = this._prodCard('Total Units', prod.totalActual, prod.totalGoal);
+    }
     prodEl.innerHTML = `
       <div class="coaching-label">Production Review <span class="coaching-sublabel">Last Week</span></div>
-      <div class="prod-cards">
-        ${this._prodCard('Total Units', prod.totalActual, prod.totalGoal)}
-        ${hideWireless ? '' : this._prodCard('Wireless Lines', prod.wirelessActual, prod.wirelessGoal)}
-      </div>`;
+      <div class="prod-cards">${prodCardsHtml}</div>`;
 
     // ── Production Trend Table ──
     this._renderProductionTrend(owner, ownerIdx);
 
     // ── Section 3: Set Goals (Next Week) ──
     const goalsEl = document.getElementById('health-goals');
-    goalsEl.innerHTML = `
-      <div class="coaching-label">Set Goals <span class="coaching-sublabel">Next Week</span></div>
-      <div class="goals-grid">
+    let goalFieldsHtml = '';
+    if (productNames.length > 0) {
+      // Per-product goal inputs
+      for (const pName of productNames) {
+        const currentGoal = (productEntries[pName] || {}).goal || '';
+        goalFieldsHtml += `
+          <div class="goal-field">
+            <label class="goal-field-label">${this._esc(pName)} Goal</label>
+            <input type="number" class="goal-input" id="goal-${pName.toLowerCase().replace(/\s+/g,'-')}-${ownerIdx}"
+              value="${currentGoal}" min="0" placeholder="—"
+              onchange="NationalApp._updateGoal(${ownerIdx}, '${pName}', this.value)">
+          </div>`;
+      }
+    } else {
+      goalFieldsHtml = `
         <div class="goal-field">
           <label class="goal-field-label">Total Units</label>
           <input type="number" class="goal-input" id="goal-total-${ownerIdx}" value="${goals.totalUnits || ''}" min="0"
             placeholder="—"
             onchange="NationalApp._updateGoal(${ownerIdx}, 'totalUnits', this.value)">
-        </div>
-        ${hideWireless ? '' : `<div class="goal-field">
-          <label class="goal-field-label">Wireless Units</label>
-          <input type="number" class="goal-input" id="goal-wireless-${ownerIdx}" value="${goals.wirelessUnits || ''}" min="0"
-            placeholder="—"
-            onchange="NationalApp._updateGoal(${ownerIdx}, 'wirelessUnits', this.value)">
-        </div>`}
-      </div>
+        </div>`;
+    }
+    goalsEl.innerHTML = `
+      <div class="coaching-label">Set Goals <span class="coaching-sublabel">Next Week</span></div>
+      <div class="goals-grid">${goalFieldsHtml}</div>
       <div class="hc-submit-row">
         <button class="hc-submit-btn" onclick="NationalApp._submitGoals(${ownerIdx})">Submit Goals</button>
         <span class="hc-submit-note" id="goal-submit-note-${ownerIdx}"></span>
@@ -1919,28 +2018,56 @@ const NationalApp = {
 
     const displayW = needsScroll ? REF_W : (YAXIS_W + barAreaW);
 
-    // ── Build editable table (back side) ──
+    // ── Build editable table (back side) — per-product columns ──
+    // Determine product names from the data (use first entry that has products)
+    let tableProductNames = [];
+    for (const r of hist) {
+      if (r.products && Object.keys(r.products).length) {
+        tableProductNames = Object.keys(r.products);
+        break;
+      }
+    }
+    const hasProducts = tableProductNames.length > 0;
+
     const tableRows = hist.map((r, i) => {
       const origIdx = n - 1 - i;
       const prev = i < n - 1 ? hist[i + 1] : null;
       const arrow = this._trendArrow(r.tA, prev?.tA);
       const pct = r.tG > 0 ? Math.round((r.tA / r.tG) * 100) : 0;
       const pctClass = pct >= 100 ? 'pct-green' : pct >= 80 ? 'pct-yellow' : pct >= 60 ? 'pct-orange' : 'pct-red';
+
+      let productCells = '';
+      if (hasProducts) {
+        for (const pName of tableProductNames) {
+          const pData = (r.products || {})[pName] || { actual: 0, goal: 0 };
+          productCells += `<td class="num">${pData.actual || 0}</td><td class="num">${pData.goal || 0}</td>`;
+        }
+      }
+
       return `<tr>
         <td class="bold">${this._esc(r.date)}</td>
-        <td class="num"><input type="number" class="hc-edit-input" value="${r.tA || 0}" min="0"
-          onchange="NationalApp._onProdTableEdit(${ownerIdx},${origIdx},'tA',this.value)">${arrow}</td>
-        <td class="num"><input type="number" class="hc-edit-input" value="${r.tG || 0}" min="0"
-          onchange="NationalApp._onProdTableEdit(${ownerIdx},${origIdx},'tG',this.value)"></td>
+        ${productCells}
+        <td class="num">${hasProducts ? (r.tA || 0) : `<input type="number" class="hc-edit-input" value="${r.tA || 0}" min="0"
+          onchange="NationalApp._onProdTableEdit(${ownerIdx},${origIdx},'tA',this.value)">`}${arrow}</td>
+        <td class="num">${hasProducts ? (r.tG || 0) : `<input type="number" class="hc-edit-input" value="${r.tG || 0}" min="0"
+          onchange="NationalApp._onProdTableEdit(${ownerIdx},${origIdx},'tG',this.value)">`}</td>
         <td class="num"><span class="prod-pct-badge ${pctClass}">${pct}%</span></td>
       </tr>`;
     }).join('');
+
+    // Build per-product header columns
+    let productHeaders = '';
+    if (hasProducts) {
+      for (const pName of tableProductNames) {
+        productHeaders += `<th class="num">${this._esc(pName)}</th><th class="num">Goal</th>`;
+      }
+    }
 
     const tableHtml = `
       <div class="data-table-wrap trend-scroll">
         <table class="data-table">
           <thead><tr>
-            <th>Week</th><th class="num">Actual</th><th class="num">Goal</th><th class="num">%</th>
+            <th>Week</th>${productHeaders}<th class="num">${hasProducts ? 'Total' : 'Actual'}</th><th class="num">${hasProducts ? 'Total Goal' : 'Goal'}</th><th class="num">%</th>
           </tr></thead>
           <tbody>${tableRows}</tbody>
         </table>
