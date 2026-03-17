@@ -22,8 +22,6 @@ var OD_NLR_FOLDER = '1hARjh3UH48CWhbYrYBJxFVwgynxapCjG';
 
 // External sheet IDs
 var SHEETS = {
-  CONSOLIDATED:       '1MNLqi8A329444SeZpKbYbcRe3dMxaOPLVdMy-7F1DPk',  // Consolidated per-campaign data (wiped & repurposed)
-  RECRUITING_WEEKLY:  '1MNLqi8A329444SeZpKbYbcRe3dMxaOPLVdMy-7F1DPk',  // DEPRECATED — same sheet, kept for backward compat
   RECRUITING_DAILY:   '1ytTGen_AlzfDPW3HGYU1JKNLz1kfHrrhAFCVnmRS3fg',  // Recruiting Scoreboard Daily
   CAMPAIGN_TRACKER:   '1HvWJYox3JXvxmza63YBWAqKPtUGPFuaV-s-BOfbWGKM',  // ATT Campaign Tracker
   PERFORMANCE_AUDIT:  '15WCMzKnqvyyRMx2ae4tC1a12_-aoSRDh3McOuRAKuHk',  // Performance Audit
@@ -276,121 +274,8 @@ function doPost(e) {
 // ══════════════════════════════════════════════════
 
 function importLatestRecruiting(weekCount) {
-  // weekCount: number of weeks to import (0 = all date-named tabs)
-  weekCount = typeof weekCount === 'number' ? weekCount : 1;
-
-  // 1. Open source sheet (Maddy's All Campaigns Stats Tracker)
-  var srcSS = SpreadsheetApp.openById(SHEETS.RECRUITING_WEEKLY);
-  var allSheets = srcSS.getSheets();
-  if (!allSheets.length) return { error: 'Source sheet has no tabs' };
-
-  // 2. Sort all tabs by date (newest first), keep only date-named tabs
-  var tabInfos = [];
-  for (var i = 0; i < allSheets.length; i++) {
-    var name = allSheets[i].getName();
-    var d = _parseTabDate(name);
-    if (d) tabInfos.push({ sheet: allSheets[i], name: name, date: d });
-  }
-  if (!tabInfos.length) return { error: 'No date-named tabs found in source sheet' };
-
-  tabInfos.sort(function(a, b) { return b.date.getTime() - a.date.getTime(); });
-
-  // 3. Slice to requested week count (0 = all)
-  var tabsToImport = weekCount === 0 ? tabInfos : tabInfos.slice(0, weekCount);
-
-  // 4. Open destination sheet
-  var dstSS = SpreadsheetApp.openById(SHEETS.NATIONAL);
-  var importedTabNames = [];
-  var totalRows = 0;
-  var totalSections = 0;
-
-  // 5. Loop through each tab and copy
-  for (var t = 0; t < tabsToImport.length; t++) {
-    var tab = tabsToImport[t];
-    var srcData = tab.sheet.getDataRange().getValues();
-    var tabName = tab.name;
-
-    var sections = _findCampaignSections(srcData);
-    if (!sections.length) continue; // skip tabs with no recognizable sections
-
-    // Build output rows — copy raw header + owner rows verbatim
-    var outputRows = [];
-    for (var s = 0; s < sections.length; s++) {
-      var sec = sections[s];
-
-      var headerRow = [];
-      for (var c = 0; c < srcData[sec.headerRow].length; c++) {
-        headerRow.push(srcData[sec.headerRow][c]);
-      }
-      outputRows.push(headerRow);
-
-      for (var r = sec.startRow; r <= sec.endRow; r++) {
-        var ownerRow = [];
-        for (var c = 0; c < srcData[r].length; c++) {
-          ownerRow.push(srcData[r][c]);
-        }
-        outputRows.push(ownerRow);
-      }
-      outputRows.push([]);
-    }
-
-    // Write to destination tab (create or overwrite)
-    var dstSheet = dstSS.getSheetByName(tabName);
-    if (dstSheet) {
-      dstSheet.clearContents();
-    } else {
-      dstSheet = dstSS.insertSheet(tabName);
-    }
-
-    if (outputRows.length > 0) {
-      var maxCols = 1;
-      for (var i = 0; i < outputRows.length; i++) {
-        if (outputRows[i].length > maxCols) maxCols = outputRows[i].length;
-      }
-      for (var i = 0; i < outputRows.length; i++) {
-        while (outputRows[i].length < maxCols) outputRows[i].push('');
-      }
-      dstSheet.getRange(1, 1, outputRows.length, maxCols).setValues(outputRows);
-    }
-
-    importedTabNames.push(tabName);
-    totalRows += outputRows.length;
-    totalSections += sections.length;
-  }
-
-  if (!importedTabNames.length) return { error: 'No importable data found in source tabs' };
-
-  // 6. Import applies/STL from NLR B2B sheet
-  var appliesResult = {};
-  try {
-    appliesResult = importNLRApplies();
-    Logger.log('NLR applies import: ' + JSON.stringify(appliesResult));
-  } catch (err) {
-    Logger.log('NLR applies import failed (non-fatal): ' + err.message);
-  }
-
-  // 6b. Import production data from NLR B2B sheet
-  try {
-    var prodResult = importNLRProduction();
-    Logger.log('NLR production import: ' + JSON.stringify(prodResult));
-  } catch (err) {
-    Logger.log('NLR production import failed (non-fatal): ' + err.message);
-  }
-
-  // 7. Return success + fresh data
-  var freshData = readNationalRecruiting(6);
-
-  return {
-    ok: true,
-    imported: {
-      tabCount: importedTabNames.length,
-      tabNames: importedTabNames,
-      tabName: importedTabNames[0], // backwards compat
-      sections: totalSections,
-      rows: totalRows
-    },
-    recruiting: freshData
-  };
+  // DEPRECATED — old Maddy's sheet import removed. Redirects to new pipeline.
+  return refreshAllCampaigns();
 }
 
 function validateKey(key) {
@@ -414,7 +299,6 @@ function loadCampaignOverview(campaignKey) {
   if (!cfg) return { error: 'Unknown campaign: ' + campaignKey };
 
   const ctSS = SpreadsheetApp.openById(SHEETS.CAMPAIGN_TRACKER);
-  const rwSS = SpreadsheetApp.openById(SHEETS.RECRUITING_WEEKLY);
 
   // 1. Read Campaign Totals tab for aggregate recruiting funnel
   const totals = readCampaignTotals(ctSS, cfg);
@@ -429,11 +313,11 @@ function loadCampaignOverview(campaignKey) {
     }
   });
 
-  // 3. Enrich with latest weekly recruiting data
+  // 3. Weekly recruiting enrichment (deprecated — data now comes from consolidated tabs)
   try {
-    enrichWithWeeklyRecruiting(rwSS, owners, cfg);
+    // Skip — old Maddy's sheet no longer used
   } catch (err) {
-    Logger.log('Weekly recruiting enrichment error: ' + err.message);
+    Logger.log('Weekly recruiting enrichment skipped: ' + err.message);
   }
 
   return {
@@ -4343,7 +4227,7 @@ var SKIP_TABS_ = ['campaign totals', 'template', 'instructions', 'summary', 'mas
 function refreshAllCampaigns() {
   var destSS;
   try {
-    destSS = SpreadsheetApp.openById(SHEETS.CONSOLIDATED);
+    destSS = SpreadsheetApp.openById(SHEETS.NATIONAL);
   } catch (err) {
     return { ok: false, error: 'Cannot open consolidated sheet: ' + err.message };
   }
@@ -4674,10 +4558,10 @@ function readConsolidatedRecruiting(weekCount, campaignFilter) {
 
   var ss;
   try {
-    ss = SpreadsheetApp.openById(SHEETS.CONSOLIDATED);
+    ss = SpreadsheetApp.openById(SHEETS.NATIONAL);
   } catch (err) {
-    Logger.log('readConsolidatedRecruiting fallback: ' + err.message);
-    return readNationalRecruiting(weekCount);
+    Logger.log('readConsolidatedRecruiting error: ' + err.message);
+    return { campaigns: {}, error: 'Cannot open national sheet' };
   }
 
   var campaigns = {};

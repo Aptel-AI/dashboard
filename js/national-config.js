@@ -16,12 +16,8 @@ const NATIONAL_CONFIG = {
 
   // ── Data Source Sheets ──
   // These are external sheets shared with the NC. NationalCode.gs reads them via openById().
+  // Consolidated per-campaign data lives in NATIONAL sheet tabs (auto-populated by refreshAllCampaigns).
   sheets: {
-    // Consolidated per-campaign data (auto-populated by refreshAllCampaigns from source spreadsheets)
-    consolidated: {
-      id: '1MNLqi8A329444SeZpKbYbcRe3dMxaOPLVdMy-7F1DPk',
-      label: 'Consolidated Campaign Data'
-    },
     // Sheet 1 Alt: Daily recruiting scoreboard
     recruitingDaily: {
       id: '1ytTGen_AlzfDPW3HGYU1JKNLz1kfHrrhAFCVnmRS3fg',
