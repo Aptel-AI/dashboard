@@ -20,13 +20,14 @@ const OD_CONFIG = {
   // Each campaign has a Google Sheet with owner data.
   // sheetId is blank for campaigns not yet connected.
   campaignSources: {
-    'frontier':     { label: 'Frontier',           sheetId: '1WWpLQTCyvPmJbx3jjowFszwOF_JUnjS6tzu-eAASwk0' },
-    'verizon-fios': { label: 'Verizon Fios',       sheetId: '12J3HBdFQrqq5D7YwWEp93US40vmZz5n9mS-KMKXaXxA' },
-    'att-nds':      { label: 'AT&T NDS/Verizon',   sheetId: '1kcUWR3EKgP-9wDct4vDyuQJ7IuS0cbcetY97dmVTY64' },
-    'att-res':      { label: 'AT&T Residential',   sheetId: '1HvWJYox3JXvxmza63YBWAqKPtUGPFuaV-s-BOfbWGKM' },
-    'rogers':       { label: 'Rogers',             sheetId: '1o1MPKrAzzeaU2JWMODkR9M3uY5rOhIKo-Q64armeTvE' },
-    'leafguard':    { label: 'Leafguard',          sheetId: '' },
-    'lumen':        { label: 'Lumen',              sheetId: '' }
+    'frontier':        { label: 'Frontier',           sheetId: '1WWpLQTCyvPmJbx3jjowFszwOF_JUnjS6tzu-eAASwk0' },
+    'frontier-retail': { label: 'Frontier Retail',    sheetId: '1OULSC_r8dCW2dlvIGeP6zLtNKANJ3mZMDPyE15tH3gM' },
+    'verizon-fios':    { label: 'Verizon Fios',       sheetId: '12J3HBdFQrqq5D7YwWEp93US40vmZz5n9mS-KMKXaXxA' },
+    'att-nds':         { label: 'AT&T NDS/Verizon',   sheetId: '1kcUWR3EKgP-9wDct4vDyuQJ7IuS0cbcetY97dmVTY64' },
+    'att-res':         { label: 'AT&T Residential',   sheetId: '1HvWJYox3JXvxmza63YBWAqKPtUGPFuaV-s-BOfbWGKM' },
+    'rogers':          { label: 'Rogers',             sheetId: '1o1MPKrAzzeaU2JWMODkR9M3uY5rOhIKo-Q64armeTvE' },
+    'leafguard':       { label: 'Leafguard',          sheetId: '' },
+    'lumen':           { label: 'Lumen',              sheetId: '' }
   },
 
   // ── Teams ──
