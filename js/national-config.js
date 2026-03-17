@@ -66,37 +66,15 @@ const NATIONAL_CONFIG = {
     }
   },
 
-  // ── Owner List (AT&T B2B) ──
-  // Maps owner display names to their tab names in the Campaign Tracker.
-  // Also maps to business names in the Performance Audit sheet.
-  // TODO: This could eventually be pulled dynamically from the _Owners tab in admin sheet.
-  owners: {
-    'att-b2b': [
-      { name: 'Jay T',             tab: 'Jay T',             businesses: [] },
-      { name: 'Mason',             tab: 'Mason',             businesses: [] },
-      { name: 'Steven Sykes',      tab: 'Steven Sykes',      businesses: [] },
-      { name: 'Olin Salter',       tab: 'Olin Salter',       businesses: [] },
-      { name: 'Eric Martinez',     tab: 'Eric Martinez',     businesses: [] },
-      { name: 'Natalia Gwarda',    tab: 'Natalia Gwarda',    businesses: [] },
-      { name: 'Nigel Gilbert',     tab: 'Nigel Gil',         businesses: [] }
-    ]
-  },
+  // ── Owner List ──
+  // Owners are now loaded dynamically from campaign spreadsheets via NationalCode.gs.
+  // No hardcoded list needed — odGetCampaignOwners reads Column A of each sheet.
+  owners: {},
 
   // ── Owner Name Aliases ──
-  // Maps variations/nicknames from Cam's Performance Audit sheet (Client Name column)
-  // to canonical owner names used in the recruiting/campaign data.
-  // Key = lowercase alias, Value = canonical owner name from owners list.
+  // Maps variations/nicknames to canonical owner names for fuzzy matching.
   // Add entries here as mismatches are discovered.
-  ownerAliases: {
-    // Examples — update these once you see the actual Client Name values in Cam's sheet:
-    // 'jay':            'Jay T',
-    // 'jay thurston':   'Jay T',
-    // 'steve':          'Steven Sykes',
-    // 'steve sykes':    'Steven Sykes',
-    // 'nat':            'Natalia Gwarda',
-    // 'nigel':          'Nigel Gilbert',
-    // 'nigel gil':      'Nigel Gilbert',
-  },
+  ownerAliases: {},
 
   // ── Login ──
   // NC dashboard uses admin portal SSO (o4 role) or direct PIN login.

@@ -206,13 +206,14 @@ const NationalApp = {
       }
     });
 
-    // ── Build owners from recruiting data (or scaffold) ──
+    // ── Build owners from recruiting data ──
     const sheetData = results.recruiting || null;
     if (sheetData && sheetData.owners && sheetData.owners.length) {
       this._buildOwnersFromSheet(campaignKey, sheetData);
     } else {
-      console.log('[NationalApp] No recruiting data, using scaffold');
-      this._loadScaffoldData(campaignKey);
+      console.log('[NationalApp] No recruiting data — showing empty state');
+      this.state.owners = [];
+      this.state.campaignTotals = {};
     }
 
     // ── Apply enrichments from parallel results ──
@@ -943,219 +944,9 @@ const NationalApp = {
     });
   },
 
-  // ── Scaffold data based on actual spreadsheet observations ──
-  _loadScaffoldData(campaignKey) {
-    const ownerDefs = NATIONAL_CONFIG.owners[campaignKey] || [];
-    const weeks = ['Feb-9', 'Feb-16', 'Feb-23', 'Mar-2'];
-
-    // Per-owner demo data (compact: health, status, recruiting projected/actuals, sales, audit)
-    // h = headcount: active, leaders, training
-    // p = production: totalGoal, totalActual, wirelessGoal, wirelessActual (goal = set last week, actual = from Tableau)
-    // g = next week goals: totalUnits, wirelessUnits
-    const demo = {
-      'Jay T': {
-        h: { active: 12, leaders: 3, training: 4 },
-        hcHist: [
-          { date: '2/17', active: 9, leaders: 2, training: 3 },
-          { date: '2/24', active: 11, leaders: 3, training: 5 },
-          { date: '3/3',  active: 12, leaders: 3, training: 4 }
-        ],
-        p: { totalGoal: 22, totalActual: 18, wirelessGoal: 15, wirelessActual: 12 },
-        prodHist: [
-          { date: '2/17', tA: 14, tG: 18, wA: 9, wG: 12 },
-          { date: '2/24', tA: 16, tG: 20, wA: 11, wG: 14 },
-          { date: '3/3',  tA: 18, tG: 22, wA: 12, wG: 15 }
-        ],
-        g: { totalUnits: 0, wirelessUnits: 0 },
-        sc: 55,
-        rLeaders: 3,
-
-        rA: [[36,44,32,42],[28,35,25,32],[18,22,15,20],[14,18,12,17],[78,82,80,85],[47,52,42,50],[8,12,7,10],[7,10,5,8],[88,83,71,80],[4,6,3,5],[3,5,3,4],[75,83,100,80]],
-        s: { totalSales: 42, newInternet: 18, upgrades: 14, videoSales: 10, abpMix: '72%', gigMix: '45%' },
-        a: { reviews: 'A', website: 'B+', social: 'B', seo: 'A-' }
-      },
-      'Mason': {
-        h: { active: 8, leaders: 2, training: 3 },
-        hcHist: [
-          { date: '2/17', active: 6, leaders: 1, training: 2 },
-          { date: '2/24', active: 7, leaders: 2, training: 3 },
-          { date: '3/3',  active: 8, leaders: 2, training: 3 }
-        ],
-        p: { totalGoal: 18, totalActual: 14, wirelessGoal: 12, wirelessActual: 9 },
-        prodHist: [
-          { date: '2/17', tA: 10, tG: 14, wA: 7, wG: 10 },
-          { date: '2/24', tA: 12, tG: 16, wA: 8, wG: 11 },
-          { date: '3/3',  tA: 14, tG: 18, wA: 9, wG: 12 }
-        ],
-        g: { totalUnits: 0, wirelessUnits: 0 },
-        sc: 22,
-        rLeaders: 2,
-
-        rA: [[24,28,20,26],[18,22,15,20],[12,16,10,14],[9,12,7,11],[75,75,70,79],[40,53,33,47],[5,8,4,6],[4,6,3,5],[80,75,75,83],[3,4,2,3],[2,3,2,3],[67,75,100,100]],
-        s: { totalSales: 31, newInternet: 14, upgrades: 10, videoSales: 7, abpMix: '68%', gigMix: '38%' },
-        a: { reviews: 'B+', website: 'B', social: 'C+', seo: 'B' }
-      },
-      'Steven Sykes': {
-        h: { active: 15, leaders: 4, training: 5 },
-        hcHist: [
-          { date: '2/17', active: 12, leaders: 3, training: 4 },
-          { date: '2/24', active: 14, leaders: 4, training: 6 },
-          { date: '3/3',  active: 15, leaders: 4, training: 5 }
-        ],
-        p: { totalGoal: 28, totalActual: 24, wirelessGoal: 20, wirelessActual: 18 },
-        prodHist: [
-          { date: '2/17', tA: 20, tG: 24, wA: 14, wG: 17 },
-          { date: '2/24', tA: 22, tG: 26, wA: 16, wG: 19 },
-          { date: '3/3',  tA: 24, tG: 28, wA: 18, wG: 20 }
-        ],
-        g: { totalUnits: 0, wirelessUnits: 0 },
-        sc: 66,
-        rLeaders: 4,
-
-        rA: [[52,60,48,58],[40,48,36,44],[26,32,22,30],[22,26,18,24],[85,81,82,80],[47,53,46,52],[12,16,10,14],[10,14,8,12],[83,88,80,86],[6,8,5,7],[5,7,4,6],[83,88,80,86]],
-        s: { totalSales: 56, newInternet: 24, upgrades: 18, videoSales: 14, abpMix: '75%', gigMix: '52%' },
-        a: { reviews: 'A', website: 'A-', social: 'A', seo: 'A' }
-      },
-      'Olin Salter': {
-        h: { active: 6, leaders: 1, training: 3 },
-        hcHist: [
-          { date: '2/17', active: 5, leaders: 1, training: 2 },
-          { date: '2/24', active: 5, leaders: 1, training: 2 },
-          { date: '3/3',  active: 6, leaders: 1, training: 3 }
-        ],
-        p: { totalGoal: 14, totalActual: 8, wirelessGoal: 10, wirelessActual: 5 },
-        prodHist: [
-          { date: '2/17', tA: 6, tG: 12, wA: 4, wG: 8 },
-          { date: '2/24', tA: 7, tG: 13, wA: 4, wG: 9 },
-          { date: '3/3',  tA: 8, tG: 14, wA: 5, wG: 10 }
-        ],
-        g: { totalUnits: 0, wirelessUnits: 0 },
-        sc: 44,
-        rLeaders: 1,
-
-        rA: [[14,18,12,16],[10,14,8,12],[7,10,6,8],[5,7,4,6],[71,70,67,75],[35,50,30,40],[3,5,2,4],[2,4,2,3],[67,80,100,75],[1,3,1,2],[1,2,1,2],[100,67,100,100]],
-        s: { totalSales: 18, newInternet: 8, upgrades: 6, videoSales: 4, abpMix: '62%', gigMix: '30%' },
-        a: { reviews: 'C+', website: 'C', social: 'D+', seo: 'C' }
-      },
-      'Eric Martinez': {
-        h: { active: 10, leaders: 2, training: 4 },
-        hcHist: [
-          { date: '2/17', active: 8, leaders: 2, training: 3 },
-          { date: '2/24', active: 9, leaders: 2, training: 4 },
-          { date: '3/3',  active: 10, leaders: 2, training: 4 }
-        ],
-        p: { totalGoal: 20, totalActual: 16, wirelessGoal: 14, wirelessActual: 11 },
-        prodHist: [
-          { date: '2/17', tA: 12, tG: 16, wA: 8, wG: 11 },
-          { date: '2/24', tA: 14, tG: 18, wA: 10, wG: 13 },
-          { date: '3/3',  tA: 16, tG: 20, wA: 11, wG: 14 }
-        ],
-        g: { totalUnits: 0, wirelessUnits: 0 },
-        sc: 55,
-        rLeaders: 2,
-
-        rA: [[30,38,28,34],[24,30,20,26],[16,20,12,18],[12,16,10,14],[75,80,83,78],[46,53,43,50],[7,10,5,8],[6,8,4,7],[86,80,80,88],[4,5,3,4],[3,4,3,4],[75,80,100,100]],
-        s: { totalSales: 36, newInternet: 16, upgrades: 12, videoSales: 8, abpMix: '70%', gigMix: '42%' },
-        a: { reviews: 'B', website: 'B+', social: 'B-', seo: 'B+' }
-      },
-      'Natalia Gwarda': {
-        h: { active: 9, leaders: 2, training: 4 },
-        hcHist: [
-          { date: '2/17', active: 7, leaders: 1, training: 3 },
-          { date: '2/24', active: 8, leaders: 2, training: 4 },
-          { date: '3/3',  active: 9, leaders: 2, training: 4 }
-        ],
-        p: { totalGoal: 16, totalActual: 12, wirelessGoal: 11, wirelessActual: 8 },
-        prodHist: [
-          { date: '2/17', tA: 9, tG: 13, wA: 6, wG: 9 },
-          { date: '2/24', tA: 10, tG: 14, wA: 7, wG: 10 },
-          { date: '3/3',  tA: 12, tG: 16, wA: 8, wG: 11 }
-        ],
-        g: { totalUnits: 0, wirelessUnits: 0 },
-        sc: 33,
-        rLeaders: 2,
-
-        rA: [[26,34,24,30],[20,26,18,22],[14,18,10,16],[10,14,8,12],[71,78,80,75],[44,53,38,50],[6,9,4,7],[5,7,3,6],[83,78,75,86],[3,5,2,4],[2,4,2,3],[67,80,100,75]],
-        s: { totalSales: 28, newInternet: 12, upgrades: 9, videoSales: 7, abpMix: '66%', gigMix: '36%' },
-        a: { reviews: 'B-', website: 'C+', social: 'B', seo: 'C+' }
-      },
-      'Nigel Gilbert': {
-        h: { active: 7, leaders: 1, training: 3 },
-        hcHist: [
-          { date: '2/17', active: 6, leaders: 1, training: 2 },
-          { date: '2/24', active: 6, leaders: 1, training: 3 },
-          { date: '3/3',  active: 7, leaders: 1, training: 3 }
-        ],
-        p: { totalGoal: 14, totalActual: 10, wirelessGoal: 10, wirelessActual: 6 },
-        prodHist: [
-          { date: '2/17', tA: 7, tG: 12, wA: 4, wG: 8 },
-          { date: '2/24', tA: 8, tG: 13, wA: 5, wG: 9 },
-          { date: '3/3',  tA: 10, tG: 14, wA: 6, wG: 10 }
-        ],
-        g: { totalUnits: 0, wirelessUnits: 0 },
-        sc: 22,
-        rLeaders: 1,
-
-        rA: [[16,20,14,18],[12,16,10,14],[8,12,7,10],[6,9,5,8],[75,75,71,80],[36,50,32,42],[4,6,3,5],[3,5,2,4],[75,83,67,80],[2,3,1,3],[1,2,1,2],[50,67,100,67]],
-        s: { totalSales: 22, newInternet: 10, upgrades: 7, videoSales: 5, abpMix: '64%', gigMix: '32%' },
-        a: { reviews: 'C', website: 'C-', social: 'D', seo: 'C-' }
-      }
-    };
-
-    // Build owner objects
-    this.state.owners = ownerDefs.map(def => {
-      const d = demo[def.name] || {};
-      const h = d.h || {};
-      const p = d.p || {};
-      const g = d.g || {};
-      return {
-        name: def.name,
-        tab: def.tab,
-        statusCode: d.sc || null,
-        // 1-on-1 Coaching: Headcount (editable during call)
-        headcount: {
-          active: h.active || 0,
-          leaders: h.leaders || 0,
-          training: h.training || 0
-        },
-        // Headcount history (week-over-week log, newest last)
-        headcountHistory: d.hcHist ? d.hcHist.map(e => ({ ...e })) : [],
-        // 1-on-1 Coaching: Production Review (goal set last week vs actual from Tableau)
-        production: {
-          totalGoal: p.totalGoal || 0,
-          totalActual: p.totalActual || 0,
-          wirelessGoal: p.wirelessGoal || 0,
-          wirelessActual: p.wirelessActual || 0
-        },
-        // Production history (week-over-week log)
-        productionHistory: d.prodHist ? d.prodHist.map(e => ({ ...e })) : [],
-        // 1-on-1 Coaching: Next week goals (set during call)
-        nextGoals: {
-          totalUnits: g.totalUnits || 0,
-          wirelessUnits: g.wirelessUnits || 0
-        },
-        // Recruiting (spreadsheet format)
-        recruiting: {
-          leaders: d.rLeaders || 0,
-          weeks: weeks,
-          rows: d.rA ? this._buildRows(d.rLeaders || 0, d.rA) : []
-        },
-        // Sales
-        sales: {
-          summary: d.s || null,
-          reps: []
-        },
-        // Audit
-        audit: {
-          grades: d.a || { reviews: '—', website: '—', social: '—', seo: '—' },
-          details: {}
-        }
-      };
-    });
-
-    // Build campaign-level aggregates (shared helper)
-    this._buildCampaignAggregates(weeks);
-  },
+  // ── [REMOVED] _loadScaffoldData — hardcoded demo data for 7 test owners removed ──
+  // Data now comes exclusively from consolidated campaign tabs via readConsolidatedRecruiting().
+  // If no data exists, the UI shows an empty state instead of fake numbers.
 
   // ══════════════════════════════════════════════════
   // CAMPAIGN LANDING PAGE
@@ -1365,7 +1156,7 @@ const NationalApp = {
       container.innerHTML = `
         <div class="empty-state" style="grid-column:1/-1">
           <div class="empty-state-icon">📊</div>
-          <div class="empty-state-text">No owner data available yet.<br>Configure NationalCode.gs to load data.</div>
+          <div class="empty-state-text">No owner data available yet.<br>Click <strong>Refresh Data</strong> to pull from campaign spreadsheets.</div>
         </div>`;
       return;
     }
