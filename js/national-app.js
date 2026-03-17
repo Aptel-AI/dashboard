@@ -961,18 +961,12 @@ const NationalApp = {
     const container = document.getElementById('campaign-cards');
     if (!container) return;
 
-    // Only include campaigns that have real data (owners with weeks)
-    // OR are explicitly in NATIONAL_CONFIG.campaigns
+    // Only include campaigns that have owners
     const allKeys = new Set([...Object.keys(campaigns), ...Object.keys(configCampaigns)]);
     const activeKeys = [...allKeys].filter(key => {
-      // Always show campaigns in config
-      if (configCampaigns[key]) return true;
-      // Only show backend campaigns that have owners with data
       const cd = campaigns[key];
       if (!cd) return false;
-      const hasOwners = (cd.owners || []).length > 0;
-      const hasWeeks = (cd.weeks || []).length > 0;
-      return hasOwners && hasWeeks;
+      return (cd.owners || []).length > 0;
     });
 
     // Sort by label
@@ -1008,6 +1002,7 @@ const NationalApp = {
       return `
         <div class="campaign-card" onclick="NationalApp.selectCampaign('${key}')">
           ${logoHtml}
+          <div class="campaign-card-label">${this._esc(label)}</div>
           ${variantHtml}
           ${ownerCount ? `<div class="campaign-card-owners">${ownerCount} owner${ownerCount !== 1 ? 's' : ''}</div>` : ''}
         </div>`;
