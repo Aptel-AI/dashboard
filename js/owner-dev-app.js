@@ -291,7 +291,7 @@ const OwnerDev = {
    * @param {Object} params - Additional query parameters
    * @returns {Promise<Object>} parsed JSON response
    */
-  async _api(action, params = {}) {
+  async _api(action, params = {}, timeout) {
     const url = new URL(OD_CONFIG.appsScriptUrl);
     url.searchParams.set('key', OD_CONFIG.apiKey);
     url.searchParams.set('action', action);
@@ -299,7 +299,8 @@ const OwnerDev = {
       url.searchParams.set(k, v);
     }
     const res = await this._fetchWithTimeout(
-      fetch(url.toString()).then(r => r.json())
+      fetch(url.toString()).then(r => r.json()),
+      timeout
     );
     return res;
   },
@@ -420,9 +421,8 @@ const OwnerDev = {
       if (!hasAnyTabs) {
         // Fetch workbooks WITH tabs (longer timeout — this opens each spreadsheet)
         try {
-          const fullRes = await this._fetchWithTimeout(
-            this._api('odNlrWorkbooks', { includeTabs: 'true' }),
-            120000 // 2 minute timeout for tab scanning
+          const fullRes = await this._api(
+            'odNlrWorkbooks', { includeTabs: 'true' }, 120000 // 2 minute timeout for tab scanning
           );
           if (fullRes.success && fullRes.workbooks) {
             this.state.nlrWorkbooks = fullRes.workbooks;
