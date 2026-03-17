@@ -46,17 +46,35 @@ const OwnerDev = {
     const email = (this.state.session.email || '').toLowerCase();
     this.state.isSuperadmin = (OD_CONFIG.superadmins || []).some(e => e.toLowerCase() === email);
     this.state.realTeam = this.state.session.team;
+    const role = (this.state.session.role || '').toLowerCase();
+    this.state.isCoachOnly = role === 'coach';
 
     // Populate user info in top bar
     this._renderUserInfo();
 
+    // Coach-only mode: skip mapping/team, go straight to coach view
+    if (this.state.isCoachOnly) {
+      // Hide all nav tabs except coach
+      document.querySelectorAll('.nav-tab').forEach(t => t.style.display = 'none');
+      const coachTab = document.getElementById('nav-coach-tab');
+      if (coachTab) { coachTab.style.display = ''; coachTab.classList.add('active'); }
+      // Hide mapping view, show coach view
+      document.getElementById('view-mapping').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      this.state.activeTab = 'coach';
+      if (typeof NationalApp !== 'undefined') {
+        NationalApp.initCoachView({ email: this.state.session.email, name: this.state.session.name });
+      }
+      return;
+    }
+
     // Show team tab if manager or superadmin
-    if (this.state.session.role === 'manager' || this.state.isSuperadmin) {
+    if (role === 'manager' || this.state.isSuperadmin) {
       document.getElementById('nav-team-tab').style.display = '';
     }
 
-    // Show coach tab for superadmins (Ken's coaching view)
-    if (this.state.isSuperadmin) {
+    // Show coach tab for superadmins or managers
+    if (this.state.isSuperadmin || role === 'manager') {
       const coachTab = document.getElementById('nav-coach-tab');
       if (coachTab) coachTab.style.display = '';
     }
@@ -1056,7 +1074,10 @@ const OwnerDev = {
   _openCamDropdown(campaign, ownerName, cellId) {
     const mapping = this._findMapping(campaign, ownerName);
     const currentVal = mapping?.camCompany || '';
-    const options = this.state.camCompanies.map(c => ({ value: c, label: c }));
+    const options = [
+      { value: 'Non-Partner', label: '⛔ Non-Partner' },
+      ...this.state.camCompanies.map(c => ({ value: c, label: c }))
+    ];
 
     this._openSearchDropdown(cellId, options, currentVal, (value, label) => {
       // Update the trigger display
@@ -1106,12 +1127,15 @@ const OwnerDev = {
   _openNlrFileDropdown(campaign, ownerName, cellId) {
     const mapping = this._findMapping(campaign, ownerName);
     const currentVal = mapping?.nlrWorkbookId || '';
-    const options = this.state.nlrWorkbooks.map(wb => ({ value: wb.id, label: wb.name }));
+    const options = [
+      { value: 'Non-Partner', label: '⛔ Non-Partner' },
+      ...this.state.nlrWorkbooks.map(wb => ({ value: wb.id, label: wb.name }))
+    ];
 
     this._openSearchDropdown(cellId, options, currentVal, (value, label) => {
       const trigger = document.querySelector(`#sd-wrap-${cellId} .sd-trigger`);
       if (trigger) {
-        trigger.querySelector('span').textContent = value ? label : '-- Select File --';
+        trigger.querySelector('span').textContent = value === 'Non-Partner' ? 'Non-Partner' : (value ? label : '-- Select File --');
         trigger.classList.toggle('has-value', !!value);
       }
       // Fire save (this also fetches tabs for the new workbook)
@@ -1173,7 +1197,10 @@ const OwnerDev = {
     }
 
     const tabs = (wbId && this.state.nlrTabsCache[wbId]) || [];
-    const options = tabs.map(t => ({ value: t, label: t }));
+    const options = [
+      { value: 'Non-Partner', label: '⛔ Non-Partner' },
+      ...tabs.map(t => ({ value: t, label: t }))
+    ];
 
     this._openSearchDropdown(cellId, options, currentVal, (value, label) => {
       const trigger = document.querySelector(`#sd-wrap-${cellId} .sd-trigger`);
@@ -1248,7 +1275,10 @@ const OwnerDev = {
     const tabMapping = this._findCampaignTabMap(campaign, ownerName);
     const currentVal = tabMapping?.tabName || '';
     const tabs = this.state.campaignTabsCache[campaign] || [];
-    const options = tabs.map(t => ({ value: t, label: t }));
+    const options = [
+      { value: 'Non-Partner', label: '⛔ Non-Partner' },
+      ...tabs.map(t => ({ value: t, label: t }))
+    ];
 
     this._openSearchDropdown(cellId, options, currentVal, (value, label) => {
       const trigger = document.querySelector(`#sd-wrap-${cellId} .sd-trigger`);

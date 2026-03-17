@@ -1,0 +1,2921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELEVATE — Leaderboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    /* ── Smart Connections Brand Palette ── */
+    --sc-cyan:       #00c8ff;   /* electric blue outline / network lines     */
+    --sc-green:      #39ff8f;   /* neon green — lightbulb, circuit accents   */
+    --sc-teal:       #00e5cc;   /* cyan-green hybrid glow                    */
+    --sc-navy:       #070d1a;   /* deep background — head silhouette         */
+    --sc-steel:      #1a4a7a;   /* mid-tone gear bodies                      */
+
+    /* Primary action blues */
+    --blue-core:   #0099cc;
+    --blue-deep:   #004466;
+    --blue-struct: #1a5ce5;    /* structural blue — borders, dividers, grids */
+
+    /* Backgrounds — light mode */
+    --black:   #f0f4f8;
+    --black-2: #e4edf5;
+    --black-3: #d8e6f0;
+    --black-4: #c8daea;
+
+    /* Text */
+    --silver:     #1a3a52;
+    --silver-dim: #4a7090;
+    --white:      #0d2035;
+
+    /* Semantic colors — unified palette */
+    --red:        #e53535;
+    --red-bg:     rgba(229,53,53,0.12);
+    --red-border: rgba(229,53,53,0.40);
+
+    --yellow:        #f0b429;
+    --yellow-bg:     rgba(240,180,41,0.14);
+    --yellow-border: rgba(240,180,41,0.45);
+
+    --green:        #22c55e;
+    --green-bg:     rgba(34,197,94,0.12);
+    --green-border: rgba(34,197,94,0.35);
+
+    --orange:        #f97316;
+    --orange-bg:     rgba(249,115,22,0.12);
+    --orange-border: rgba(249,115,22,0.30);
+
+    /* Cards */
+    --card-bg:     #ddeaf5;
+    --card-border: rgba(0,150,200,0.25);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: linear-gradient(135deg, #c8dff0 0%, #daeaf5 40%, #c2daea 70%, #b8d4e8 100%);
+    color: var(--white);
+    font-family: 'Barlow', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle cyan-teal wash overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 15% 20%, rgba(0,200,255,0.10) 0%, transparent 50%),
+      radial-gradient(ellipse at 85% 80%, rgba(0,229,204,0.10) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after { content: none; }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 0 24px 60px;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 28px 0 32px;
+    border-bottom: 1px solid rgba(0,200,255,0.2);
+    margin-bottom: 40px;
+  }
+
+  .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+
+  .week-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--silver-dim);
+  }
+
+  .live-badge {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(34,197,94,0.12);
+    border: 1px solid rgba(34,197,94,0.3);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: var(--sc-green);
+    text-transform: uppercase;
+  }
+
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--sc-green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  /* SECTION */
+  .section {
+    margin-bottom: 48px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .section:nth-child(2) { animation-delay: 0.1s; }
+  .section:nth-child(3) { animation-delay: 0.2s; }
+  .section:nth-child(4) { animation-delay: 0.3s; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .section-icon {
+    font-size: 20px;
+  }
+
+  .section-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--silver);
+  }
+
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(26,92,229,0.5), transparent);
+  }
+
+  .section-count {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: var(--silver-dim);
+  }
+
+  /* TABLE */
+  .table-wrap {
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #e8f0f7;
+  }
+
+  thead tr {
+    background: rgba(0,0,0,0.06);
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+  }
+
+  th {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--silver-dim);
+    padding: 7px 16px;
+    text-align: center;
+  }
+
+  th.name-col { text-align: left; padding-left: 20px; }
+
+  /* Day group headers */
+  .day-group {
+    background: rgba(0,0,0,0.05);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--silver-dim);
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(26,92,229,0.10);
+    transition: background 0.2s;
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(26,92,229,0.07); }
+
+  /* Rank */
+  .rank {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--silver-dim);
+    padding: 0 8px 0 16px;
+    text-align: center;
+    width: 40px;
+  }
+
+  .rank-1 { color: #FFD700; }
+  .rank-2 { color: #C0C0C0; }
+  .rank-3 { color: #CD7F32; }
+
+  .rank-medal {
+    font-size: 16px;
+  }
+
+  /* Name */
+  .name-cell {
+    padding: 7px 16px 7px 4px;
+    text-align: left;
+  }
+
+  .name-text {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--white);
+  }
+
+  /* Value cells */
+  td.val {
+    text-align: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 7px 4px;
+    min-width: 32px;
+  }
+
+  td.val-weekly {
+    font-size: 16px;
+    font-weight: 700;
+    padding: 7px 10px;
+    min-width: 56px;
+  }
+
+  td.val-4w {
+    font-size: 16px;
+    font-weight: 700;
+    padding: 7px 10px;
+    min-width: 64px;
+    color: var(--silver);
+  }
+
+  /* Color states */
+  .c-red   {
+    color: #a80020;
+    background: rgba(210,0,40,0.30);
+    border-right: 3px solid #cc0028;
+    font-weight: 900;
+  }
+  .c-yellow {
+    color: #7a5200;
+    background: rgba(220,160,0,0.35);
+    border-right: 3px solid #b87c00;
+    font-weight: 900;
+  }
+  .c-green  {
+    color: #005c2a;
+    background: rgba(0,160,75,0.32);
+    border-right: 3px solid #007a38;
+    font-weight: 900;
+  }
+  .c-none  { color: var(--silver-dim); }
+  .c-zero  { color: rgba(0,0,0,0.2); }
+
+  /* Top performer glow */
+  tbody tr.top-row {
+    background: rgba(0,0,0,0.04);
+  }
+  tbody tr.top-row .name-text {
+    color: var(--sc-cyan);
+  }
+
+  /* Total row */
+  tr.total-row {
+    background: rgba(255,255,255,0.4) !important;
+    border-top: 1px solid rgba(26,92,229,0.3);
+  }
+
+  tr.total-row td {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 1px;
+    color: var(--silver);
+    padding: 7px 6px;
+  }
+
+  tr.total-row .name-text {
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--silver-dim);
+  }
+
+  /* Day separator */
+  .day-sep {
+    border-left: 1px solid rgba(26,92,229,0.15);
+  }
+
+  /* Week separator */
+  .week-sep {
+    border-left: 2px solid rgba(26,92,229,0.3);
+  }
+
+  /* TEAM SECTION */
+  .team-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .team-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+
+  .team-card:hover {
+    border-color: rgba(26,92,229,0.5);
+    transform: translateY(-2px);
+  }
+
+  .team-card.rank-1-card {
+    border-color: rgba(255,215,0,0.4);
+    background: rgba(255,215,0,0.04);
+  }
+
+  .team-rank {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--silver-dim);
+    text-transform: uppercase;
+  }
+
+  .team-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: var(--white);
+    text-align: center;
+  }
+
+  .team-score {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 36px;
+    font-weight: 900;
+    color: var(--sc-cyan);
+    line-height: 1;
+  }
+
+  .team-label {
+    font-size: 11px;
+    color: var(--silver-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* Column group header */
+  .col-group-header {
+    background: rgba(0,0,0,0.04);
+  }
+
+  /* HERO BAR */
+  .hero-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    background: rgba(255,255,255,0.5);
+    border: 1px solid rgba(26,92,229,0.3);
+    border-radius: 14px;
+    margin-bottom: 32px;
+    overflow: hidden;
+  }
+
+  .hero-stat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 40px;
+    gap: 6px;
+  }
+
+  .hero-divider {
+    width: 1px;
+    height: 60px;
+    background: rgba(26,92,229,0.3);
+  }
+
+  .hero-stat-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--silver-dim);
+  }
+
+  .hero-stat-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 56px;
+    font-weight: 900;
+    line-height: 1;
+    color: var(--white);
+  }
+
+  .hero-units {
+    background: linear-gradient(90deg, var(--sc-cyan), #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* PODIUM */
+  .podium-wrap {
+    display: flex;
+    gap: 16px;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .podium-card {
+    flex: 1;
+    max-width: 340px;
+    border-radius: 12px;
+    padding: 24px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(26,92,229,0.2);
+    background: rgba(255,255,255,0.5);
+  }
+
+  .podium-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .podium-card.p1 { 
+    padding-top: 32px;
+    border-color: rgba(255,215,0,0.4);
+    background: linear-gradient(180deg, rgba(255,215,0,0.06) 0%, var(--black-2) 60%);
+  }
+  .podium-card.p1::before { background: linear-gradient(90deg, #FFD700, #fbbf24); }
+  .podium-card.p2::before { background: linear-gradient(90deg, #C0C0C0, #94a3b8); }
+  .podium-card.p3::before { background: linear-gradient(90deg, #CD7F32, #b45309); }
+
+  .podium-position {
+    font-size: 28px;
+    line-height: 1;
+  }
+
+  .podium-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: var(--white);
+    text-align: center;
+  }
+
+  .podium-role {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--silver-dim);
+  }
+
+  .podium-stats {
+    display: flex;
+    gap: 20px;
+    margin-top: 8px;
+  }
+
+  .podium-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .podium-stat-val {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 32px;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .podium-stat-val.units-val { color: var(--sc-cyan); }
+  .podium-stat-val.yeses-val { color: var(--silver); }
+
+  .podium-stat-lbl {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--silver-dim);
+  }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .podium-wrap { flex-direction: column; align-items: center; }
+    .podium-card { max-width: 100%; width: 100%; }
+  }
+
+
+
+  /* Separator / group total rows */
+  tr.group-total-row td {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 10px 6px;
+  }
+  tr.leader-total-row td { background: rgba(0,0,0,0.08); color: var(--silver); }
+  tr.rep-total-row td    { background: rgba(249,115,22,0.15); color: #7a5200; }
+  tr.daily-total-row td  { background: rgba(0,0,0,0.04); color: var(--silver); font-weight:700; }
+  tr.office-total-row td { background: rgba(0,0,0,0.08); color: var(--silver); font-weight:800; font-size:14px; }
+
+  /* Day border — thick left border on first col of each day */
+  td.day-start, th.day-start { border-left: 2px solid rgba(0,0,0,0.12) !important; }
+  td.week-start, th.week-start { border-left: 3px solid rgba(0,0,0,0.2) !important; }
+
+
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.1);
+  }
+  .table-scroll table {
+    min-width: max-content;
+    width: 100%;
+  }
+
+  /* Collapsible day columns */
+  .day-toggle {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .day-toggle:hover { color: var(--sc-cyan); }
+
+  .day-toggle .toggle-icon {
+    display: inline-block;
+    font-size: 9px;
+    margin-left: 4px;
+    transition: transform 0.2s;
+    opacity: 0.6;
+  }
+  .day-toggle.expanded .toggle-icon {
+    transform: rotate(180deg);
+  }
+
+  .detail-col {
+    transition: opacity 0.2s;
+  }
+  .hidden { display: none !important; visibility: collapse; }
+
+  /* VIEW TOGGLE GROUP */
+  .view-toggle-group {
+    display: flex;
+    background: rgba(255,255,255,0.5);
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-right: 12px;
+  }
+  .view-toggle {
+    padding: 6px 16px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--silver-dim);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    border-right: 1px solid rgba(0,0,0,0.1);
+  }
+  .view-toggle:last-child { border-right: none; }
+  .view-toggle:hover { color: var(--silver); background: rgba(0,0,0,0.08); }
+  .view-toggle.active { background: rgba(0,0,0,0.12); color: var(--silver); }
+
+  /* Own row highlight — keep color-coded cells visible */
+  tr.own-row { outline: 2px solid rgba(26,92,229,0.35); outline-offset: -2px; }
+  tr.own-row td { font-weight: 900; }
+  tr.own-row td.name-cell { border-left: 3px solid var(--sc-cyan); }
+  .team-locked { opacity: 0.45; cursor: default; }
+  .team-locked .team-name { cursor: default !important; }
+
+  /* Week summary columns */
+  th.week-col {
+    color: var(--silver);
+  }
+  .week-start {
+    border-left: 3px solid rgba(0,0,0,0.15) !important;
+  }
+  /* Day start — lighter separator */
+  .day-start {
+    border-left: 2px solid rgba(0,0,0,0.07);
+  }
+
+  /* ── NAV TABS ── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+  }
+  #main-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    padding: 0 24px;
+  }
+  .nav-tab {
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 18px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--silver-dim);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .nav-tab:hover { color: var(--white); background: rgba(0,200,255,0.08); border-color: rgba(0,200,255,0.2); }
+  .nav-tab.active { color: var(--sc-cyan); background: rgba(0,200,255,0.12); border-color: rgba(0,200,255,0.35); }
+  .nav-tab-edit { padding: 8px 12px; font-size: 14px; }
+  #nav-team-edit { display: none; } /* shown only for JD */
+
+  /* ── ROLE SWITCHER ── */
+  #role-switcher {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 24px; margin: 0 auto 4px;
+    max-width: 1400px;
+    background: rgba(26,92,229,0.06);
+    border: 1px solid rgba(26,92,229,0.2);
+    border-radius: 10px;
+  }
+  .role-switcher-label {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 11px;
+    font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--silver-dim); white-space: nowrap;
+  }
+  .role-switcher-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .role-pill {
+    padding: 5px 14px; border-radius: 20px; border: 1px solid rgba(26,92,229,0.3);
+    background: transparent; color: var(--silver-dim); cursor: pointer;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 12px;
+    font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .role-pill:hover { border-color: var(--sc-cyan); color: var(--white); }
+  .role-pill.active { background: rgba(0,153,204,0.35); border-color: var(--sc-cyan); color: var(--sc-cyan); }
+  #role-persona-wrap { margin-left: auto; }
+  #role-persona {
+    background: rgba(255,255,255,0.4); border: 1px solid rgba(26,92,229,0.3);
+    border-radius: 8px; color: var(--white); padding: 5px 10px;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 13px;
+    cursor: pointer; min-width: 160px;
+  }
+  #role-persona option { background: rgba(255,255,255,0.4); }
+
+  /* ── LOCKED / RESTRICTED STATES ── */
+  .row-locked td { opacity: 0.4; }
+  .row-locked td.name-cell span.name-text { cursor: default !important; text-decoration: none !important; color: var(--silver-dim) !important; }
+  .locked-badge {
+    display: inline-block; font-size: 9px; letter-spacing: 1px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px; padding: 1px 5px; color: var(--silver-dim);
+    vertical-align: middle; margin-left: 6px; text-transform: uppercase;
+  }
+
+  /* NAME LINKS */
+  .name-link { cursor: pointer; transition: color 0.15s; }
+  .name-link:hover { color: var(--sc-cyan) !important; text-decoration: underline; }
+
+  /* PROFILE PAGE */
+  #profile-page {
+    display: none;
+    position: fixed; inset: 0; z-index: 1000;
+    background: linear-gradient(135deg, #c8dff0 0%, #daeaf5 40%, #c2daea 70%, #b8d4e8 100%);
+    overflow-y: auto;
+  }
+  #profile-page.open { display: block; }
+
+  .profile-page-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  .profile-topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 0 24px;
+    border-bottom: 1px solid rgba(0,200,255,0.2);
+    margin-bottom: 28px;
+    position: sticky; top: 0; z-index: 10;
+    background: linear-gradient(135deg, #c8dff0 0%, #daeaf5 40%, #c2daea 70%, #b8d4e8 100%);
+  }
+  .profile-back {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(26,92,229,0.15); border: 1px solid rgba(26,92,229,0.3);
+    border-radius: 8px; padding: 8px 16px; cursor: pointer;
+    color: var(--sc-cyan); font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    transition: background 0.15s;
+  }
+  .profile-back:hover { background: rgba(26,92,229,0.28); }
+  .profile-back-arrow { font-size: 18px; line-height: 1; }
+
+  .profile-heading { text-align: right; }
+  .profile-page-name { font-family: 'Barlow Condensed', sans-serif; font-size: 36px; font-weight: 900; color: var(--white); letter-spacing: 2px; line-height: 1; }
+  .profile-page-sub { font-size: 13px; color: var(--silver-dim); margin-top: 4px; }
+  .profile-page-sub span { color: var(--sc-cyan); }
+
+  /* ── ORDER CARDS ── */
+  .order-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 2px;
+  }
+  .urgent-card {
+    background: rgba(229,53,53,0.07);
+    border-color: rgba(229,53,53,0.30);
+    box-shadow: 0 2px 20px rgba(229,53,53,0.10);
+  }
+  .pending-card {
+    background: rgba(240,180,41,0.06);
+    border-color: rgba(240,180,41,0.25);
+  }
+  .issue-badge {
+    display: inline-block;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px; font-weight: 800;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 6px;
+  }
+  .order-field-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 9px; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--silver-dim);
+    margin-bottom: 2px;
+  }
+  .order-field-val {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px; font-weight: 700; color: var(--white);
+  }
+  .order-num { color: var(--sc-cyan); letter-spacing: 1px; }
+
+  .profile-section-title {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: 3px; text-transform: uppercase; color: var(--silver-dim);
+    margin: 28px 0 12px; border-bottom: 1px solid rgba(26,92,229,0.15); padding-bottom: 8px;
+  }
+
+  .profile-stats-bar { display: flex; background: rgba(255,255,255,0.5); border-radius: 12px; border: 1px solid rgba(26,92,229,0.2); overflow: hidden; margin-bottom: 4px; }
+  .profile-stat { flex: 1; padding: 20px 12px; text-align: center; border-right: 1px solid rgba(26,92,229,0.15); }
+  .profile-stat:last-child { border-right: none; }
+  .profile-stat-val { font-family: 'Barlow Condensed', sans-serif; font-size: 34px; font-weight: 900; color: var(--white); line-height: 1; }
+  .profile-stat-val.units-val { color: var(--sc-cyan); }
+  .profile-stat-lbl { font-size: 10px; color: var(--silver-dim); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 4px; }
+
+  /* ── BREAKDOWN GRID ── */
+  .breakdown-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr;
+    gap: 8px; margin-bottom: 4px;
+  }
+  .breakdown-remark { border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: center; }
+  .breakdown-stat { background: rgba(255,255,255,0.4); border: 1px solid rgba(26,92,229,0.15); border-radius: 8px; padding: 10px 8px; text-align: center; }
+  .breakdown-val { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; color: var(--white); }
+  .breakdown-lbl { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--silver-dim); margin-top: 2px; }
+
+  /* ── CHURN BUCKETS ── */
+  .churn-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 4px; }
+  .churn-bucket { background: rgba(255,255,255,0.4); border: 1px solid rgba(26,92,229,0.15); border-radius: 8px; padding: 12px 8px; text-align: center; }
+  .churn-label { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--silver-dim); text-transform: uppercase; margin-bottom: 6px; }
+  .churn-fraction { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; color: var(--white); }
+  .churn-pct { font-size: 11px; font-weight: 600; margin-top: 2px; }
+
+  /* ── CHARTS ── */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
+  .chart-box { background: rgba(255,255,255,0.4); border: 1px solid rgba(26,92,229,0.15); border-radius: 10px; padding: 14px 12px; }
+  .chart-title { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--sc-cyan); margin-bottom: 10px; }
+  .chart-wrap { position: relative; width: 100%; }
+  .chart-wrap canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; }
+
+  @media (max-width: 600px) {
+    .breakdown-grid { grid-template-columns: 1fr 1fr; }
+    .churn-grid { grid-template-columns: repeat(3, 1fr); }
+    .charts-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-area">
+      <img src="references/logos/elevate-logo-full-standard-blue.png" alt="Elevate" style="height:52px; width:auto;">
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <span class="week-label">Weekly Leaderboard</span>
+        <div class="live-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
+            <circle cx="12" cy="20" r="3" fill="#22c55e"/>
+            <path d="M12 17 L6 10 L9 10 L9 4 L15 4 L15 10 L18 10 Z" fill="#22c55e"/>
+          </svg>
+          Live
+        </div>
+      </div>
+    </div>
+  
+    <!-- NAV TABS -->
+    <nav id="main-nav">
+      <button class="nav-tab active" id="nav-leaderboard" onclick="navTo('leaderboard')">🏆 Leaderboard</button>
+      <button class="nav-tab" id="nav-profile" onclick="navTo('profile')">👤 My Profile</button>
+      <button class="nav-tab" id="nav-team" onclick="navTo('team')"><span id="nav-team-label">⚡ My Team</span></button>
+      <button class="nav-tab nav-tab-edit" id="nav-team-edit" onclick="handleTeamEditClick()" title="Customize team" style="position:relative">
+        ✏️ <span id="edit-unlock-badge" style="display:none;position:absolute;top:2px;right:2px;width:8px;height:8px;background:#f97316;border-radius:50%;border:2px solid var(--black)"></span>
+      </button>
+      <button class="nav-tab" id="nav-orders" onclick="navTo('orders')" style="display:none">📦 All Orders</button>
+      <button class="nav-tab" id="nav-roster" onclick="navTo('roster')" style="position:relative">
+        📋 People
+        <span id="roster-notif-badge" style="display:none;position:absolute;top:4px;right:4px;min-width:16px;height:16px;background:#f97316;border-radius:8px;border:2px solid var(--black);font-size:9px;font-weight:900;color:#fff;display:none;align-items:center;justify-content:center;padding:0 3px;font-family:'Barlow Condensed',sans-serif;letter-spacing:0">0</span>
+      </button>
+    </nav>
+</header>
+  <!-- TEAM CUSTOMIZE MODAL -->
+  <div id="team-customize-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.75);align-items:center;justify-content:center">
+    <div style="background:rgba(255,255,255,0.5);border:1px solid rgba(26,92,229,0.3);border-radius:16px;padding:32px;width:min(420px,90vw)">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:var(--white);margin-bottom:4px">Customize Your Team</div>
+      <div style="font-size:12px;color:var(--silver-dim);margin-bottom:24px">Changes how your team appears on the leaderboard</div>
+      <label style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:8px">Team Emoji</label>
+      <div id="emoji-picker" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;font-size:22px"></div>
+      <div style="font-size:11px;color:var(--silver-dim);margin-bottom:20px">Selected: <span id="emoji-display" style="font-size:18px">—</span></div>
+      <label style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:8px">Team Name</label>
+      <input id="team-name-input" type="text" placeholder="Enter team name..."
+        style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.06);border:1px solid rgba(26,92,229,0.3);border-radius:8px;padding:10px 14px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:15px;outline:none;margin-bottom:24px">
+      <div style="display:flex;gap:10px">
+        <button onclick="saveTeamCustomize()" style="flex:1;background:var(--blue-core);border:none;border-radius:8px;padding:10px;color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer">Save</button>
+        <button onclick="closeTeamCustomize()" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px;color:var(--silver);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNLOCK REQUEST MODAL (JD sees this when not unlocked) -->
+  <div id="unlock-request-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.75);align-items:center;justify-content:center">
+    <div style="background:rgba(255,255,255,0.5);border:1px solid rgba(26,92,229,0.3);border-radius:16px;padding:32px;width:min(400px,90vw);text-align:center">
+      <div style="font-size:40px;margin-bottom:12px">🔐</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:var(--white);margin-bottom:8px">Request Edit Access</div>
+      <div style="font-size:13px;color:var(--silver-dim);margin-bottom:24px;line-height:1.6">Team customization requires approval from an Admin or Owner. Send a request to unlock this feature.</div>
+      <div id="unlock-request-status"></div>
+      <div style="display:flex;gap:10px">
+        <button id="unlock-send-btn" onclick="sendUnlockRequest()" style="flex:1;background:var(--blue-core);border:none;border-radius:8px;padding:10px;color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer">Send Request</button>
+        <button onclick="closeUnlockModal()" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px;color:var(--silver);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ALL ORDERS PAGE (Sales Support) -->
+  <div id="orders-page" style="display:none;position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#c8dff0 0%,#daeaf5 40%,#c2daea 70%,#b8d4e8 100%);overflow-y:auto">
+    <div style="max-width:1200px;margin:0 auto;padding:24px 24px 80px">
+      <div style="display:flex;align-items:center;gap:16px;padding-bottom:20px;border-bottom:1px solid rgba(0,200,255,0.2);margin-bottom:28px">
+        <button class="profile-back" onclick="navTo('leaderboard')"><span>←</span> Back</button>
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:var(--white);letter-spacing:2px">📦 All Orders</div>
+          <div style="font-size:12px;color:var(--silver-dim);margin-top:4px" id="orders-subtitle"></div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
+          <select id="orders-filter-rep" onchange="renderAllOrders()" style="background:rgba(0,0,0,0.06);border:1px solid rgba(0,200,255,0.2);border-radius:8px;color:var(--white);padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-size:13px;cursor:pointer;outline:none">
+            <option value="">All Reps</option>
+          </select>
+          <select id="orders-filter-status" onchange="renderAllOrders()" style="background:rgba(0,0,0,0.06);border:1px solid rgba(0,200,255,0.2);border-radius:8px;color:var(--white);padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-size:13px;cursor:pointer;outline:none">
+            <option value="">All Statuses</option>
+            <option value="Active">Active</option>
+            <option value="Pending">Pending</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+          <select id="orders-filter-type" onchange="renderAllOrders()" style="background:rgba(0,0,0,0.06);border:1px solid rgba(0,200,255,0.2);border-radius:8px;color:var(--white);padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-size:13px;cursor:pointer;outline:none">
+            <option value="">All Types</option>
+            <option value="Urgent">🚨 Urgent</option>
+            <option value="Pending Activation">⏳ Pending Activation</option>
+          </select>
+        </div>
+      </div>
+      <div id="orders-table-wrap"></div>
+    </div>
+  </div>
+
+  <!-- ORDER EDIT MODAL -->
+  <div id="order-edit-modal" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.8);align-items:center;justify-content:center">
+    <div style="background:rgba(255,255,255,0.5);border:1px solid rgba(0,200,255,0.3);border-radius:16px;padding:32px;width:min(500px,92vw);max-height:90vh;overflow-y:auto">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:var(--white);margin-bottom:4px">✏️ Edit Order</div>
+      <div id="order-edit-ordernum" style="font-size:12px;color:var(--sc-cyan);letter-spacing:2px;margin-bottom:20px"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div>
+          <label style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Product</label>
+          <select id="edit-product" style="width:100%;background:rgba(0,0,0,0.06);border:1px solid rgba(0,200,255,0.2);border-radius:8px;color:var(--white);padding:9px 12px;font-family:'Barlow Condensed',sans-serif;font-size:14px;outline:none">
+            <option>Air</option><option>Cell</option><option>Fiber</option><option>VoIP</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Status</label>
+          <select id="edit-status" style="width:100%;background:rgba(0,0,0,0.06);border:1px solid rgba(0,200,255,0.2);border-radius:8px;color:var(--white);padding:9px 12px;font-family:'Barlow Condensed',sans-serif;font-size:14px;outline:none">
+            <option>Active</option><option>Pending</option><option>Delivered</option><option>Cancelled</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Date Submitted</label>
+          <input id="edit-date" type="text" style="width:100%;background:rgba(0,0,0,0.06);border:1px solid rgba(0,200,255,0.2);border-radius:8px;color:var(--white);padding:9px 12px;font-family:'Barlow Condensed',sans-serif;font-size:14px;outline:none">
+        </div>
+        <div>
+          <label style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Order #</label>
+          <input id="edit-ordernum-field" type="text" style="width:100%;background:rgba(0,0,0,0.06);border:1px solid rgba(0,200,255,0.2);border-radius:8px;color:var(--white);padding:9px 12px;font-family:'Barlow Condensed',sans-serif;font-size:14px;outline:none">
+        </div>
+      </div>
+
+      <label style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);display:block;margin-bottom:6px">Sales Support Notes</label>
+      <textarea id="edit-notes" rows="4" placeholder="Add notes about this order — porting issues, payment status, follow-up needed..."
+        style="width:100%;box-sizing:border-box;background:rgba(0,0,0,0.06);border:1px solid rgba(0,200,255,0.2);border-radius:8px;color:var(--white);padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:13px;outline:none;resize:vertical;margin-bottom:20px"></textarea>
+
+      <div id="edit-note-history" style="margin-bottom:20px"></div>
+
+      <div style="display:flex;gap:10px">
+        <button onclick="saveOrderEdit()" style="flex:1;background:rgba(0,153,204,0.35);border:1px solid var(--sc-cyan);border-radius:8px;padding:10px;color:var(--sc-cyan);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer">Save</button>
+        <button onclick="closeOrderEdit()" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px;color:var(--silver);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <div id="roster-page" style="display:none;position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#c8dff0 0%,#daeaf5 40%,#c2daea 70%,#b8d4e8 100%);overflow-y:auto">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 24px 80px">
+
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid rgba(26,92,229,0.3);margin-bottom:28px">
+        <div style="display:flex;align-items:center;gap:16px">
+          <div>
+            <button class="profile-back" onclick="navTo('leaderboard')" style="margin-bottom:8px"><span>←</span> Back</button>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:var(--white);letter-spacing:2px">📋 People</div>
+            <div style="font-size:12px;color:var(--silver-dim);margin-top:4px" id="roster-subtitle"></div>
+          </div>
+        </div>
+        <button id="add-member-btn" onclick="openAddMemberModal()" style="display:none;background:linear-gradient(135deg,var(--blue-core),var(--blue-struct));border:none;border-radius:8px;color:#fff;padding:10px 20px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;box-shadow:0 2px 8px rgba(0,153,204,0.3)">+ Add Member</button>
+        <!-- Pending unlock requests badge -->
+        <div id="pending-requests-section" style="display:none;background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:12px 16px">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#f97316;margin-bottom:8px">⚠ Pending Unlock Requests</div>
+          <div id="pending-requests-list"></div>
+        </div>
+      </div>
+
+      <!-- Roster Table -->
+      <div style="background:rgba(255,255,255,0.5);border:1px solid rgba(26,92,229,0.2);border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse" id="roster-table">
+          <thead>
+            <tr style="background:rgba(0,0,0,0.06)">
+              <th style="text-align:left;padding:12px 16px;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Name</th>
+              <th style="text-align:left;padding:12px 16px;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Role</th>
+              <th style="text-align:left;padding:12px 16px;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Team</th>
+              <th style="text-align:center;padding:12px 16px;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Status</th>
+            </tr>
+          </thead>
+          <tbody id="roster-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ADD MEMBER MODAL -->
+  <div id="add-member-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center">
+    <div style="background:linear-gradient(135deg,#d8e8f4 0%,#e4eff8 100%);border:1px solid rgba(26,92,229,0.3);border-radius:16px;padding:32px;width:420px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--white);letter-spacing:2px">+ Add Team Member</div>
+        <button onclick="closeAddMemberModal()" style="background:none;border:none;color:var(--silver-dim);font-size:22px;cursor:pointer;padding:4px 8px">&times;</button>
+      </div>
+      <div id="add-member-error" style="display:none;background:rgba(229,53,53,0.1);border:1px solid rgba(229,53,53,0.3);border-radius:8px;padding:10px 14px;margin-bottom:16px;color:#e53535;font-family:'Barlow Condensed',sans-serif;font-size:13px"></div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div>
+          <label style="display:block;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:6px">Email Address</label>
+          <input id="add-member-email" type="email" placeholder="rep@example.com" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.5);border:1px solid rgba(26,92,229,0.25);border-radius:8px;color:var(--white);padding:10px 14px;font-family:'Barlow Condensed',sans-serif;font-size:14px;outline:none">
+        </div>
+        <div>
+          <label style="display:block;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:6px">Display Name</label>
+          <input id="add-member-name" type="text" placeholder="Full Name" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.5);border:1px solid rgba(26,92,229,0.25);border-radius:8px;color:var(--white);padding:10px 14px;font-family:'Barlow Condensed',sans-serif;font-size:14px;outline:none">
+        </div>
+        <div style="display:flex;gap:12px">
+          <div style="flex:1">
+            <label style="display:block;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:6px">Team</label>
+            <select id="add-member-team" style="width:100%;background:rgba(255,255,255,0.5);border:1px solid rgba(26,92,229,0.25);border-radius:8px;color:var(--white);padding:10px 14px;font-family:'Barlow Condensed',sans-serif;font-size:13px;cursor:pointer;outline:none"></select>
+          </div>
+          <div style="flex:1">
+            <label style="display:block;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:6px">Rank</label>
+            <select id="add-member-rank" style="width:100%;background:rgba(255,255,255,0.5);border:1px solid rgba(26,92,229,0.25);border-radius:8px;color:var(--white);padding:10px 14px;font-family:'Barlow Condensed',sans-serif;font-size:13px;cursor:pointer;outline:none">
+              <option value="rep">Client Rep</option>
+              <option value="l1">Team Leader</option>
+              <option value="jd">Jr. Director</option>
+              <option value="support">Sales Support</option>
+              <option value="admin">Admin</option>
+              <option value="owner">Owner</option>
+            </select>
+          </div>
+        </div>
+        <button id="add-member-submit" onclick="submitAddMember()" style="margin-top:8px;background:linear-gradient(135deg,var(--blue-core),var(--blue-struct));border:none;border-radius:8px;color:#fff;padding:12px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;box-shadow:0 2px 8px rgba(0,153,204,0.3)">Add to Roster</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROLE SWITCHER (demo only) -->
+  <div id="role-switcher">
+    <div class="role-switcher-label">Viewing as</div>
+    <div class="role-switcher-pills">
+      <button class="role-pill active" data-role="owner"    onclick="setRole('owner')">Owner</button>
+      <button class="role-pill"        data-role="admin"    onclick="setRole('admin')">Admin</button>
+      <button class="role-pill"        data-role="jd"       onclick="setRole('jd')">Jr. Director</button>
+      <button class="role-pill"        data-role="l1"       onclick="setRole('l1')">Team Leader</button>
+      <button class="role-pill"        data-role="support"  onclick="setRole('support')">Sales Support</button>
+        <button class="role-pill"        data-role="rep"      onclick="setRole('rep')">Client Rep</button>
+    </div>
+    <div id="role-persona-wrap">
+      <select id="role-persona" onchange="setPersona(this.value)"></select>
+    </div>
+  </div>
+
+  <!-- HERO STATS BAR -->
+  <div class="hero-bar">
+    <div class="hero-stat">
+      <div class="hero-stat-label">Week Yeses</div>
+      <div class="hero-stat-value" id="hero-yeses">—</div>
+    </div>
+    <div class="hero-divider"></div>
+    <div class="hero-stat">
+      <div class="hero-stat-label">Week Units</div>
+      <div class="hero-stat-value hero-units" id="hero-units">—</div>
+    </div>
+  </div>
+
+  <!-- TOP PERFORMERS -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon">🏆</span>
+      <span class="section-title">Top Performers</span>
+      <div class="section-line"></div>
+      <span class="section-count">This week</span>
+    </div>
+    <div style="margin-bottom:12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Individuals</div>
+    <div class="podium-wrap" id="podium" style="margin-bottom:32px"></div>
+    <div style="margin-bottom:12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Teams</div>
+    <div class="podium-wrap" id="team-podium"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon">👑</span>
+      <span class="section-title">Office Leaderboard</span>
+      <div class="section-line"></div>
+      <div class="view-toggle-group">
+        <button class="view-toggle active" onclick="setView('days')" id="vt-days">Days</button>
+        <button class="view-toggle" onclick="setView('weeks')" id="vt-weeks">Weeks</button>
+      </div>
+      <span class="section-count" id="member-count"></span>
+    </div>
+    <div class="table-scroll">
+      <div class="table-wrap">
+        <table id="main-table">
+          <thead>
+            <tr class="day-group"></tr>
+            <tr></tr>
+          </thead>
+          <tbody id="main-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEAMS -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-icon">🔥</span>
+      <span class="section-title">Team Rankings</span>
+      <div class="section-line"></div>
+      <span class="section-count">7 teams</span>
+    </div>
+    <div class="team-grid" id="team-grid"></div>
+  </div>
+
+</div>
+
+<!-- FULL PROFILE PAGE -->
+<div id="profile-page">
+  <div class="profile-page-inner" id="profile-page-inner"></div>
+</div>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay" style="position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#c8dff0 0%,#daeaf5 40%,#c2daea 70%,#b8d4e8 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity 0.4s">
+  <img src="references/logos/elevate-logo-full-standard-blue.png" alt="Elevate" style="height:64px;width:auto;opacity:0.7">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;letter-spacing:3px;text-transform:uppercase;color:var(--silver-dim)" id="loading-text">Connecting to live data…</div>
+  <div style="width:120px;height:3px;background:rgba(0,0,0,0.08);border-radius:2px;overflow:hidden"><div style="width:40%;height:100%;background:var(--sc-cyan);border-radius:2px;animation:loadSlide 1.2s ease infinite"></div></div>
+</div>
+
+<!-- LOGIN MODAL -->
+<div id="login-modal" style="display:none;position:fixed;inset:0;z-index:10000;background:linear-gradient(135deg,#c8dff0 0%,#daeaf5 40%,#c2daea 70%,#b8d4e8 100%);align-items:center;justify-content:center">
+  <div style="text-align:center;width:380px;max-width:90vw">
+    <img src="references/logos/elevate-logo-full-standard-blue.png" alt="Elevate" style="height:56px;width:auto;opacity:0.7;margin-bottom:24px">
+    <div style="background:rgba(255,255,255,0.5);border:1px solid rgba(26,92,229,0.2);border-radius:16px;padding:32px;box-shadow:0 8px 32px rgba(0,0,0,0.08)">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--white);letter-spacing:2px;margin-bottom:6px">Welcome</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;color:var(--silver-dim);letter-spacing:1px;margin-bottom:24px">Enter your email to view the dashboard</div>
+      <input id="login-email" type="email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')submitLogin()"
+        style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.6);border:1px solid rgba(26,92,229,0.25);border-radius:8px;color:var(--white);padding:12px 16px;font-family:'Barlow Condensed',sans-serif;font-size:15px;outline:none;text-align:center;margin-bottom:12px">
+      <div id="login-error" style="display:none;color:#e53535;font-family:'Barlow Condensed',sans-serif;font-size:12px;margin-bottom:12px"></div>
+      <button onclick="submitLogin()" style="width:100%;background:linear-gradient(135deg,var(--blue-core),var(--blue-struct));border:none;border-radius:8px;color:#fff;padding:12px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;box-shadow:0 2px 8px rgba(0,153,204,0.3)">Sign In</button>
+    </div>
+    <div id="login-demo-link" style="display:none;margin-top:16px">
+      <button onclick="loginAsDemo()" style="background:none;border:none;color:var(--silver-dim);font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1px;cursor:pointer;text-decoration:underline">or continue with demo data</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  @keyframes loadSlide { 0%{transform:translateX(-100%)} 100%{transform:translateX(350%)} }
+</style>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CONFIG — Google Sheet Integration
+// ═══════════════════════════════════════════════════════
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLsTHqFqp33feYD-G4bPJP4yVpP6XsojsSNFDVzc1K6-4Hq7lLaaknNzLfju7DUlrl/exec';
+const API_KEY = 'elevate-dash-2026-secret';
+let DATA_LOADED = false;
+
+function showLoading() {
+  const el = document.getElementById('loading-overlay');
+  if (el) el.style.display = 'flex';
+}
+function hideLoading() {
+  const el = document.getElementById('loading-overlay');
+  if (el) { el.style.opacity = '0'; setTimeout(() => el.style.display = 'none', 400); }
+}
+// ═══════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════
+function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
+function randPeriod(active){
+  if(!active) return {y:0,air:0,cell:0,fiber:0,voip:0,units:0};
+  const air=rnd(0,3),cell=rnd(0,5),fiber=rnd(0,3),voip=rnd(0,2);
+  const units=air+cell+fiber+voip;
+  const y=units>0?rnd(1,Math.max(1,Math.ceil(units/1.5))):0;
+  return {y,air,cell,fiber,voip,units};
+}
+let TEAM_NAMES=["Aces","Squids","Grind Team","Queenz","Different Breed","Sharks","Dawgs"];
+const LEADER_NAMES=["Matt Hankee","Mason Pickard","Bethany Cheung","David Montes","Jared Kibunguchy","Cesar Ochoa","André Benicio","Mino Huang","EJ","Anthony Hernandez","Edgar Mariscal","José Gudino","Crystal Figueroa","Jackie Leroy"];
+const REP_NAMES=["Saman B Jameel","Kenia Garcia","JD Pangilinan","Elijah Morrise","Gerardo Velasquez","Elias Marquez","Khelani Moore","Jason Martin","Nathan Asres","Iann Perez","Abram Chimal","Ahmad Rashad","Ralph Moreno","Hector Espinoza","Anthony Delgado"];
+
+function randPerson(name,role){
+  const days=Array.from({length:7},()=>randPeriod(Math.random()>0.45));
+  const lw=randPeriod(Math.random()>0.3);
+  const w2=randPeriod(Math.random()>0.3);
+  const w3=randPeriod(Math.random()>0.3);
+  const team=TEAM_NAMES[rnd(0,TEAM_NAMES.length-1)];
+  const totalActs=Math.max(1,days.reduce((s,d)=>s+d.units,0)+lw.units+w2.units+w3.units);
+  const active=rnd(Math.floor(totalActs*0.6),Math.floor(totalActs*0.85));
+  const pending=rnd(0,Math.floor(totalActs*0.2));
+  const cancel=Math.max(0,totalActs-active-pending);
+  const projDisco=rnd(0,Math.floor(totalActs*0.08));
+  const recentAvg=parseFloat(((lw.units+days.reduce((s,d)=>s+d.units,0))/2).toFixed(2));
+  const fourWkAvg=parseFloat(((lw.units+w2.units+w3.units+days.reduce((s,d)=>s+d.units,0))/4).toFixed(2));
+  const vsPct=fourWkAvg>0?parseFloat(((recentAvg-fourWkAvg)/fourWkAvg*100).toFixed(1)):0;
+  let remark,remarkColor;
+  if(vsPct>=20){remark='Strong upward trend';remarkColor='#22c55e';}
+  else if(vsPct>=5){remark='Slight improvement';remarkColor='#86efac';}
+  else if(vsPct>=-5){remark='Holding steady';remarkColor='#f0b429';}
+  else if(vsPct>=-20){remark='Meaningful decline';remarkColor='#f97316';}
+  else{remark='Significant drop';remarkColor='#e53535';}
+  const churnBuckets=[['0–30 Day',30],['30–60 Day',60],['60–90 Day',90],['90–120 Day',120],['120–150 Day',150]].map(([label],i)=>{
+    const activated=rnd(3,Math.max(3,Math.floor(totalActs*rnd(10,30)/100)));
+    const disco=Math.random()<0.05+i*0.01?rnd(0,Math.ceil(activated*0.15)):0;
+    return {label,activated,disco,pct:activated>0?((disco/activated)*100).toFixed(1):'0.0'};
+  });
+  const salesPerDay=days.map(d=>d.units);
+  const fourWkDaily=Array.from({length:7},(_,i)=>parseFloat(([days[i].units,...[lw,w2,w3].map(w=>Math.max(0,w.units+rnd(-2,2)))].reduce((a,v)=>a+v,0)/4).toFixed(1)));
+  const alpha=salesPerDay.map((v,i)=>parseFloat((v-fourWkDaily[i]).toFixed(1)));
+  const timeSlots=['10:30–4:00','4:00–6:00','6:00–9:00','9:00–10:00'];
+  const recentTime=timeSlots.map(()=>rnd(0,4));
+  const fw4Time=timeSlots.map(()=>rnd(0,12));
+  const prodLabels=['Air','Cell','Fiber','VoIP'];
+  const recentProds=[days.reduce((s,d)=>s+d.air,0),days.reduce((s,d)=>s+d.cell,0),days.reduce((s,d)=>s+d.fiber,0),days.reduce((s,d)=>s+d.voip,0)];
+  const fw4Prods=[[days,lw,w2,w3]].flat().reduce((a,w)=>[a[0]+w.air,a[1]+w.cell,a[2]+w.fiber,a[3]+w.voip],[0,0,0,0]);
+  return {name,role,team,days,lw,w2,w3,
+    metrics:{totalActs,active,pending,cancel,projDisco,recentAvg,fourWkAvg,vsPct,
+      remark,remarkColor,churnBuckets,salesPerDay,fourWkDaily,alpha,
+      timeSlots,recentTime,fw4Time,prodLabels,recentProds,fw4Prods}};
+}
+
+
+// ═══════════════════════════════════════════════════════
+// ORDER DATA GENERATOR
+// ═══════════════════════════════════════════════════════
+const FIRST_NAMES=['James','Maria','Kevin','Aaliyah','Derek','Sofia','Marcus','Priya','Tyler','Zoe','Carlos','Destiny','Nathan','Jasmine','Omar'];
+const LAST_NAMES=['Johnson','Rodriguez','Kim','Patel','Thompson','Davis','Garcia','Wilson','Martinez','Anderson','Taylor','Moore','Jackson','White','Harris'];
+const PRODUCTS=['Air','Cell','Fiber','VoIP'];
+const CARRIERS=['T-Mobile','AT&T','Verizon','Metro','Cricket'];
+const URGENT_TYPES=[
+  {type:'Port Freeze',color:'#e53535',priority:1},
+  {type:'Port Rejection',color:'#e53535',priority:1},
+  {type:'Payment Declined',color:'#f97316',priority:2},
+  {type:'Wrong Number Ported',color:'#e53535',priority:1},
+  {type:'SIM Not Received',color:'#f0b429',priority:3},
+  {type:'Activation Failed',color:'#f97316',priority:2},
+  {type:'Customer Cancel Risk',color:'#f97316',priority:2},
+];
+
+function randCustomerName(){ return FIRST_NAMES[rnd(0,FIRST_NAMES.length-1)]+' '+LAST_NAMES[rnd(0,LAST_NAMES.length-1)]; }
+function randOrderNum(){ return 'ORD-'+Math.random().toString(36).substring(2,8).toUpperCase(); }
+function randDate(daysAgo){ const d=new Date(); d.setDate(d.getDate()-daysAgo); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+
+function randOrders(count){
+  return Array.from({length:count},(_,i)=>({
+    customer: randCustomerName(),
+    order:    randOrderNum(),
+    product:  PRODUCTS[rnd(0,3)],
+    carrier:  CARRIERS[rnd(0,4)],
+    date:     randDate(rnd(0,28)),
+    daysAgo:  rnd(0,28),
+    status:   ['Active','Active','Active','Active','Pending','Pending','Delivered','Delivered','Cancelled'][rnd(0,8)]
+  })).sort((a,b)=>a.daysAgo-b.daysAgo);
+}
+
+function randPendingActivations(count){
+  return Array.from({length:count},()=>({
+    customer: randCustomerName(),
+    order:    randOrderNum(),
+    product:  PRODUCTS[rnd(0,3)],
+    date:     randDate(rnd(2,14)),
+    daysAgo:  rnd(2,14),
+    deliveredDays: rnd(1,10)
+  })).sort((a,b)=>b.deliveredDays-a.deliveredDays); // longest waiting first
+}
+
+function randUrgent(count){
+  return Array.from({length:count},()=>{
+    const issue=URGENT_TYPES[rnd(0,URGENT_TYPES.length-1)];
+    return {
+      customer: randCustomerName(),
+      order:    randOrderNum(),
+      product:  PRODUCTS[rnd(0,3)],
+      date:     randDate(rnd(1,21)),
+      daysAgo:  rnd(1,21),
+      issue:    issue.type,
+      color:    issue.color,
+      priority: issue.priority,
+    };
+  }).sort((a,b)=>a.priority-b.priority || b.daysAgo-a.daysAgo);
+}
+
+// Attach orders to each person
+function attachOrders(p){
+  const urgentCount = Math.random() < 0.5 ? rnd(0,3) : rnd(0,1);
+  const pendingCount = rnd(0,4);
+  p.orders = {
+    recent:  randOrders(20),
+    pending: randPendingActivations(pendingCount),
+    urgent:  randUrgent(urgentCount)
+  };
+  return p;
+}
+
+let leaders = [];
+let reps = [];
+let teams = [];
+
+// ═══════════════════════════════════════════════════════
+// SHEET DATA LOADING
+// ═══════════════════════════════════════════════════════
+
+// Build a person object from sheet-sourced data, computing all derived metrics
+function buildPersonFromSheetData(p) {
+  // Map sheet period names to dashboard period structure
+  const days = p.days.map(d => ({
+    y: d.y, air: d.air, cell: d.cell, fiber: d.fiber, voip: d.voip,
+    units: d.air + d.cell + d.fiber + d.voip
+  }));
+  const lw = {y:p.priorWeek.y, air:p.priorWeek.air, cell:p.priorWeek.cell,
+    fiber:p.priorWeek.fiber, voip:p.priorWeek.voip,
+    units:p.priorWeek.air+p.priorWeek.cell+p.priorWeek.fiber+p.priorWeek.voip};
+  const w2 = {y:p.twoWkPrior.y, air:p.twoWkPrior.air, cell:p.twoWkPrior.cell,
+    fiber:p.twoWkPrior.fiber, voip:p.twoWkPrior.voip,
+    units:p.twoWkPrior.air+p.twoWkPrior.cell+p.twoWkPrior.fiber+p.twoWkPrior.voip};
+  const w3 = {y:p.threeWkPrior.y, air:p.threeWkPrior.air, cell:p.threeWkPrior.cell,
+    fiber:p.threeWkPrior.fiber, voip:p.threeWkPrior.voip,
+    units:p.threeWkPrior.air+p.threeWkPrior.cell+p.threeWkPrior.fiber+p.threeWkPrior.voip};
+
+  const role = p.type === 'leader' ? 'Team Leader' : 'Client Rep';
+  const team = p.team;
+
+  // Compute metrics (same formulas as randPerson)
+  const totalActs = Math.max(1, days.reduce((s,d)=>s+d.units,0) + lw.units + w2.units + w3.units);
+  const active = rnd(Math.floor(totalActs*0.6), Math.floor(totalActs*0.85));
+  const pending = rnd(0, Math.floor(totalActs*0.2));
+  const cancel = Math.max(0, totalActs - active - pending);
+  const projDisco = rnd(0, Math.floor(totalActs*0.08));
+  const recentAvg = parseFloat(((lw.units + days.reduce((s,d)=>s+d.units,0))/2).toFixed(2));
+  const fourWkAvg = parseFloat(((lw.units + w2.units + w3.units + days.reduce((s,d)=>s+d.units,0))/4).toFixed(2));
+  const vsPct = fourWkAvg>0 ? parseFloat(((recentAvg-fourWkAvg)/fourWkAvg*100).toFixed(1)) : 0;
+
+  let remark, remarkColor;
+  if(vsPct>=20){remark='Strong upward trend';remarkColor='#22c55e';}
+  else if(vsPct>=5){remark='Slight improvement';remarkColor='#86efac';}
+  else if(vsPct>=-5){remark='Holding steady';remarkColor='#f0b429';}
+  else if(vsPct>=-20){remark='Meaningful decline';remarkColor='#f97316';}
+  else{remark='Significant drop';remarkColor='#e53535';}
+
+  const churnBuckets=[['0–30 Day',30],['30–60 Day',60],['60–90 Day',90],['90–120 Day',120],['120–150 Day',150]].map(([label],i)=>{
+    const activated=rnd(3,Math.max(3,Math.floor(totalActs*rnd(10,30)/100)));
+    const disco=Math.random()<0.05+i*0.01?rnd(0,Math.ceil(activated*0.15)):0;
+    return {label,activated,disco,pct:activated>0?((disco/activated)*100).toFixed(1):'0.0'};
+  });
+
+  const salesPerDay = days.map(d=>d.units);
+  const fourWkDaily = Array.from({length:7},(_,i)=>parseFloat(([days[i].units,...[lw,w2,w3].map(w=>Math.max(0,w.units+rnd(-2,2)))].reduce((a,v)=>a+v,0)/4).toFixed(1)));
+  const alpha = salesPerDay.map((v,i)=>parseFloat((v-fourWkDaily[i]).toFixed(1)));
+  const timeSlots=['10:30–4:00','4:00–6:00','6:00–9:00','9:00–10:00'];
+  const recentTime=timeSlots.map(()=>rnd(0,4));
+  const fw4Time=timeSlots.map(()=>rnd(0,12));
+  const prodLabels=['Air','Cell','Fiber','VoIP'];
+  const recentProds=[days.reduce((s,d)=>s+d.air,0),days.reduce((s,d)=>s+d.cell,0),days.reduce((s,d)=>s+d.fiber,0),days.reduce((s,d)=>s+d.voip,0)];
+  const fw4Prods=[[...days,lw,w2,w3]].flat().reduce((a,w)=>[a[0]+w.air,a[1]+w.cell,a[2]+w.fiber,a[3]+w.voip],[0,0,0,0]);
+
+  return {name:p.name, role, team, days, lw, w2, w3,
+    metrics:{totalActs,active,pending,cancel,projDisco,recentAvg,fourWkAvg,vsPct,
+      remark,remarkColor,churnBuckets,salesPerDay,fourWkDaily,alpha,
+      timeSlots,recentTime,fw4Time,prodLabels,recentProds,fw4Prods}};
+}
+
+// Global roster lookup: email → {name, team, rank, deactivated}
+let sheetRoster = {};
+
+function loadFromSheet(data) {
+  leaders.length = 0;
+  reps.length = 0;
+
+  // Store the roster for login/management
+  sheetRoster = data.roster || {};
+
+  // Build team names from roster data
+  if (data.teamMap) {
+    TEAM_NAMES.length = 0;
+    const seen = new Set();
+    // Use all teams from the emoji map as the canonical list
+    Object.values(data.teamMap).forEach(name => {
+      if (!seen.has(name)) { seen.add(name); TEAM_NAMES.push(name); }
+    });
+  }
+
+  // Process people (already filtered to roster-only by the API)
+  data.people.forEach(p => {
+    if (p.deactivated) {
+      deactivated.add(p.name);
+    }
+
+    const person = buildPersonFromSheetData(p);
+    attachOrders(person);
+
+    if (p.type === 'leader') leaders.push(person);
+    else reps.push(person);
+
+    // Set role from rank
+    ROLE_MAP[p.name] = p.rank || (p.type === 'leader' ? 'l1' : 'rep');
+  });
+
+  // Populate mutable state from sheet
+  if (data.orderOverrides) Object.assign(orderOverrides, data.orderOverrides);
+  if (data.teamCustomizations) Object.assign(teamCustomizations, data.teamCustomizations);
+  if (data.unlockRequests) Object.assign(unlockRequests, data.unlockRequests);
+
+  rebuildTeams();
+}
+
+function loadRandomData() {
+  leaders.length = 0;
+  reps.length = 0;
+  LEADER_NAMES.forEach(n => leaders.push(attachOrders(randPerson(n, 'Team Leader'))));
+  REP_NAMES.forEach(n => reps.push(attachOrders(randPerson(n, 'Client Rep'))));
+  // Reset ROLE_MAP to defaults
+  ROLE_MAP['Jackie Leroy'] = 'owner';
+  REP_NAMES.slice(0,2).forEach(n => { ROLE_MAP[n] = 'support'; });
+  LEADER_NAMES.forEach((n,i) => { ROLE_MAP[n] = i < 4 ? 'jd' : 'l1'; });
+  REP_NAMES.forEach(n => { if(!ROLE_MAP[n]) ROLE_MAP[n] = 'rep'; });
+  // Default persona for demo mode
+  currentPersona = 'Jackie Leroy';
+  currentRole = 'owner';
+  rebuildTeams();
+}
+
+function rebuildTeams() {
+  teams.length = 0;
+  TEAM_NAMES.forEach(name => {
+    const members=[...leaders,...reps].filter(p=>p.team===name);
+    if(!members.length){ teams.push({name,units:0,y:0,members,metrics:null}); return; }
+
+    function aggPeriod(pi){ return sumPeriod(members,pi); }
+    const tw=aggPeriod(7), lw=aggPeriod(8), w2=aggPeriod(9), w3=aggPeriod(10), fw=aggPeriod(11);
+
+    const totalActs=Math.max(fw.units,1);
+    const active=Math.round(rnd(60,85)/100*totalActs);
+    const pending=Math.round(rnd(8,20)/100*totalActs);
+    const cancel=Math.max(0,totalActs-active-pending);
+    const projDisco=Math.round(rnd(0,7)/100*totalActs);
+    const recentAvg=parseFloat(((lw.units+tw.units)/2).toFixed(2));
+    const fourWkAvg=parseFloat(((tw.units+lw.units+w2.units+w3.units)/4).toFixed(2));
+    const vsPct=fourWkAvg>0?parseFloat(((recentAvg-fourWkAvg)/fourWkAvg*100).toFixed(1)):0;
+    let remark,remarkColor;
+    if(vsPct>=20){remark='Strong upward trend';remarkColor='#22c55e';}
+    else if(vsPct>=5){remark='Slight improvement';remarkColor='#86efac';}
+    else if(vsPct>=-5){remark='Holding steady';remarkColor='#f0b429';}
+    else if(vsPct>=-20){remark='Meaningful decline';remarkColor='#f97316';}
+    else{remark='Significant drop';remarkColor='#e53535';}
+    const churnBuckets=[['0–30 Day'],['30–60 Day'],['60–90 Day'],['90–120 Day'],['120–150 Day']].map(([label],i)=>{
+      const activated=rnd(5,Math.max(5,Math.floor(totalActs*rnd(8,25)/100)));
+      const disco=Math.random()<0.05+i*0.01?rnd(0,Math.ceil(activated*0.12)):0;
+      return {label,activated,disco,pct:activated>0?((disco/activated)*100).toFixed(1):'0.0'};
+    });
+    const salesPerDay=Array.from({length:7},(_,i)=>members.reduce((s,p)=>s+p.days[i].units,0));
+    const fourWkDaily=Array.from({length:7},(_,i)=>{
+      const vals=members.map(p=>[p.days[i].units,p.lw.units,p.w2.units,p.w3.units].reduce((a,v)=>a+v,0)/4);
+      return parseFloat((vals.reduce((a,v)=>a+v,0)).toFixed(1));
+    });
+    const alpha=salesPerDay.map((v,i)=>parseFloat((v-fourWkDaily[i]).toFixed(1)));
+    const timeSlots=['10:30–4:00','4:00–6:00','6:00–9:00','9:00–10:00'];
+    const recentTime=timeSlots.map(()=>rnd(0,members.length*2));
+    const fw4Time=timeSlots.map(()=>rnd(0,members.length*6));
+    const prodLabels=['Air','Cell','Fiber','VoIP'];
+    const recentProds=[tw.air,tw.cell,tw.fiber,tw.voip];
+    const fw4Prods=[fw.air,fw.cell,fw.fiber,fw.voip];
+    teams.push({name,units:tw.units,y:tw.y,members,metrics:{
+      totalActs,active,pending,cancel,projDisco,recentAvg,fourWkAvg,vsPct,remark,remarkColor,
+      churnBuckets,salesPerDay,fourWkDaily,alpha,timeSlots,recentTime,fw4Time,prodLabels,recentProds,fw4Prods
+    }});
+  });
+}
+
+function finishInit() {
+  renderMainTable();
+  const everyone=[...leaders,...reps];
+  makePodium('podium',everyone,twUnits,twYeses,p=>p.role);
+  makePodium('team-podium',teams,t=>t.units,t=>t.y,()=>'Team');
+  renderTeamGrid();
+  const offU=everyone.reduce((s,p)=>s+twUnits(p),0);
+  const offY=everyone.reduce((s,p)=>s+twYeses(p),0);
+  document.getElementById('hero-yeses').textContent=offY;
+  document.getElementById('hero-units').textContent=offU;
+  document.getElementById('member-count').textContent=`${leaders.length} leaders · ${reps.length} reps`;
+  populatePersonaSelect(currentRole);
+  updateRoleIndicator();
+  updateNav();
+}
+
+// ═══════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════
+const PERIOD_LABELS=['MON','TUE','WED','THU','FRI','SAT','SUN','THIS WK','LW','2WA','3WA','4W TOTAL'];
+// pi 0-6=days, 7=this week, 8=LW, 9=2WA, 10=3WA, 11=4W total
+// WEEK_PERIODS: indices that are weekly summaries (not individual days)
+const WEEK_PERIODS=new Set([7,8,9,10,11]);
+const expandedPeriods={};
+let currentView='days'; // 'days' | 'weeks'
+
+function setView(v){
+  currentView=v;
+  document.querySelectorAll('.view-toggle').forEach(b=>b.classList.remove('active'));
+  document.getElementById('vt-'+v).classList.add('active');
+  renderMainTable();
+}
+
+function visiblePeriods(){
+  if(currentView==='weeks') return [7,8,9,10,11];
+  return [0,1,2,3,4,5,6];
+}
+function getPeriod(p,pi){
+  if(pi<7) return p.days[pi];
+  if(pi===7){// THIS WK = sum of all 7 days
+    return p.days.reduce((a,d)=>({y:a.y+d.y,air:a.air+d.air,cell:a.cell+d.cell,fiber:a.fiber+d.fiber,voip:a.voip+d.voip,units:a.units+d.units}),{y:0,air:0,cell:0,fiber:0,voip:0,units:0});
+  }
+  if(pi===8) return p.lw;
+  if(pi===9) return p.w2;
+  if(pi===10) return p.w3;
+  // pi===11: 4W total = this wk + lw + w2 + w3
+  const all=[...p.days,p.lw,p.w2,p.w3];
+  return all.reduce((a,d)=>({y:a.y+d.y,air:a.air+d.air,cell:a.cell+d.cell,fiber:a.fiber+d.fiber,voip:a.voip+d.voip,units:a.units+d.units}),{y:0,air:0,cell:0,fiber:0,voip:0,units:0});
+}
+function sumPeriod(people,pi){
+  return people.reduce((a,p)=>{const d=getPeriod(p,pi);return {y:a.y+d.y,air:a.air+d.air,cell:a.cell+d.cell,fiber:a.fiber+d.fiber,voip:a.voip+d.voip,units:a.units+d.units}},{y:0,air:0,cell:0,fiber:0,voip:0,units:0});
+}
+function twUnits(p){return p.days.reduce((s,d)=>s+d.units,0);}
+function twYeses(p){return p.days.reduce((s,d)=>s+d.y,0);}
+function dailyClass(u){if(!u)return 'c-red';if(u<=2)return 'c-yellow';return 'c-green';}
+function weeklyClass(u){if(!u)return 'c-red';if(u<=9)return 'c-yellow';return 'c-green';}
+function fmt(v){return(v===null||v===undefined)?'—':v;}
+function pct(n,d){return d>0?((n/d)*100).toFixed(1):'0.0';}
+function rankLabel(i){
+  if(i===0)return '<span class="rank-medal">🥇</span>';
+  if(i===1)return '<span class="rank-medal">🥈</span>';
+  if(i===2)return '<span class="rank-medal">🥉</span>';
+  return i+1;
+}
+
+// ═══════════════════════════════════════════════════════
+// NAV SYSTEM
+// ═══════════════════════════════════════════════════════
+let currentNav = 'leaderboard';
+const teamCustomizations = {};
+const TEAM_EMOJIS = ['🦈','🐺','🦁','🔥','⚡','🏆','💎','👑','🎯','🚀','🦅','🐉','💪','🌊','🎪','🏹','⚔️','🛡️','🌟','🎲'];
+
+// Unlock request state: { personaName: 'pending'|'approved'|null }
+const unlockRequests = {};
+// Deactivated people set
+const deactivated = new Set();
+// Overridden roles & teams (from roster edits): { name: { role, team } }
+const rosterOverrides = {};
+
+function getPersonTeamDisplay(teamName) {
+  for(const [persona, custom] of Object.entries(teamCustomizations)) {
+    const p = [...leaders,...reps].find(x=>x.name===persona);
+    if(p && p.team === teamName) return { emoji: custom.emoji, name: custom.name };
+  }
+  return { emoji: '⚡', name: teamName };
+}
+
+function getEffectiveRole(name) {
+  return ROLE_MAP[name] || 'rep';
+}
+
+function getEffectiveTeam(name) {
+  const p = [...leaders,...reps].find(x=>x.name===name);
+  return p ? p.team : null;
+}
+
+function updateNav() {
+  const role = currentRole;
+  const showProfile  = true;
+  const showTeam     = (role === 'rep' || role === 'l1' || role === 'jd');
+  const showEdit     = (role === 'jd');
+  const showRoster   = (role === 'owner' || role === 'admin' || role === 'jd');
+  const showOrders   = (role === 'support');
+  const ordersTab    = document.getElementById('nav-orders');
+  if(ordersTab) ordersTab.style.display = showOrders ? '' : 'none';
+
+  document.getElementById('nav-profile').style.display  = showProfile ? '' : 'none';
+  document.getElementById('nav-team').style.display     = showTeam    ? '' : 'none';
+  document.getElementById('nav-team-edit').style.display= showEdit    ? '' : 'none';
+  document.getElementById('nav-roster').style.display   = showRoster  ? '' : 'none';
+
+  // Update team label
+  if(showTeam) {
+    const myTeam = getEffectiveTeam(currentPersona);
+    if(myTeam) {
+      const d = getPersonTeamDisplay(myTeam);
+      document.getElementById('nav-team-label').textContent = d.emoji + ' ' + d.name;
+    } else {
+      document.getElementById('nav-team-label').textContent = '⚡ My Team';
+    }
+  }
+
+  // Unlock request badge on edit button (JD pending)
+  if(showEdit) {
+    const badge = document.getElementById('edit-unlock-badge');
+    badge.style.display = unlockRequests[currentPersona] === 'pending' ? 'block' : 'none';
+  }
+
+  // Notification badge on People tab — pending unlock requests count
+  if(showRoster) {
+    const pendingCount = Object.values(unlockRequests).filter(s => s === 'pending').length;
+    const badge = document.getElementById('roster-notif-badge');
+    if(badge) {
+      badge.style.display = pendingCount > 0 ? 'flex' : 'none';
+      badge.textContent = pendingCount;
+    }
+  }
+
+  // Active tab highlight
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  const activeTab = document.getElementById('nav-' + currentNav);
+  if(activeTab) activeTab.classList.add('active');
+}
+
+function navTo(tab) {
+  // Hide pages if leaving
+  if(tab !== 'roster') document.getElementById('roster-page').style.display = 'none';
+  if(tab !== 'orders' && document.getElementById('orders-page')) document.getElementById('orders-page').style.display = 'none';
+
+  currentNav = tab;
+  updateNav();
+
+  if(tab === 'leaderboard') { closeProfile(); return; }
+  if(tab === 'profile')     { openPersonProfile(currentPersona); return; }
+  if(tab === 'team') {
+    const myTeam = getEffectiveTeam(currentPersona);
+    if(myTeam) openTeamProfile(myTeam);
+    return;
+  }
+  if(tab === 'roster')  { closeProfile(); renderRoster(); return; }
+  if(tab === 'orders')  { closeProfile(); renderAllOrders(); return; }
+}
+
+// ── Team Edit / Unlock Request ────────────────────────
+function handleTeamEditClick() {
+  const status = unlockRequests[currentPersona];
+  if(status === 'approved') {
+    openTeamCustomize();
+  } else if(status === 'pending') {
+    // Show status
+    showUnlockModal(`<div style="color:#f0b429;font-size:13px;margin-bottom:16px">⏳ Your request is pending approval from an Admin or Owner.</div>`);
+  } else {
+    showUnlockModal('');
+  }
+}
+
+function showUnlockModal(statusHtml) {
+  document.getElementById('unlock-request-status').innerHTML = statusHtml;
+  const btn = document.getElementById('unlock-send-btn');
+  const status = unlockRequests[currentPersona];
+  btn.style.display = (status === 'pending') ? 'none' : '';
+  document.getElementById('unlock-request-modal').style.display = 'flex';
+}
+
+function sendUnlockRequest() {
+  unlockRequests[currentPersona] = 'pending';
+  document.getElementById('unlock-request-status').innerHTML =
+    `<div style="color:#22c55e;font-size:13px;margin-bottom:16px">✓ Request sent! An Admin or Owner will review it shortly.</div>`;
+  document.getElementById('unlock-send-btn').style.display = 'none';
+  updateNav(); // triggers badge on People tab for admins viewing same session
+  postToSheet('setUnlockRequest', {persona: currentPersona, status: 'pending'});
+}
+
+function closeUnlockModal() {
+  document.getElementById('unlock-request-modal').style.display = 'none';
+}
+
+function approveUnlock(personaName) {
+  unlockRequests[personaName] = 'approved';
+  updateNav();
+  renderRoster();
+  postToSheet('setUnlockRequest', {persona: personaName, status: 'approved'});
+}
+
+function denyUnlock(personaName) {
+  delete unlockRequests[personaName];
+  updateNav();
+  renderRoster();
+  postToSheet('deleteUnlockRequest', {persona: personaName});
+}
+
+function openTeamCustomize() {
+  const modal = document.getElementById('team-customize-modal');
+  modal.style.display = 'flex';
+  const picker = document.getElementById('emoji-picker');
+  picker.innerHTML = TEAM_EMOJIS.map(e =>
+    `<span onclick="selectEmoji('${e}')" style="cursor:pointer;font-size:24px;padding:4px 6px;border-radius:8px;border:2px solid transparent;transition:all 0.1s" id="emoji-opt-${e.codePointAt(0)}">${e}</span>`
+  ).join('');
+  const myTeam = getEffectiveTeam(currentPersona);
+  const existing = teamCustomizations[currentPersona];
+  selectedEmoji = existing?.emoji || '⚡';
+  document.getElementById('team-name-input').value = existing?.name || (myTeam || '');
+  document.getElementById('emoji-display').textContent = selectedEmoji;
+  highlightSelectedEmoji();
+}
+
+let selectedEmoji = '⚡';
+function selectEmoji(e) {
+  selectedEmoji = e;
+  document.getElementById('emoji-display').textContent = e;
+  highlightSelectedEmoji();
+}
+function highlightSelectedEmoji() {
+  document.querySelectorAll('#emoji-picker span').forEach(s => { s.style.borderColor='transparent'; s.style.background='transparent'; });
+  const el = document.getElementById('emoji-opt-' + selectedEmoji.codePointAt(0));
+  if(el) { el.style.borderColor='var(--sc-cyan)'; el.style.background='rgba(26,92,229,0.2)'; }
+}
+function saveTeamCustomize() {
+  const name = document.getElementById('team-name-input').value.trim();
+  if(!name) return;
+  teamCustomizations[currentPersona] = { emoji: selectedEmoji||'⚡', name };
+  // Reset approval — one-time use
+  delete unlockRequests[currentPersona];
+  closeTeamCustomize();
+  updateNav();
+  renderTeamGrid();
+  postToSheet('setTeamCustomization', {persona: currentPersona, emoji: selectedEmoji||'⚡', displayName: name});
+  postToSheet('deleteUnlockRequest', {persona: currentPersona});
+}
+function closeTeamCustomize() {
+  document.getElementById('team-customize-modal').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════
+// ROSTER PAGE
+// ═══════════════════════════════════════════════════════
+const ROLE_LABELS = { owner:'Owner', admin:'Admin', support:'Sales Support', jd:'Jr. Director', l1:'Team Leader', rep:'Client Rep' };
+const ROLE_OPTIONS = ['owner','admin','support','jd','l1','rep'];
+
+function renderRoster() {
+  document.getElementById('roster-page').style.display = 'block';
+
+  const everyone = [...leaders,...reps];
+  document.getElementById('roster-subtitle').textContent =
+    `${everyone.length} people · ${deactivated.size} deactivated`;
+
+  // Show "Add Member" button for JD+ roles
+  const canManageRoster = ['owner','admin','jd'].includes(currentRole);
+  document.getElementById('add-member-btn').style.display = canManageRoster ? '' : 'none';
+
+  // Pending unlock requests (admin/owner only)
+  const pending = Object.entries(unlockRequests).filter(([,s])=>s==='pending');
+  const pendingSection = document.getElementById('pending-requests-section');
+  const pendingList    = document.getElementById('pending-requests-list');
+  if(pending.length > 0) {
+    pendingSection.style.display = 'block';
+    pendingList.innerHTML = pending.map(([name])=>`
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <span style="color:var(--white);font-size:13px;font-family:'Barlow Condensed',sans-serif;font-weight:700">${name}</span>
+        <span style="color:var(--silver-dim);font-size:11px">requested team edit access</span>
+        <button onclick="approveUnlock('${name}')" style="background:rgba(34,197,94,0.13);border:1px solid rgba(34,197,94,0.33);border-radius:6px;color:#22c55e;padding:3px 10px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;text-transform:uppercase">Approve</button>
+        <button onclick="denyUnlock('${name}')" style="background:rgba(229,53,53,0.1);border:1px solid rgba(229,53,53,0.3);border-radius:6px;color:#e53535;padding:3px 10px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;text-transform:uppercase">Deny</button>
+      </div>`).join('');
+  } else {
+    pendingSection.style.display = 'none';
+  }
+
+  // Roster rows
+  const tbody = document.getElementById('roster-body');
+  tbody.innerHTML = '';
+  everyone.forEach(p => {
+    const isDeactivated = deactivated.has(p.name);
+    const effRole = getEffectiveRole(p.name);
+    const effTeam = getEffectiveTeam(p.name);
+
+    const roleSelect = ROLE_OPTIONS.map(r =>
+      `<option value="${r}"${effRole===r?' selected':''}>${ROLE_LABELS[r]}</option>`
+    ).join('');
+
+    const teamSelect = TEAM_NAMES.map(t =>
+      `<option value="${t}"${effTeam===t?' selected':''}>${t}</option>`
+    ).join('');
+
+    const tr = document.createElement('tr');
+    tr.style.cssText = `border-bottom:1px solid rgba(255,255,255,0.04);${isDeactivated?'opacity:0.35;':''}`;
+    tr.innerHTML = `
+      <td style="padding:12px 16px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:${isDeactivated?'var(--silver-dim)':'var(--white)'}">
+          ${p.name}
+          ${isDeactivated?'<span style="font-size:10px;letter-spacing:1px;color:#e53535;margin-left:8px;border:1px solid rgba(229,53,53,0.4);border-radius:4px;padding:1px 5px;text-transform:uppercase">Inactive</span>':''}
+        </div>
+      </td>
+      <td style="padding:12px 16px">
+        <select onchange="setPersonRole('${p.name}',this.value)"
+          style="background:rgba(0,0,0,0.06);border:1px solid rgba(26,92,229,0.25);border-radius:6px;color:var(--white);padding:5px 8px;font-family:'Barlow Condensed',sans-serif;font-size:12px;cursor:pointer;outline:none">
+          ${roleSelect}
+        </select>
+      </td>
+      <td style="padding:12px 16px">
+        <select onchange="setPersonTeam('${p.name}',this.value)"
+          style="background:rgba(0,0,0,0.06);border:1px solid rgba(26,92,229,0.25);border-radius:6px;color:var(--white);padding:5px 8px;font-family:'Barlow Condensed',sans-serif;font-size:12px;cursor:pointer;outline:none">
+          ${teamSelect}
+        </select>
+      </td>
+      <td style="padding:12px 16px;text-align:center">
+        <button onclick="toggleDeactivate('${p.name}')"
+          style="background:${isDeactivated?'rgba(34,197,94,0.1)':'rgba(229,53,53,0.1)'};border:1px solid ${isDeactivated?'rgba(34,197,94,0.3)':'rgba(229,53,53,0.3)'};border-radius:6px;color:${isDeactivated?'#22c55e':'#e53535'};padding:5px 14px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;text-transform:uppercase">
+          ${isDeactivated ? 'Reactivate' : 'Deactivate'}
+        </button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// === ADD MEMBER MODAL ===
+
+function openAddMemberModal() {
+  const modal = document.getElementById('add-member-modal');
+  modal.style.display = 'flex';
+  // Clear fields
+  document.getElementById('add-member-email').value = '';
+  document.getElementById('add-member-name').value = '';
+  document.getElementById('add-member-rank').value = 'rep';
+  document.getElementById('add-member-error').style.display = 'none';
+  // Populate team dropdown
+  const teamSel = document.getElementById('add-member-team');
+  teamSel.innerHTML = TEAM_NAMES.map(t => `<option value="${t}">${t}</option>`).join('');
+  // Focus email field
+  setTimeout(() => document.getElementById('add-member-email').focus(), 100);
+}
+
+function closeAddMemberModal() {
+  document.getElementById('add-member-modal').style.display = 'none';
+}
+
+async function submitAddMember() {
+  const email = document.getElementById('add-member-email').value.trim().toLowerCase();
+  const name = document.getElementById('add-member-name').value.trim();
+  const team = document.getElementById('add-member-team').value;
+  const rank = document.getElementById('add-member-rank').value;
+  const errEl = document.getElementById('add-member-error');
+
+  // Validate
+  if (!email || !email.includes('@')) {
+    errEl.textContent = 'Please enter a valid email address.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!name) {
+    errEl.textContent = 'Please enter a display name.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (sheetRoster[email]) {
+    errEl.textContent = 'This email is already in the roster.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // Disable button while saving
+  const btn = document.getElementById('add-member-submit');
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+
+  try {
+    // Save to sheet
+    await postToSheet('addRosterEntry', { email, name, team, rank });
+
+    // Update local state
+    sheetRoster[email] = { name, team, rank, deactivated: false, dateAdded: new Date().toISOString().split('T')[0] };
+    ROLE_MAP[name] = rank;
+
+    // Create a person object and add to the right list
+    const type = LEADER_RANKS.includes(rank) ? 'leader' : 'rep';
+    const emptyPeriod = () => ({y:0,air:0,cell:0,fiber:0,voip:0,units:0});
+    const person = buildPersonFromSheetData({
+      name, type, email, rank, teamEmoji: '', team,
+      days: Array.from({length:7}, emptyPeriod),
+      thisWeek: emptyPeriod(), priorWeek: emptyPeriod(),
+      twoWkPrior: emptyPeriod(), threeWkPrior: emptyPeriod(),
+      fourWkRunning: emptyPeriod()
+    });
+    attachOrders(person);
+
+    if (type === 'leader') leaders.push(person);
+    else reps.push(person);
+
+    rebuildTeams();
+    closeAddMemberModal();
+    renderRoster();
+    renderMainTable();
+    renderTeamGrid();
+  } catch(err) {
+    errEl.textContent = 'Failed to save. Please try again.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'Add to Roster';
+    btn.disabled = false;
+  }
+}
+
+// Check if rank qualifies as "leader" type
+const LEADER_RANKS = ['owner','jd','l1'];
+
+function setPersonRole(name, role) {
+  ROLE_MAP[name] = role;
+  const rosterEmail = Object.entries(sheetRoster).find(([e, r]) => r.name === name)?.[0];
+  if (rosterEmail) {
+    sheetRoster[rosterEmail].rank = role;
+    postToSheet('updateRosterEntry', {email: rosterEmail, rank: role});
+  }
+}
+
+function setPersonTeam(name, team) {
+  const p = [...leaders,...reps].find(x=>x.name===name);
+  if(p) p.team = team;
+  renderTeamGrid();
+  const rosterEmail = Object.entries(sheetRoster).find(([e, r]) => r.name === name)?.[0];
+  if (rosterEmail) {
+    sheetRoster[rosterEmail].team = team;
+    postToSheet('updateRosterEntry', {email: rosterEmail, team});
+  }
+}
+
+function toggleDeactivate(name) {
+  if(deactivated.has(name)) {
+    deactivated.delete(name);
+  } else {
+    deactivated.add(name);
+  }
+  renderRoster();
+  renderMainTable();
+  renderTeamGrid();
+  // Find email for this person from roster
+  const rosterEmail = Object.entries(sheetRoster).find(([e, r]) => r.name === name)?.[0];
+  if (rosterEmail) postToSheet('toggleDeactivate', {email: rosterEmail, deactivated: deactivated.has(name)});
+}
+
+// ═══════════════════════════════════════════════════════
+// ALL ORDERS PAGE (Sales Support)
+// ═══════════════════════════════════════════════════════
+const orderOverrides = {}; // { 'personName:orderIdx:type' : {product,status,date,order,notes:[]} }
+
+function getOrderKey(personName, listType, idx) {
+  return `${personName}::${listType}::${idx}`;
+}
+
+function getOrderData(personName, listType, idx) {
+  const person = [...leaders,...reps].find(p=>p.name===personName);
+  if(!person) return null;
+  const list = person.orders[listType];
+  if(!list || !list[idx]) return null;
+  const base = {...list[idx]};
+  const key = getOrderKey(personName, listType, idx);
+  const ov = orderOverrides[key] || {};
+  return {...base, ...ov, notes: ov.notes || [], repName: personName};
+}
+
+function renderAllOrders() {
+  document.getElementById('orders-page').style.display = 'block';
+
+  const everyone = [...leaders,...reps].filter(p=>!deactivated.has(p.name));
+
+  // Populate rep filter
+  const repSel = document.getElementById('orders-filter-rep');
+  const curRep = repSel.value;
+  if(repSel.options.length <= 1) {
+    everyone.forEach(p => {
+      const o = document.createElement('option');
+      o.value = p.name; o.textContent = p.name;
+      repSel.appendChild(o);
+    });
+    repSel.value = curRep;
+  }
+
+  const filterRep    = document.getElementById('orders-filter-rep').value;
+  const filterStatus = document.getElementById('orders-filter-status').value;
+  const filterType   = document.getElementById('orders-filter-type').value;
+
+  // Gather all orders
+  let rows = [];
+  everyone.forEach(p => {
+    if(filterRep && p.name !== filterRep) return;
+    // Urgent
+    if(!filterType || filterType === 'Urgent') {
+      p.orders.urgent.forEach((o,i) => {
+        const d = getOrderData(p.name,'urgent',i);
+        if(filterStatus && d.status !== filterStatus) return;
+        rows.push({...d, listType:'urgent', idx:i, repName:p.name, _urgency:1});
+      });
+    }
+    // Pending activations
+    if(!filterType || filterType === 'Pending Activation') {
+      p.orders.pending.forEach((o,i) => {
+        const d = getOrderData(p.name,'pending',i);
+        if(filterStatus && d.status !== filterStatus) return;
+        rows.push({...d, listType:'pending', idx:i, repName:p.name, _urgency:2});
+      });
+    }
+    // Recent
+    if(!filterType) {
+      p.orders.recent.forEach((o,i) => {
+        const d = getOrderData(p.name,'recent',i);
+        if(filterStatus && d.status !== filterStatus) return;
+        rows.push({...d, listType:'recent', idx:i, repName:p.name, _urgency:3});
+      });
+    }
+  });
+
+  // Sort: urgents first, then by daysAgo oldest first
+  rows.sort((a,b) => a._urgency - b._urgency || b.daysAgo - a.daysAgo);
+
+  document.getElementById('orders-subtitle').textContent =
+    `${rows.length} orders · ${everyone.length} reps`;
+
+  const statusColor = s => s==='Active'?'var(--green)':s==='Pending'?'var(--yellow)':s==='Delivered'?'var(--sc-cyan)':'var(--red)';
+  const statusBg    = s => s==='Active'?'var(--green-bg)':s==='Pending'?'var(--yellow-bg)':s==='Delivered'?'rgba(0,200,255,0.1)':'var(--red-bg)';
+
+  const html = `
+    <div style="background:rgba(255,255,255,0.5);border:1px solid rgba(0,200,255,0.15);border-radius:12px;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:rgba(0,0,0,0.06)">
+          <th style="text-align:left;padding:10px 14px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Rep</th>
+          <th style="text-align:left;padding:10px 14px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Order #</th>
+          <th style="text-align:left;padding:10px 14px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Product</th>
+          <th style="text-align:left;padding:10px 14px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Date</th>
+          <th style="text-align:left;padding:10px 14px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Status</th>
+          <th style="text-align:left;padding:10px 14px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Issue / Note</th>
+          <th style="padding:10px 14px"></th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => {
+            const rowBg = r._urgency===1 ? 'background:rgba(229,53,53,0.05)' : r._urgency===2 ? 'background:rgba(240,180,41,0.04)' : '';
+            const notePreview = r.notes && r.notes.length ? `<span style="color:var(--sc-cyan);font-size:11px">💬 ${r.notes[r.notes.length-1].text.substring(0,40)}${r.notes[r.notes.length-1].text.length>40?'…':''}</span>` : (r.issue ? `<span style="color:var(--red);font-size:11px">⚠ ${r.issue}</span>` : '<span style="color:var(--silver-dim);font-size:11px">—</span>');
+            return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);${rowBg}">
+              <td style="padding:10px 14px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--white)">${r.repName}</td>
+              <td style="padding:10px 14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:var(--sc-cyan);letter-spacing:1px">${r.order}</td>
+              <td style="padding:10px 14px;font-size:12px;color:var(--silver)">${r.product}</td>
+              <td style="padding:10px 14px;font-size:12px;color:var(--silver-dim)">${r.date}</td>
+              <td style="padding:10px 14px">
+                <span style="background:${statusBg(r.status)};border:1px solid ${statusColor(r.status)}44;color:${statusColor(r.status)};padding:2px 8px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase">${r.status}</span>
+              </td>
+              <td style="padding:10px 14px;max-width:220px">${notePreview}</td>
+              <td style="padding:10px 14px;text-align:right">
+                <button onclick="openOrderEdit('${r.repName}','${r.listType}',${r.idx})"
+                  style="background:rgba(0,200,255,0.1);border:1px solid rgba(0,200,255,0.3);border-radius:6px;color:var(--sc-cyan);padding:4px 12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;text-transform:uppercase">
+                  ✏️ Edit
+                </button>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('orders-table-wrap').innerHTML = rows.length ? html :
+    `<div style="text-align:center;padding:60px;color:var(--silver-dim)">No orders match the current filters</div>`;
+}
+
+// ── Order Edit Modal ─────────────────────────────────
+let editingOrder = null; // { repName, listType, idx }
+
+function openOrderEdit(repName, listType, idx) {
+  editingOrder = { repName, listType, idx };
+  const d = getOrderData(repName, listType, idx);
+  if(!d) return;
+
+  document.getElementById('order-edit-ordernum').textContent = d.order;
+  document.getElementById('edit-product').value = d.product;
+  document.getElementById('edit-status').value  = d.status;
+  document.getElementById('edit-date').value    = d.date;
+  document.getElementById('edit-ordernum-field').value = d.order;
+  document.getElementById('edit-notes').value   = '';
+
+  // Show note history
+  const hist = d.notes || [];
+  document.getElementById('edit-note-history').innerHTML = hist.length ? `
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px">Note History</div>
+    ${hist.map(n=>`
+      <div style="background:rgba(0,200,255,0.06);border:1px solid rgba(0,200,255,0.15);border-radius:6px;padding:8px 12px;margin-bottom:6px">
+        <div style="font-size:10px;color:var(--silver-dim);margin-bottom:3px">${n.author} · ${n.date}</div>
+        <div style="font-size:13px;color:var(--white)">${n.text}</div>
+      </div>`).join('')}
+  ` : '';
+
+  document.getElementById('order-edit-modal').style.display = 'flex';
+}
+
+function saveOrderEdit() {
+  if(!editingOrder) return;
+  const { repName, listType, idx } = editingOrder;
+  const key = getOrderKey(repName, listType, idx);
+  if(!orderOverrides[key]) orderOverrides[key] = { notes: [] };
+
+  orderOverrides[key].product = document.getElementById('edit-product').value;
+  orderOverrides[key].status  = document.getElementById('edit-status').value;
+  orderOverrides[key].date    = document.getElementById('edit-date').value;
+  orderOverrides[key].order   = document.getElementById('edit-ordernum-field').value;
+
+  const noteText = document.getElementById('edit-notes').value.trim();
+  if(noteText) {
+    if(!orderOverrides[key].notes) orderOverrides[key].notes = [];
+    orderOverrides[key].notes.push({
+      text: noteText,
+      author: currentPersona,
+      date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+    });
+  }
+
+  closeOrderEdit();
+  // Refresh current view
+  if(currentNav === 'orders') renderAllOrders();
+  // Write back to sheet
+  postToSheet('saveOrderOverride', {
+    key,
+    product: orderOverrides[key].product,
+    status: orderOverrides[key].status,
+    date: orderOverrides[key].date,
+    order: orderOverrides[key].order,
+    notes: orderOverrides[key].notes
+  });
+}
+
+function closeOrderEdit() {
+  document.getElementById('order-edit-modal').style.display = 'none';
+  editingOrder = null;
+}
+
+
+
+// Roles: owner > admin > jd (junior director) > l1 (leader) > rep
+let currentRole = 'rep';
+let currentPersona = ''; // set by login
+
+// Role rank for comparisons
+const ROLE_RANK = {owner:5, admin:4, support:4, jd:3, l1:2, rep:1};
+
+// Assign roles to people (Jackie=owner, some leaders=jd, others=l1, reps=rep)
+const ROLE_MAP = {};
+// Jackie is owner
+ROLE_MAP['Jackie Leroy'] = 'owner';
+// First 2 reps become Sales Support for demo
+REP_NAMES.slice(0,2).forEach(n => { ROLE_MAP[n] = 'support'; });
+// First 4 leaders are JDs, rest are L1s
+LEADER_NAMES.forEach((n,i) => { ROLE_MAP[n] = i < 4 ? 'jd' : 'l1'; });
+REP_NAMES.forEach(n => { ROLE_MAP[n] = 'rep'; });
+
+function personRole(name) { return ROLE_MAP[name] || 'rep'; }
+
+// Can the current viewer see full metrics for a given person?
+// Look up anyone's actual team from live data at call time
+function getPersonTeam(name) {
+  const p = [...leaders,...reps].find(p=>p.name===name);
+  return p ? p.team : null;
+}
+
+function canViewMetrics(targetName) {
+  if(currentRole === 'owner' || currentRole === 'admin' || currentRole === 'support') return true;
+  if(targetName === currentPersona) return true;
+  if(currentRole === 'jd') {
+    const myTeam = getPersonTeam(currentPersona);
+    const theirTeam = getPersonTeam(targetName);
+    return myTeam !== null && myTeam === theirTeam;
+  }
+  return false;
+}
+
+function canViewTeam(teamName) {
+  if(currentRole === 'owner' || currentRole === 'admin' || currentRole === 'support') return true;
+  if(currentRole === 'jd') {
+    const myTeam = getPersonTeam(currentPersona);
+    return myTeam === teamName;
+  }
+  return false;
+}
+
+
+// Can this role add/edit notes and override order fields?
+function canEditOrders(targetName) {
+  if(currentRole === 'owner' || currentRole === 'admin' || currentRole === 'support') return true;
+  return false;
+}
+
+// Populate persona selector based on role
+function populatePersonaSelect(role) {
+  const sel = document.getElementById('role-persona');
+  const wrap = document.getElementById('role-persona-wrap');
+  let people = [];
+  if(role === 'owner') people = ['Jackie Leroy'];
+  else if(role === 'admin') people = ['Admin'];
+  else if(role === 'jd') people = LEADER_NAMES.filter(n => ROLE_MAP[n]==='jd');
+  else if(role === 'l1') people = LEADER_NAMES.filter(n => ROLE_MAP[n]==='l1');
+  else if(role === 'support') people = REP_NAMES.slice(0,2);
+  else people = REP_NAMES.filter(n => ROLE_MAP[n]==='rep');
+  // Set persona FIRST so it's ready before any render calls
+  currentPersona = people[0] || 'Admin';
+  if(people.length <= 1) {
+    wrap.style.display = 'none';
+  } else {
+    wrap.style.display = 'block';
+    sel.innerHTML = people.map(n=>`<option value="${n}">${n}</option>`).join('');
+    sel.value = currentPersona;
+  }
+}
+
+function updateRoleIndicator() {
+  const team = getPersonTeam(currentPersona);
+  const existing = document.getElementById('role-team-tag');
+  if(existing) existing.remove();
+  if(team && (currentRole==='jd'||currentRole==='l1'||currentRole==='rep')) {
+    const tag = document.createElement('div');
+    tag.id = 'role-team-tag';
+    tag.style.cssText = 'font-family:"Barlow Condensed",sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--sc-cyan);background:rgba(26,92,229,0.15);border:1px solid rgba(26,92,229,0.3);border-radius:6px;padding:4px 10px;white-space:nowrap';
+    tag.textContent = '⬡ ' + team;
+    document.getElementById('role-switcher').appendChild(tag);
+  }
+}
+
+function setRole(role) {
+  currentRole = role;
+  currentNav = 'leaderboard';
+  document.querySelectorAll('.role-pill').forEach(b => b.classList.toggle('active', b.dataset.role===role));
+  populatePersonaSelect(role);
+  updateRoleIndicator();
+  updateNav();
+  closeProfile();
+  renderMainTable();
+  renderTeamGrid();
+}
+
+function setPersona(name) {
+  currentPersona = name;
+  currentNav = 'leaderboard';
+  updateRoleIndicator();
+  updateNav();
+  closeProfile();
+  renderMainTable();
+  renderTeamGrid();
+}
+
+
+function buildTableHeaders(tableId){
+  const table=document.getElementById(tableId);
+  const gr=table.querySelector('thead tr:nth-child(1)');
+  const dr=table.querySelector('thead tr:nth-child(2)');
+  gr.innerHTML='';dr.innerHTML='';
+  gr.insertAdjacentHTML('beforeend','<th colspan="2"></th>');
+  dr.insertAdjacentHTML('beforeend','<th style="width:36px">#</th><th class="name-col" style="min-width:120px">Name</th>');
+  visiblePeriods().forEach(pi=>{
+    const isExp=!!expandedPeriods[pi];
+    const isWeek=WEEK_PERIODS.has(pi);
+    const bc=isWeek?'week-start':'day-start';
+    const th=document.createElement('th');
+    th.colSpan=isExp?6:2;
+    th.className=`day-toggle ${bc}${isWeek?' week-col':''}${isExp?' expanded':''}`;
+    th.dataset.pi=pi;
+    th.innerHTML=`${PERIOD_LABELS[pi]} <span class="toggle-icon">▼</span>`;
+    th.addEventListener('click',()=>togglePeriod(pi));
+    gr.appendChild(th);
+    const yTh=document.createElement('th');yTh.textContent='Yeses';yTh.className=`${bc}${isWeek?' week-col':''}`;dr.appendChild(yTh);
+    ['Air','Cell','Fiber','VoIP'].forEach(col=>{
+      const dth=document.createElement('th');dth.textContent=col;
+      dth.className=`detail-col dp${pi}${isWeek?' week-col':''}${isExp?'':' hidden'}`;
+      dr.appendChild(dth);
+    });
+    const uTh=document.createElement('th');uTh.textContent='Units';uTh.className=isWeek?'week-col':'';dr.appendChild(uTh);
+  });
+}
+
+function togglePeriod(pi){
+  expandedPeriods[pi]=!expandedPeriods[pi];
+  // Full re-render so column counts are always exact
+  renderMainTable();
+}
+
+function periodCells(d,pi,weekly){
+  const isExp=!!expandedPeriods[pi];
+  const hc=isExp?'':'hidden';
+  const isWeek=WEEK_PERIODS.has(pi);
+  const uc=isWeek?weeklyClass(d.units):dailyClass(d.units);
+  const bc=isWeek?'week-start':'day-start';
+  const wc=isWeek?' week-col':'';
+  return `<td class="val c-none ${bc}${wc}">${fmt(d.y)}</td>`+
+    `<td class="val c-none dp${pi}${wc} ${hc}">${fmt(d.air)}</td>`+
+    `<td class="val c-none dp${pi}${wc} ${hc}">${fmt(d.cell)}</td>`+
+    `<td class="val c-none dp${pi}${wc} ${hc}">${fmt(d.fiber)}</td>`+
+    `<td class="val c-none dp${pi}${wc} ${hc}">${fmt(d.voip)}</td>`+
+    `<td class="val ${uc}${wc}">${fmt(d.units)}</td>`;
+}
+
+function personRowHTML(p,rankIdx){
+  const canView = canViewMetrics(p.name);
+  const isSelf  = p.name === currentPersona;
+  const nameCell = canView
+    ? `<span class="name-text name-link" onclick="openPersonProfile('${p.name.replace(/'/g,"\\'")}')">${p.name}${isSelf?' <span style="font-size:9px;color:var(--sc-cyan);letter-spacing:1px">(YOU)</span>':''}</span><br><span style="font-size:10px;color:var(--silver-dim)">${p.role}</span>`
+    : `<span class="name-text" style="cursor:default">${p.name}<span class="locked-badge">🔒</span></span><br><span style="font-size:10px;color:var(--silver-dim)">${p.role}</span>`;
+  let cells=`<td class="rank ${rankIdx<3?'rank-'+(rankIdx+1):''}">${rankLabel(rankIdx)}</td><td class="name-cell">${nameCell}</td>`;
+  visiblePeriods().forEach(pi=>{ cells+=periodCells(getPeriod(p,pi),pi,false); });
+  return cells;
+}
+
+function personRowClass(p){
+  // Highlight own row; dim locked rows
+  if(p.name === currentPersona) return 'own-row';
+  if(!canViewMetrics(p.name)) return 'row-locked';
+  return '';
+}
+
+function groupTotalRowHTML(people,label,rowClass){
+  let cells=`<td></td><td class="name-cell" style="text-align:left;padding-left:8px">${label}</td>`;
+  visiblePeriods().forEach(pi=>{ cells+=periodCells(sumPeriod(people,pi),pi,true); });
+  return `<tr class="group-total-row ${rowClass}">${cells}</tr>`;
+}
+
+function renderMainTable(){
+  buildTableHeaders('main-table');
+  const tbody=document.getElementById('main-body');
+  tbody.innerHTML='';
+  const activeLeaders=[...leaders].filter(p=>!deactivated.has(p.name));
+  const activeReps=[...reps].filter(p=>!deactivated.has(p.name));
+  const sortedL=[...activeLeaders].sort((a,b)=>twUnits(b)-twUnits(a));
+  sortedL.forEach((p,i)=>{const tr=document.createElement('tr');tr.className=personRowClass(p);tr.innerHTML=personRowHTML(p,i);tbody.appendChild(tr);});
+  tbody.insertAdjacentHTML('beforeend',groupTotalRowHTML(activeLeaders,'👑 Leader Total','leader-total-row'));
+  const sortedR=[...activeReps].sort((a,b)=>twUnits(b)-twUnits(a));
+  sortedR.forEach((p,i)=>{const tr=document.createElement('tr');tr.className=personRowClass(p);tr.innerHTML=personRowHTML(p,i);tbody.appendChild(tr);});
+  tbody.insertAdjacentHTML('beforeend',groupTotalRowHTML(activeReps,'⚡ Rep Total','rep-total-row'));
+  tbody.insertAdjacentHTML('beforeend',groupTotalRowHTML([...activeLeaders,...activeReps],'Office Total','office-total-row'));
+}
+
+// ═══════════════════════════════════════════════════════
+// PODIUMS & TEAM GRID
+// ═══════════════════════════════════════════════════════
+function makePodium(id,items,getU,getY,getRole){
+  const wrap=document.getElementById(id);if(!wrap)return;wrap.innerHTML='';
+  const sorted=[...items].sort((a,b)=>getU(b)-getU(a));
+  const top3=sorted.slice(0,3);
+  const order=top3.length>=3?[top3[1],top3[0],top3[2]]:top3;
+  const classes=['p2','p1','p3'],medals=['🥈','🥇','🥉'];
+  order.forEach((item,i)=>{
+    const card=document.createElement('div');
+    card.className=`podium-card ${classes[i]}`;
+    card.innerHTML=`<div class="podium-position">${medals[i]}</div><div class="podium-name">${item.name}</div><div class="podium-role">${getRole(item)}</div>`+
+      `<div class="podium-stats"><div class="podium-stat"><div class="podium-stat-val units-val">${getU(item)}</div><div class="podium-stat-lbl">Units</div></div>`+
+      `<div class="podium-stat"><div class="podium-stat-val yeses-val">${getY(item)}</div><div class="podium-stat-lbl">Yeses</div></div></div>`;
+    wrap.appendChild(card);
+  });
+}
+
+function renderTeamGrid(){
+  const grid=document.getElementById('team-grid');grid.innerHTML='';
+  [...teams].sort((a,b)=>b.units-a.units).forEach((t,i)=>{
+    const canSee = canViewTeam(t.name);
+    const card=document.createElement('div');
+    card.className=`team-card${i===0?' rank-1-card':''}${!canSee?' team-locked':''}`;
+    card.innerHTML=`<div class="team-rank">${i===0?'🏆 ':''}#${i+1}</div>`+
+      `<div class="team-name${canSee?' name-link':''}" ${canSee?`onclick="openTeamProfile('${t.name.replace(/'/g,"\\'")}')"`:''}>${t.name}${!canSee?' <span class="locked-badge">🔒</span>':''}</div>`+
+      `<div class="team-score">${t.units}</div><div class="team-label">Units this week</div>`;
+    grid.appendChild(card);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// PROFILE PAGE SYSTEM
+// ═══════════════════════════════════════════════════════
+let activeCharts=[];
+
+function openProfilePage(html){
+  activeCharts.forEach(c=>{try{c.destroy();}catch(e){}});
+  activeCharts=[];
+  const page=document.getElementById('profile-page');
+  const inner=document.getElementById('profile-page-inner');
+  inner.innerHTML=html;
+  page.style.display='block';
+  page.scrollTop=0;
+  document.body.style.overflow='hidden';
+}
+
+function closeProfile(){
+  activeCharts.forEach(c=>{try{c.destroy();}catch(e){}});
+  activeCharts=[];
+  document.getElementById('profile-page').style.display='none';
+  document.body.style.overflow='';
+}
+
+function mkChart(canvasId,config){
+  const el=document.getElementById(canvasId);
+  if(!el)return;
+  // Make sure canvas has explicit pixel size matching its container
+  const box=el.parentElement;
+  if(box){el.width=box.offsetWidth;el.height=box.offsetHeight;}
+  const chart=new Chart(el,config);
+  activeCharts.push(chart);
+}
+
+// ─── PERSON PROFILE ──────────────────────────────────────────────────────────
+function openPersonProfile(name){
+  if(!canViewMetrics(name)){
+    // Show restricted message
+    openProfilePage(`
+      <div class="profile-topbar">
+        <button class="profile-back" onclick="closeProfile()"><span>←</span> Back</button>
+        <div class="profile-heading">
+          <div class="profile-page-name">${name}</div>
+          <div class="profile-page-sub">Profile Restricted</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 24px;text-align:center">
+        <div style="font-size:48px;margin-bottom:16px">🔒</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:var(--white);margin-bottom:8px">Access Restricted</div>
+        <div style="color:var(--silver-dim);font-size:14px;max-width:360px;line-height:1.6">You don't have permission to view this person's full profile and metrics. Contact your Junior Director or Admin.</div>
+      </div>
+    `);
+    return;
+  }
+  const p=[...leaders,...reps].find(x=>x.name===name);if(!p)return;
+  const m=p.metrics;
+  const tw4=getPeriod(p,10);
+  const twU=twUnits(p),twY=twYeses(p);
+  const total=Math.max(m.totalActs,1);
+  // safe id: letters/numbers/underscore only
+  const id='p'+name.replace(/[^a-zA-Z0-9]/g,'');
+
+  const buckets=m.churnBuckets.map(b=>`
+    <div class="churn-bucket">
+      <div class="churn-label">${b.label}</div>
+      <div class="churn-fraction">${b.disco>0?`(${b.disco}/${b.activated})`:'---'}</div>
+      <div class="churn-pct" style="color:${b.disco>0?'#f97316':'var(--silver-dim)'}">${b.disco>0?b.pct+'%':'---'}</div>
+    </div>`).join('');
+
+  const vsColor=m.vsPct>=0?'#22c55e':'#e53535';
+  const vsArrow=m.vsPct>=0?'↑':'↓';
+
+  openProfilePage(`
+    <div class="profile-topbar">
+      <button class="profile-back" onclick="closeProfile()"><span>←</span> Back</button>
+      <div class="profile-heading">
+        <div class="profile-page-name">${p.name}</div>
+        <div class="profile-page-sub">${p.role} · Team: <span class="name-link" onclick="openTeamProfile('${p.team.replace(/'/g,"\\'")}')" style="cursor:pointer">${p.team}</span></div>
+      </div>
+    </div>
+
+    <div class="profile-stats-bar">
+      <div class="profile-stat"><div class="profile-stat-val units-val">${twU}</div><div class="profile-stat-lbl">This Wk Units</div></div>
+      <div class="profile-stat"><div class="profile-stat-val">${twY}</div><div class="profile-stat-lbl">This Wk Yeses</div></div>
+      <div class="profile-stat"><div class="profile-stat-val units-val">${tw4.units}</div><div class="profile-stat-lbl">4W Units</div></div>
+      <div class="profile-stat"><div class="profile-stat-val">${tw4.y}</div><div class="profile-stat-lbl">4W Yeses</div></div>
+      <div class="profile-stat"><div class="profile-stat-val" style="color:${vsColor}">${vsArrow}${Math.abs(m.vsPct)}%</div><div class="profile-stat-lbl">vs 4Wk Avg</div></div>
+    </div>
+
+    <div class="profile-section-title">Sales Breakdown</div>
+    <div class="breakdown-grid">
+      <div class="breakdown-remark" style="background:${m.remarkColor}22;border:1px solid ${m.remarkColor}55">
+        <div style="font-size:10px;letter-spacing:2px;color:${m.remarkColor};text-transform:uppercase;font-family:'Barlow Condensed',sans-serif;font-weight:700;margin-bottom:6px">Remarks</div>
+        <div style="font-size:18px;font-weight:700;color:${m.remarkColor}">${m.remark}</div>
+        <div style="font-size:11px;color:var(--silver-dim);margin-top:6px">Rec Wk Avg: <b style="color:var(--silver)">${m.recentAvg}</b> &nbsp;·&nbsp; 4Wk Avg: <b style="color:var(--silver)">${m.fourWkAvg}</b></div>
+      </div>
+      <div class="breakdown-stat"><div class="breakdown-val">${m.recentAvg}</div><div class="breakdown-lbl">Rec. Wk Avg</div></div>
+      <div class="breakdown-stat"><div class="breakdown-val" style="color:${vsColor}">${vsArrow}${Math.abs(m.vsPct)}%</div><div class="breakdown-lbl">vs 4Wk Avg</div></div>
+      <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(pct(m.active,total))>=75?'#22c55e':'#f0b429'}">${pct(m.active,total)}%</div><div class="breakdown-lbl">Active</div></div>
+      <div class="breakdown-stat"><div class="breakdown-val" style="color:#f0b429">${pct(m.pending,total)}%</div><div class="breakdown-lbl">Pending</div></div>
+      <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(pct(m.cancel,total))>10?'#e53535':'var(--silver)'}">${pct(m.cancel,total)}%</div><div class="breakdown-lbl">Cancel</div></div>
+      <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(pct(m.projDisco,total))>5?'#f97316':'#22c55e'}">${pct(m.projDisco,total)}%</div><div class="breakdown-lbl">Proj. Disco</div></div>
+    </div>
+
+    <div class="profile-section-title">Churn Buckets</div>
+    <div class="churn-grid">${buckets}</div>
+
+    ${buildUrgentSection(p)}
+    ${buildPendingSection(p)}
+
+    <div class="profile-section-title">Sales Trends</div>
+    <div class="charts-row">
+      <div class="chart-box">
+        <div class="chart-title">Sales Per Day</div>
+        <div class="chart-wrap" style="height:160px"><canvas id="spd_${id}"></canvas></div>
+        <div class="chart-title" style="margin-top:18px;font-size:11px">Pos / Neg Alpha</div>
+        <div class="chart-wrap" style="height:100px"><canvas id="alpha_${id}"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">Time of Sales — Recent</div>
+        <div class="chart-wrap" style="height:130px"><canvas id="tsr_${id}"></canvas></div>
+        <div class="chart-title" style="margin-top:18px">Time of Sales — 4Wk Running</div>
+        <div class="chart-wrap" style="height:130px"><canvas id="ts4_${id}"></canvas></div>
+      </div>
+    </div>
+
+    <div class="profile-section-title">Products Sold</div>
+    <div class="charts-row">
+      <div class="chart-box">
+        <div class="chart-title">Recent Week</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="pr_${id}"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">4Wk Running</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="p4_${id}"></canvas></div>
+      </div>
+    </div>
+
+    ${buildRecentOrdersSection(p)}
+  `);
+
+  // Give browser time to paint and establish layout before drawing
+  setTimeout(()=>drawCharts(id,m), 100);
+}
+
+// ─── ORDER SECTIONS ──────────────────────────────────────────────────────────
+function buildUrgentSection(p){
+  const o = p.orders || { urgent:[] };
+  const urgentHTML = o.urgent.length === 0
+    ? `<div style="text-align:center;padding:24px;color:var(--silver-dim);font-size:13px">✓ No urgent issues</div>`
+    : o.urgent.map((u,i)=>{
+      const key=getOrderKey(p.name,'urgent',i);
+      const ov=orderOverrides[key]||{};
+      const notes=ov.notes||[];
+      const lastNote=notes.length?notes[notes.length-1]:null;
+      const canEdit=canEditOrders(p.name);
+      return `<div class="order-card urgent-card" style="border-left:4px solid ${u.color}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span class="issue-badge" style="background:${u.color}22;border:1px solid ${u.color}66;color:${u.color}">⚠ ${ov.status||u.issue||'Urgent'}</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:11px;color:var(--silver-dim)">${u.daysAgo}d ago · ${ov.date||u.date}</span>
+            ${canEdit?`<button onclick="openOrderEdit('${p.name}','urgent',${i})" style="background:rgba(0,200,255,0.1);border:1px solid rgba(0,200,255,0.3);border-radius:5px;color:var(--sc-cyan);padding:3px 10px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;cursor:pointer;text-transform:uppercase">✏️ Edit</button>`:''}
+          </div>
+        </div>
+        <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+          <div><div class="order-field-label">Order #</div><div class="order-field-val order-num">${ov.order||u.order}</div></div>
+          <div><div class="order-field-label">Product</div><div class="order-field-val">${ov.product||u.product}</div></div>
+          <div><div class="order-field-label">Status</div><div class="order-field-val">${ov.status||u.status||'—'}</div></div>
+        </div>
+        ${lastNote?`<div style="margin-top:8px;background:rgba(0,200,255,0.07);border:1px solid rgba(0,200,255,0.15);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--silver)">💬 <span style="color:var(--sc-cyan);font-weight:700">${lastNote.author}:</span> ${lastNote.text}</div>`:''}
+      </div>`;
+    }).join('');
+  const urgentCount = o.urgent.length;
+  return `
+    <div class="profile-section-title" style="${urgentCount>0?'color:var(--red);border-color:rgba(229,53,53,0.30)':''}">
+      ${urgentCount>0?`🚨 Urgent Attention <span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 8px;font-size:12px;margin-left:6px">${urgentCount}</span>`:'🚨 Urgent Attention'}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px">${urgentHTML}</div>`;
+}
+
+function buildPendingSection(p){
+  const o = p.orders || { pending:[] };
+  const pendingHTML = o.pending.length === 0
+    ? `<div style="text-align:center;padding:24px;color:var(--silver-dim);font-size:13px">✓ No pending activations</div>`
+    : o.pending.map((pd,i)=>{
+      const key=getOrderKey(p.name,'pending',i);
+      const ov=orderOverrides[key]||{};
+      const notes=ov.notes||[];
+      const lastNote=notes.length?notes[notes.length-1]:null;
+      const canEdit=canEditOrders(p.name);
+      return `<div class="order-card pending-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span class="issue-badge" style="background:var(--yellow-bg);border:1px solid var(--yellow-border);color:var(--yellow)">📦 Delivered ${pd.deliveredDays}d ago — Not Active</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:11px;color:var(--silver-dim)">${ov.date||pd.date}</span>
+            ${canEdit?`<button onclick="openOrderEdit('${p.name}','pending',${i})" style="background:rgba(0,200,255,0.1);border:1px solid rgba(0,200,255,0.3);border-radius:5px;color:var(--sc-cyan);padding:3px 10px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;cursor:pointer;text-transform:uppercase">✏️ Edit</button>`:''}
+          </div>
+        </div>
+        <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+          <div><div class="order-field-label">Order #</div><div class="order-field-val order-num">${ov.order||pd.order}</div></div>
+          <div><div class="order-field-label">Product</div><div class="order-field-val">${ov.product||pd.product}</div></div>
+          <div><div class="order-field-label">Status</div><div class="order-field-val">${ov.status||'Delivered'}</div></div>
+        </div>
+        ${lastNote?`<div style="margin-top:8px;background:rgba(0,200,255,0.07);border:1px solid rgba(0,200,255,0.15);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--silver)">💬 <span style="color:var(--sc-cyan);font-weight:700">${lastNote.author}:</span> ${lastNote.text}</div>`:''}
+      </div>`;
+    }).join('');
+  const pendingCount = o.pending.length;
+  return `
+    <div class="profile-section-title" style="${pendingCount>0?'color:var(--yellow);border-color:rgba(240,180,41,0.30)':''}">
+      ${pendingCount>0?`⏳ Pending Activations <span style="background:var(--yellow);color:#000;border-radius:10px;padding:1px 8px;font-size:12px;margin-left:6px;font-weight:900">${pendingCount}</span>`:'⏳ Pending Activations'}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px">${pendingHTML}</div>`;
+}
+
+function buildRecentOrdersSection(p){
+  const o = p.orders || { recent:[] };
+  const statusColor = s => s==='Active'?'var(--green)':s==='Pending'?'var(--yellow)':s==='Delivered'?'var(--sc-cyan)':'var(--red)';
+  const statusBg    = s => s==='Active'?'var(--green-bg)':s==='Pending'?'var(--yellow-bg)':s==='Delivered'?'rgba(0,200,255,0.10)':'var(--red-bg)';
+  const recentHTML  = o.recent.slice(0,20).map(r=>`
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
+      <td style="padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--white)">${r.customer}</td>
+      <td style="padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:var(--sc-cyan);letter-spacing:1px">${r.order}</td>
+      <td style="padding:10px 12px;font-size:12px;color:var(--silver)">${r.product}</td>
+      <td style="padding:10px 12px;font-size:12px;color:var(--silver-dim)">${r.date}</td>
+      <td style="padding:10px 12px">
+        <span style="background:${statusBg(r.status)};border:1px solid ${statusColor(r.status)}44;color:${statusColor(r.status)};padding:2px 8px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase">${r.status}</span>
+      </td>
+    </tr>`).join('');
+  return `
+    <div class="profile-section-title">📋 Recent Orders</div>
+    <div style="background:rgba(255,255,255,0.5);border:1px solid var(--card-border);border-radius:12px;overflow:hidden;margin-bottom:40px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:rgba(0,0,0,0.06)">
+          <th style="text-align:left;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Customer</th>
+          <th style="text-align:left;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Order #</th>
+          <th style="text-align:left;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Product</th>
+          <th style="text-align:left;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Date</th>
+          <th style="text-align:left;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Status</th>
+        </tr></thead>
+        <tbody>${recentHTML}</tbody>
+      </table>
+    </div>`;
+}
+
+
+  function drawCharts(id,m){
+  const W='#1a3a52',GRID='rgba(26,92,229,0.10)',TICK='#4a7090',BLUE='#0099cc';
+  const tip={backgroundColor:'#0d2035',borderColor:'rgba(0,200,255,0.35)',borderWidth:1,titleColor:'#e8f0f7',bodyColor:'#e8f0f7',padding:8};
+  const base={
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:W,font:{family:'Barlow Condensed',size:11},boxWidth:12,padding:6}},tooltip:tip},
+    scales:{x:{ticks:{color:TICK,font:{size:10}},grid:{color:GRID}},y:{ticks:{color:TICK,font:{size:10}},grid:{color:GRID},beginAtZero:true}}
+  };
+  const DAY=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  mkChart('spd_'+id,{type:'bar',data:{labels:DAY,datasets:[
+    {label:'Recent',data:m.salesPerDay,backgroundColor:BLUE+'99',borderColor:BLUE,borderWidth:1,borderRadius:3},
+    {label:'4Wk Avg',data:m.fourWkDaily,type:'line',borderColor:'#4a7090',borderWidth:2,pointBackgroundColor:'#4a7090',pointRadius:3,fill:false,tension:0.3}
+  ]},options:{...base,plugins:{...base.plugins,legend:{...base.plugins.legend,position:'top'}}}});
+
+  mkChart('alpha_'+id,{type:'bar',data:{labels:DAY,datasets:[
+    {label:'Pos',data:m.alpha.map(v=>v>0?v:0),backgroundColor:BLUE+'cc',borderRadius:2},
+    {label:'Neg',data:m.alpha.map(v=>v<0?v:0),backgroundColor:'#334155',borderRadius:2}
+  ]},options:{...base,plugins:{...base.plugins,legend:{...base.plugins.legend,position:'top'}},
+    scales:{x:{...base.scales.x,stacked:true},y:{...base.scales.y,stacked:true}}}});
+
+  const timeOpts={...base,plugins:{...base.plugins,legend:{display:false}},
+    scales:{x:{ticks:{color:TICK,font:{size:9}},grid:{color:GRID}},y:{ticks:{color:TICK,font:{size:9},stepSize:1},grid:{color:GRID},beginAtZero:true}}};
+  mkChart('tsr_'+id,{type:'bar',data:{labels:m.timeSlots,datasets:[{data:m.recentTime,backgroundColor:BLUE+'bb',borderRadius:3}]},options:timeOpts});
+  mkChart('ts4_'+id,{type:'bar',data:{labels:m.timeSlots,datasets:[{data:m.fw4Time,backgroundColor:BLUE+'bb',borderRadius:3}]},options:timeOpts});
+
+  const PIE=['#2f7dff','#1e4db7','#22c55e','#6366f1'];
+  const pieOpts={responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{position:'right',labels:{color:W,font:{family:'Barlow Condensed',size:11},padding:8,boxWidth:12}},tooltip:tip}};
+  mkChart('pr_'+id,{type:'doughnut',data:{labels:m.prodLabels,datasets:[{data:m.recentProds,backgroundColor:PIE,borderColor:'#e8f0f7',borderWidth:2}]},options:pieOpts});
+  mkChart('p4_'+id,{type:'doughnut',data:{labels:m.prodLabels,datasets:[{data:m.fw4Prods,backgroundColor:PIE,borderColor:'#e8f0f7',borderWidth:2}]},options:pieOpts});
+}
+
+// ─── TEAM PROFILE PAGE ───────────────────────────────────────────────────────
+function openTeamProfile(teamName){
+  if(!canViewTeam(teamName)){
+    openProfilePage(`
+      <div class="profile-topbar">
+        <button class="profile-back" onclick="closeProfile()"><span>←</span> Back</button>
+        <div class="profile-heading">
+          <div class="profile-page-name">${teamName}</div>
+          <div class="profile-page-sub">Team Restricted</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 24px;text-align:center">
+        <div style="font-size:48px;margin-bottom:16px">🔒</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:var(--white);margin-bottom:8px">Access Restricted</div>
+        <div style="color:var(--silver-dim);font-size:14px;max-width:360px;line-height:1.6">You can only view your own team's dashboard. Contact your Junior Director or Admin for access.</div>
+      </div>
+    `);
+    return;
+  }
+  const team=teams.find(t=>t.name===teamName);if(!team)return;
+  const members=team.members;
+  const m=team.metrics;
+  const sorted=[...members].sort((a,b)=>twUnits(b)-twUnits(a));
+  const tw={u:members.reduce((s,p)=>s+twUnits(p),0),y:members.reduce((s,p)=>s+twYeses(p),0)};
+  const id='t'+teamName.replace(/[^a-zA-Z0-9]/g,'');
+
+  const rows=sorted.map((p,i)=>{
+    const u=twUnits(p),y=twYeses(p);
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer" onclick="openPersonProfile('${p.name.replace(/'/g,"\\'")}')">
+      <td class="rank ${i<3?'rank-'+(i+1):''}" style="padding:12px 8px 12px 16px">${rankLabel(i)}</td>
+      <td class="name-cell"><span class="name-text name-link">${p.name}</span><br><span style="font-size:11px;color:var(--silver-dim)">${p.role}</span></td>
+      <td class="val c-none" style="text-align:center;padding:12px 8px">${y}</td>
+      <td class="val ${weeklyClass(u)}" style="text-align:center;padding:12px 8px">${u}</td>
+    </tr>`;
+  }).join('');
+
+  // If no metrics (empty team), show simple view
+  if(!m){
+    openProfilePage(`
+      <div class="profile-topbar">
+        <button class="profile-back" onclick="closeProfile()"><span>←</span> Back</button>
+        <div class="profile-heading">
+          <div class="profile-page-name">${team.name}</div>
+          <div class="profile-page-sub">Team · <span>0 members</span></div>
+        </div>
+      </div>
+      <p style="color:var(--silver-dim);padding:40px;text-align:center">No members assigned to this team yet.</p>
+    `);
+    return;
+  }
+
+  const vsColor=m.vsPct>=0?'#22c55e':'#e53535';
+  const vsArrow=m.vsPct>=0?'↑':'↓';
+  const total=Math.max(m.totalActs,1);
+
+  const buckets=m.churnBuckets.map(b=>`
+    <div class="churn-bucket">
+      <div class="churn-label">${b.label}</div>
+      <div class="churn-fraction">${b.disco>0?`(${b.disco}/${b.activated})`:'---'}</div>
+      <div class="churn-pct" style="color:${b.disco>0?'#f97316':'var(--silver-dim)'}">${b.disco>0?b.pct+'%':'---'}</div>
+    </div>`).join('');
+
+  openProfilePage(`
+    <div class="profile-topbar">
+      <button class="profile-back" onclick="closeProfile()"><span>←</span> Back</button>
+      <div class="profile-heading">
+        <div class="profile-page-name">${team.name}</div>
+        <div class="profile-page-sub">Team · <span>${members.length} members</span></div>
+      </div>
+    </div>
+
+    <div class="profile-stats-bar">
+      <div class="profile-stat"><div class="profile-stat-val units-val">${tw.u}</div><div class="profile-stat-lbl">This Wk Units</div></div>
+      <div class="profile-stat"><div class="profile-stat-val">${tw.y}</div><div class="profile-stat-lbl">This Wk Yeses</div></div>
+      <div class="profile-stat"><div class="profile-stat-val units-val">${m.fourWkAvg*4|0}</div><div class="profile-stat-lbl">4W Units</div></div>
+      <div class="profile-stat"><div class="profile-stat-val">${members.length}</div><div class="profile-stat-lbl">Members</div></div>
+      <div class="profile-stat"><div class="profile-stat-val" style="color:${vsColor}">${vsArrow}${Math.abs(m.vsPct)}%</div><div class="profile-stat-lbl">vs 4Wk Avg</div></div>
+    </div>
+
+    <div class="profile-section-title">Team Breakdown</div>
+    <div class="breakdown-grid">
+      <div class="breakdown-remark" style="background:${m.remarkColor}22;border:1px solid ${m.remarkColor}55">
+        <div style="font-size:10px;letter-spacing:2px;color:${m.remarkColor};text-transform:uppercase;font-family:'Barlow Condensed',sans-serif;font-weight:700;margin-bottom:6px">Remarks</div>
+        <div style="font-size:18px;font-weight:700;color:${m.remarkColor}">${m.remark}</div>
+        <div style="font-size:11px;color:var(--silver-dim);margin-top:6px">Rec Wk Avg: <b style="color:var(--silver)">${m.recentAvg}</b> &nbsp;·&nbsp; 4Wk Avg: <b style="color:var(--silver)">${m.fourWkAvg}</b></div>
+      </div>
+      <div class="breakdown-stat"><div class="breakdown-val">${m.recentAvg}</div><div class="breakdown-lbl">Rec. Wk Avg</div></div>
+      <div class="breakdown-stat"><div class="breakdown-val" style="color:${vsColor}">${vsArrow}${Math.abs(m.vsPct)}%</div><div class="breakdown-lbl">vs 4Wk Avg</div></div>
+      <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(pct(m.active,total))>=75?'#22c55e':'#f0b429'}">${pct(m.active,total)}%</div><div class="breakdown-lbl">Active</div></div>
+      <div class="breakdown-stat"><div class="breakdown-val" style="color:#f0b429">${pct(m.pending,total)}%</div><div class="breakdown-lbl">Pending</div></div>
+      <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(pct(m.cancel,total))>10?'#e53535':'var(--silver)'}">${pct(m.cancel,total)}%</div><div class="breakdown-lbl">Cancel</div></div>
+      <div class="breakdown-stat"><div class="breakdown-val" style="color:${parseFloat(pct(m.projDisco,total))>5?'#f97316':'#22c55e'}">${pct(m.projDisco,total)}%</div><div class="breakdown-lbl">Proj. Disco</div></div>
+    </div>
+
+    <div class="profile-section-title">Churn Buckets</div>
+    <div class="churn-grid">${buckets}</div>
+
+    <div class="profile-section-title">Sales Trends</div>
+    <div class="charts-row">
+      <div class="chart-box">
+        <div class="chart-title">Sales Per Day</div>
+        <div class="chart-wrap" style="height:160px"><canvas id="spd_${id}"></canvas></div>
+        <div class="chart-title" style="margin-top:18px;font-size:11px">Pos / Neg Alpha</div>
+        <div class="chart-wrap" style="height:100px"><canvas id="alpha_${id}"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">Time of Sales — Recent</div>
+        <div class="chart-wrap" style="height:130px"><canvas id="tsr_${id}"></canvas></div>
+        <div class="chart-title" style="margin-top:18px">Time of Sales — 4Wk Running</div>
+        <div class="chart-wrap" style="height:130px"><canvas id="ts4_${id}"></canvas></div>
+      </div>
+    </div>
+
+    <div class="profile-section-title">Products Sold</div>
+    <div class="charts-row">
+      <div class="chart-box">
+        <div class="chart-title">Recent Week</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="pr_${id}"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">4Wk Running</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="p4_${id}"></canvas></div>
+      </div>
+    </div>
+
+    <div class="profile-section-title">Member Rankings — This Week</div>
+    <div style="background:rgba(255,255,255,0.5);border:1px solid rgba(26,92,229,0.2);border-radius:12px;overflow:hidden;margin-bottom:40px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:rgba(0,0,0,0.06)">
+          <th style="width:36px"></th>
+          <th style="text-align:left;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Name</th>
+          <th style="text-align:center;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Yeses</th>
+          <th style="text-align:center;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;color:var(--silver-dim);text-transform:uppercase">Units</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <p style="font-size:11px;color:var(--silver-dim);margin-top:-30px;margin-bottom:20px;text-align:center">Click any member to view their full profile</p>
+  `);
+
+  setTimeout(()=>drawCharts(id,m), 100);
+}
+
+// ═══════════════════════════════════════════════════════
+// WRITE-BACK HELPER
+// ═══════════════════════════════════════════════════════
+async function postToSheet(action, payload) {
+  if (!DATA_LOADED || !SCRIPT_URL) return;
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain'}, // avoids CORS preflight with Apps Script
+      body: JSON.stringify({key: API_KEY, action, ...payload})
+    });
+  } catch(err) { console.warn('Write-back failed:', err); }
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT — Async Boot
+// ═══════════════════════════════════════════════════════
+// === LOGIN HANDLERS ===
+
+function showLoginModal() {
+  const modal = document.getElementById('login-modal');
+  modal.style.display = 'flex';
+  // Show demo link if no live data
+  document.getElementById('login-demo-link').style.display = DATA_LOADED ? 'none' : 'block';
+  setTimeout(() => document.getElementById('login-email').focus(), 100);
+}
+
+function submitLogin() {
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const errEl = document.getElementById('login-error');
+
+  if (!email || !email.includes('@')) {
+    errEl.textContent = 'Please enter a valid email address.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  if (DATA_LOADED && sheetRoster[email]) {
+    // Found in roster — log them in
+    const entry = sheetRoster[email];
+    currentPersona = entry.name;
+    currentRole = entry.rank || 'rep';
+    document.getElementById('login-modal').style.display = 'none';
+    finishInit();
+    hideLoading();
+  } else if (DATA_LOADED) {
+    errEl.textContent = 'Email not found. Contact your Jr. Director to get added.';
+    errEl.style.display = 'block';
+  } else {
+    // Demo mode — find matching name or use default
+    const match = [...leaders,...reps].find(p => p.name.toLowerCase().includes(email.split('@')[0]));
+    if (match) {
+      currentPersona = match.name;
+      currentRole = ROLE_MAP[match.name] || 'rep';
+    }
+    document.getElementById('login-modal').style.display = 'none';
+    finishInit();
+    hideLoading();
+  }
+}
+
+function loginAsDemo() {
+  document.getElementById('login-modal').style.display = 'none';
+  finishInit();
+  hideLoading();
+}
+
+// === BOOT ===
+
+(async function boot() {
+  showLoading();
+  if (SCRIPT_URL) {
+    try {
+      const res = await fetch(`${SCRIPT_URL}?key=${encodeURIComponent(API_KEY)}`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      loadFromSheet(data);
+      DATA_LOADED = true;
+      document.getElementById('loading-text').textContent = 'Live data loaded';
+    } catch(err) {
+      console.warn('Sheet fetch failed, using demo data:', err);
+      document.getElementById('loading-text').textContent = 'Using demo data…';
+      loadRandomData();
+    }
+  } else {
+    loadRandomData();
+  }
+  // Show login modal — finishInit() and hideLoading() happen after login
+  showLoginModal();
+})();
+</script>
+
+  <!-- SC FOOTER -->
+  <footer style="text-align:center; padding:24px 0 16px; opacity:0.55;">
+    <img src="references/logos/smart-connections-logo.png" alt="Smart Connections" style="height:22px; width:auto; filter:grayscale(30%);">
+    <p style="font-size:11px; letter-spacing:2px; color:#4a7090; margin-top:6px; font-family:'Barlow Condensed',sans-serif; text-transform:uppercase;">Powered by Smart Connections</p>
+  </footer>
+</body>
+</html>
