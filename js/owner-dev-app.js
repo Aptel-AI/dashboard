@@ -414,28 +414,8 @@ const OwnerDev = {
       await this._autoMapCamCompanies();
     }
 
-    // NLR auto-map: if workbooks loaded but tabs not cached yet, fetch with tabs
+    // NLR auto-map: match files first, then fetch tabs only for matched workbooks
     if (this.state.nlrWorkbooks.length > 0) {
-      // Check if tabs are already cached
-      const hasAnyTabs = this.state.nlrWorkbooks.some(wb => this.state.nlrTabsCache[wb.id]);
-      if (!hasAnyTabs) {
-        // Fetch workbooks WITH tabs (longer timeout — this opens each spreadsheet)
-        try {
-          const fullRes = await this._api(
-            'odNlrWorkbooks', { includeTabs: 'true' }, 120000 // 2 minute timeout for tab scanning
-          );
-          if (fullRes.success && fullRes.workbooks) {
-            this.state.nlrWorkbooks = fullRes.workbooks;
-            for (const wb of fullRes.workbooks) {
-              if (wb.tabs && wb.tabs.length) {
-                this.state.nlrTabsCache[wb.id] = wb.tabs;
-              }
-            }
-          }
-        } catch (err) {
-          console.warn('[OwnerDev] Tab fetch timed out, NLR tab auto-map skipped:', err.message);
-        }
-      }
       await this._autoMapNlrFiles();
     }
   },
@@ -552,8 +532,8 @@ const OwnerDev = {
 
     console.log('[OwnerDev] NLR auto-map: checking', workbooks.length, 'workbooks:', workbooks.map(w => w.name));
 
-    let autoMapped = 0;
-    const toSave = [];
+    // ── Step 1: Match owner names to workbook filenames ──
+    const matched = []; // { campaignKey, ownerName, wb }
     const unmatched = [];
 
     for (const [campaignKey, campaign] of Object.entries(this.state.campaigns)) {
@@ -561,19 +541,15 @@ const OwnerDev = {
         const existing = this._findMapping(campaignKey, ownerName);
         if (existing?.nlrWorkbookId) continue; // already mapped
 
-        // Find a workbook whose filename fuzzy-matches this owner name
         let matchedWb = null;
         for (const wb of workbooks) {
-          // Try matching owner name against workbook filename
           if (this._namesMatch(ownerName, wb.name)) {
             matchedWb = wb;
             break;
           }
-          // Also try: does the workbook name CONTAIN the owner name or vice versa?
           const normOwner = this._normName(ownerName);
           const normWb = this._normName(wb.name);
           if (normOwner && normWb) {
-            // Check if any owner name token (2+ chars) appears in the workbook name
             const ownerTokens = normOwner.split(' ').filter(t => t.length >= 2);
             const matchCount = ownerTokens.filter(t => normWb.includes(t)).length;
             if (matchCount >= 2 || (ownerTokens.length === 1 && matchCount === 1 && normWb.includes(normOwner))) {
@@ -583,30 +559,10 @@ const OwnerDev = {
           }
         }
 
-        if (!matchedWb) {
-          unmatched.push(ownerName);
-        }
-
         if (matchedWb) {
-          // Check for "Indeed Tracking 2026" tab
-          const tabs = this.state.nlrTabsCache[matchedWb.id] || matchedWb.tabs || [];
-          const indeedTab = tabs.find(t => t.toLowerCase().includes('indeed tracking'));
-          const autoTab = indeedTab || '';
-
-          this._upsertMapping(campaignKey, ownerName, {
-            nlrWorkbookId: matchedWb.id,
-            nlrWorkbookName: matchedWb.name,
-            nlrTab: autoTab
-          });
-
-          toSave.push({
-            campaign: campaignKey,
-            ownerName,
-            nlrWorkbookId: matchedWb.id,
-            nlrWorkbookName: matchedWb.name,
-            nlrTab: autoTab
-          });
-          autoMapped++;
+          matched.push({ campaignKey, ownerName, wb: matchedWb });
+        } else {
+          unmatched.push(ownerName);
         }
       }
     }
@@ -614,20 +570,58 @@ const OwnerDev = {
     if (unmatched.length > 0) {
       console.log(`[OwnerDev] NLR unmatched owners (${unmatched.length}):`, unmatched.slice(0, 20));
     }
+    if (!matched.length) { console.log('[OwnerDev] NLR auto-map: no new file matches'); return 0; }
 
-    // Save to backend
-    if (toSave.length > 0) {
-      console.log(`[OwnerDev] Auto-mapped ${toSave.length} owners to NLR files`);
+    console.log(`[OwnerDev] NLR auto-map: ${matched.length} file matches, fetching tabs...`);
 
-      const mappings = toSave.map(item => ({
-        campaign: item.campaign,
-        ownerName: item.ownerName,
-        nlrWorkbookId: item.nlrWorkbookId,
-        nlrWorkbookName: item.nlrWorkbookName,
-        nlrTab: item.nlrTab,
+    // ── Step 2: Fetch tabs only for matched workbooks (in parallel, by unique ID) ──
+    const uniqueIds = [...new Set(matched.map(m => m.wb.id))];
+    const idsToFetch = uniqueIds.filter(id => !this.state.nlrTabsCache[id]);
+
+    if (idsToFetch.length > 0) {
+      const tabResults = await Promise.allSettled(
+        idsToFetch.map(id =>
+          this._api('odNlrTabs', { sheetId: id }).then(res => ({ id, tabs: res.success ? (res.tabs || []) : [] }))
+        )
+      );
+      for (const result of tabResults) {
+        if (result.status === 'fulfilled') {
+          this.state.nlrTabsCache[result.value.id] = result.value.tabs;
+        }
+      }
+      console.log(`[OwnerDev] Fetched tabs for ${tabResults.filter(r => r.status === 'fulfilled').length}/${idsToFetch.length} workbooks`);
+    }
+
+    // ── Step 3: Build mappings with auto-selected "Indeed Tracking" tab ──
+    let autoMapped = 0;
+    const toSave = [];
+
+    for (const { campaignKey, ownerName, wb } of matched) {
+      const tabs = this.state.nlrTabsCache[wb.id] || [];
+      const indeedTab = tabs.find(t => t.toLowerCase().includes('indeed tracking'));
+      const autoTab = indeedTab || '';
+
+      this._upsertMapping(campaignKey, ownerName, {
+        nlrWorkbookId: wb.id,
+        nlrWorkbookName: wb.name,
+        nlrTab: autoTab
+      });
+
+      toSave.push({
+        campaign: campaignKey,
+        ownerName,
+        nlrWorkbookId: wb.id,
+        nlrWorkbookName: wb.name,
+        nlrTab: autoTab,
         updatedBy: 'auto-map'
-      }));
-      this._post('odBatchSaveMappings', { mappings })
+      });
+      autoMapped++;
+    }
+
+    // ── Step 4: Batch save to backend ──
+    if (toSave.length > 0) {
+      console.log(`[OwnerDev] Auto-mapped ${toSave.length} owners to NLR files (${toSave.filter(s => s.nlrTab).length} with tabs)`);
+      this._post('odBatchSaveMappings', { mappings: toSave })
         .then(res => console.log('[OwnerDev] Batch save NLR result:', res))
         .catch(err => console.warn('[OwnerDev] Batch save NLR error:', err.message));
     }
@@ -1099,12 +1093,27 @@ const OwnerDev = {
   },
 
   /**
-   * Open NLR tab searchable dropdown
+   * Open NLR tab searchable dropdown — fetches tabs on demand if not cached
    */
-  _openNlrTabDropdown(campaign, ownerName, cellId) {
+  async _openNlrTabDropdown(campaign, ownerName, cellId) {
     const mapping = this._findMapping(campaign, ownerName);
     const wbId = mapping?.nlrWorkbookId || '';
     const currentVal = mapping?.nlrTab || '';
+
+    // If tabs aren't cached yet for this workbook, fetch them on demand
+    if (wbId && !this.state.nlrTabsCache[wbId]) {
+      const trigger = document.querySelector(`#sd-wrap-${cellId} .sd-trigger`);
+      if (trigger) trigger.querySelector('span').textContent = 'Loading tabs...';
+      try {
+        const tabsRes = await this._api('odNlrTabs', { sheetId: wbId });
+        this.state.nlrTabsCache[wbId] = tabsRes.success ? (tabsRes.tabs || []) : [];
+      } catch (err) {
+        console.error('[OwnerDev] Tab fetch error for', wbId, err);
+        this.state.nlrTabsCache[wbId] = [];
+      }
+      if (trigger) trigger.querySelector('span').textContent = currentVal || '-- Select Tab --';
+    }
+
     const tabs = (wbId && this.state.nlrTabsCache[wbId]) || [];
     const options = tabs.map(t => ({ value: t, label: t }));
 
