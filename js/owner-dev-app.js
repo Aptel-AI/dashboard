@@ -84,21 +84,25 @@ const OwnerDev = {
       this._buildViewAsBar();
     }
 
-    // Load data
-    this._showLoading('Loading owner data...');
+    // Load data (cache-first: shows cached data instantly, refreshes in background)
+    const cache = this._readCache();
+    const hasCache = cache?.campaigns && Object.values(cache.campaigns).some(c => c.owners?.length > 0);
+    if (!hasCache) this._showLoading('Loading owner data...');
     try {
       await this._loadAllData();
     } catch (err) {
       console.error('[OwnerDev] Data load failed:', err);
       this._toast('Failed to load data. Please refresh.', 'error');
     }
-    this._hideLoading();
 
-    // Show dashboard
-    document.getElementById('dashboard').style.display = 'block';
-    this._renderFilterPills();
-    this._renderStats();
-    this.renderMapping();
+    // If cache was used, _loadAllData applied it synchronously — show dashboard + render
+    // If no cache, _refreshFromServer handles showing dashboard after owners arrive
+    if (hasCache) {
+      document.getElementById('dashboard').style.display = 'block';
+      this._renderFilterPills();
+      this._renderStats();
+      this.renderMapping();
+    }
   },
 
   // ══════════════════════════════════════════════════════
@@ -349,9 +353,9 @@ const OwnerDev = {
   },
 
   /**
-   * Fetch with timeout wrapper (default 20s)
+   * Fetch with timeout wrapper (default 30s)
    */
-  _fetchWithTimeout(promise, ms = 20000) {
+  _fetchWithTimeout(promise, ms = 30000) {
     return Promise.race([
       promise,
       new Promise((_, reject) => setTimeout(() => reject(new Error('Request timeout')), ms))
@@ -359,90 +363,202 @@ const OwnerDev = {
   },
 
   // ══════════════════════════════════════════════════════
-  // DATA LOADING
+  // DATA CACHE (localStorage, stale-while-revalidate)
   // ══════════════════════════════════════════════════════
 
-  /**
-   * Fire all data fetches in parallel
-   */
-  async _loadAllData() {
-    const results = await Promise.allSettled([
-      this._api('odCampaignOwners'),
-      this._api('odGetMappings'),
-      this._api('odGetUsers'),
-      this._api('odCamCompanies'),
-      this._api('odNlrWorkbooks'),
-      this._api('odGetCampaignTabMap')
-    ]);
+  _CACHE_KEY: 'od_data_cache',
+  _CACHE_MAX_AGE: 10 * 60 * 1000, // 10 min — treat as fresh, skip background refresh
 
-    // Process campaign owners (also captures tab names per campaign)
-    if (results[0].status === 'fulfilled' && results[0].value.success) {
-      this.state.campaigns = results[0].value.campaigns || {};
-      // Cache available tabs per campaign from the odCampaignOwners response
+  /**
+   * Read the full data cache from localStorage
+   */
+  _readCache() {
+    try {
+      const raw = localStorage.getItem(this._CACHE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch { return null; }
+  },
+
+  /**
+   * Write all cacheable data to localStorage
+   */
+  _writeCache(data) {
+    try {
+      data._ts = Date.now();
+      localStorage.setItem(this._CACHE_KEY, JSON.stringify(data));
+    } catch (err) {
+      console.warn('[OwnerDev] Cache write failed:', err.message);
+    }
+  },
+
+  /**
+   * Apply cached data to state (same logic as processing API results)
+   */
+  _applyCacheToState(cache) {
+    if (cache.campaigns) {
+      this.state.campaigns = cache.campaigns;
       for (const [key, camp] of Object.entries(this.state.campaigns)) {
         if (camp.tabs && camp.tabs.length) {
           this.state.campaignTabsCache[key] = camp.tabs;
         }
       }
+    }
+    if (cache.mappings) this.state.mappings = cache.mappings;
+    if (cache.users) this.state.users = cache.users;
+    if (cache.camCompanies) this.state.camCompanies = cache.camCompanies;
+    if (cache.clientToBusinessMap) this.state.clientToBusinessMap = cache.clientToBusinessMap;
+    if (cache.nlrWorkbooks) {
+      this.state.nlrWorkbooks = cache.nlrWorkbooks;
+      for (const wb of this.state.nlrWorkbooks) {
+        if (wb.tabs && wb.tabs.length) this.state.nlrTabsCache[wb.id] = wb.tabs;
+      }
+    }
+    if (cache.campaignTabMap) this.state.campaignTabMap = cache.campaignTabMap;
+    if (cache.campaignTabs) {
+      for (const [key, tabs] of Object.entries(cache.campaignTabs)) {
+        if (tabs.length) this.state.campaignTabsCache[key] = tabs;
+      }
+    }
+  },
+
+  // ══════════════════════════════════════════════════════
+  // DATA LOADING (stale-while-revalidate)
+  // ══════════════════════════════════════════════════════
+
+  /**
+   * Load data with cache-first strategy:
+   * 1. If cache exists → render immediately from cache
+   * 2. Fetch fresh data in background (or foreground if no cache)
+   * 3. Update UI when fresh data arrives
+   */
+  async _loadAllData() {
+    const cache = this._readCache();
+    const hasCache = cache && cache.campaigns && Object.values(cache.campaigns).some(c => c.owners?.length > 0);
+    const isFresh = hasCache && (Date.now() - (cache._ts || 0)) < this._CACHE_MAX_AGE;
+
+    // ── Step 1: If we have cached data, apply it immediately ──
+    if (hasCache) {
+      console.log(`[OwnerDev] Rendering from cache (age: ${Math.round((Date.now() - (cache._ts || 0)) / 1000)}s)`);
+      this._applyCacheToState(cache);
+    }
+
+    // ── Step 2: If cache is fresh enough, skip server fetch ──
+    if (isFresh) {
+      console.log('[OwnerDev] Cache is fresh, skipping server fetch');
+      return;
+    }
+
+    // ── Step 3: Fetch fresh data (foreground if no cache, background if cached) ──
+    if (hasCache) {
+      // Background refresh — don't block the UI
+      this._refreshFromServer();
     } else {
-      console.warn('[OwnerDev] Failed to load campaign owners:', results[0].reason || results[0].value);
-      // Fallback: build campaigns from config
-      this.state.campaigns = {};
-      for (const [key, cfg] of Object.entries(OD_CONFIG.campaignSources)) {
-        this.state.campaigns[key] = { label: cfg.label, owners: [] };
+      // No cache — must wait for server
+      await this._refreshFromServer();
+    }
+  },
+
+  /**
+   * Fetch all data from the server and update state + cache + UI.
+   * Uses progressive loading: renders owners as soon as they arrive
+   * instead of waiting for all 6 API calls to finish.
+   */
+  async _refreshFromServer() {
+    console.log('[OwnerDev] Fetching fresh data from server...');
+    const isFirstLoad = !Object.values(this.state.campaigns).some(c => c.owners?.length > 0);
+
+    // ── Fire all requests in parallel ──
+    const campaignOwners = this._api('odCampaignOwners', {}, 45000);
+    const mappings       = this._api('odGetMappings');
+    const users          = this._api('odGetUsers');
+    const camCompanies   = this._api('odCamCompanies', {}, 30000);
+    const nlrWorkbooks   = this._api('odNlrWorkbooks', {}, 30000);
+    const campaignTabMap = this._api('odGetCampaignTabMap');
+
+    const cacheData = {};
+
+    // ── Priority 1: Campaign owners + mappings (needed to render the table) ──
+    // Wait for these two first so we can show the table ASAP on first load
+    const [ownersResult, mappingsResult] = await Promise.allSettled([campaignOwners, mappings]);
+
+    if (ownersResult.status === 'fulfilled' && ownersResult.value.success) {
+      this.state.campaigns = ownersResult.value.campaigns || {};
+      cacheData.campaigns = this.state.campaigns;
+      for (const [key, camp] of Object.entries(this.state.campaigns)) {
+        if (camp.tabs && camp.tabs.length) this.state.campaignTabsCache[key] = camp.tabs;
+      }
+    } else {
+      const reason = ownersResult.status === 'rejected'
+        ? (ownersResult.reason?.message || 'Request timeout')
+        : (ownersResult.value?.error || 'Unknown error');
+      console.error('[OwnerDev] Failed to load campaign owners:', reason);
+      if (isFirstLoad) {
+        this._toast('Failed to load owner data: ' + reason, 'error');
+        this.state.campaigns = {};
+        for (const [key, cfg] of Object.entries(OD_CONFIG.campaignSources)) {
+          this.state.campaigns[key] = { label: cfg.label, owners: [] };
+        }
+        this._showRetryBanner();
       }
     }
 
-    // Process mappings
-    if (results[1].status === 'fulfilled' && results[1].value.success) {
-      this.state.mappings = results[1].value.mappings || [];
-    } else {
-      console.warn('[OwnerDev] Failed to load mappings:', results[1].reason || results[1].value);
+    if (mappingsResult.status === 'fulfilled' && mappingsResult.value.success) {
+      this.state.mappings = mappingsResult.value.mappings || [];
+      cacheData.mappings = this.state.mappings;
+    } else if (!this.state.mappings.length) {
       this.state.mappings = [];
     }
 
-    // Process users
-    if (results[2].status === 'fulfilled' && results[2].value.success) {
-      this.state.users = results[2].value.users || [];
-    } else {
-      console.warn('[OwnerDev] Failed to load users:', results[2].reason || results[2].value);
+    // ── Render immediately with owners + mappings ──
+    if (isFirstLoad) {
+      this._hideLoading();
+      document.getElementById('dashboard').style.display = 'block';
+    }
+    this._renderFilterPills();
+    this._renderStats();
+    this.renderMapping();
+
+    // ── Priority 2: Remaining data (settles in background) ──
+    const [usersResult, camResult, nlrResult, tabMapResult] =
+      await Promise.allSettled([users, camCompanies, nlrWorkbooks, campaignTabMap]);
+
+    if (usersResult.status === 'fulfilled' && usersResult.value.success) {
+      this.state.users = usersResult.value.users || [];
+      cacheData.users = this.state.users;
+    } else if (!this.state.users.length) {
       this.state.users = [];
     }
 
-    // Process Cam's companies + client→business name map
-    if (results[3].status === 'fulfilled' && results[3].value.success) {
-      this.state.camCompanies = results[3].value.companies || [];
-      this.state.clientToBusinessMap = results[3].value.clientToBusinessMap || [];
-    } else {
-      console.warn('[OwnerDev] Failed to load Cam companies:', results[3].reason || results[3].value);
+    if (camResult.status === 'fulfilled' && camResult.value.success) {
+      this.state.camCompanies = camResult.value.companies || [];
+      this.state.clientToBusinessMap = camResult.value.clientToBusinessMap || [];
+      cacheData.camCompanies = this.state.camCompanies;
+      cacheData.clientToBusinessMap = this.state.clientToBusinessMap;
+    } else if (!this.state.camCompanies.length) {
       this.state.camCompanies = [];
       this.state.clientToBusinessMap = [];
     }
 
-    // Process NLR workbooks (also pre-cache tabs from each workbook)
-    if (results[4].status === 'fulfilled' && results[4].value.success) {
-      this.state.nlrWorkbooks = results[4].value.workbooks || [];
-      // Pre-cache tabs for every workbook (backend now returns them inline)
+    if (nlrResult.status === 'fulfilled' && nlrResult.value.success) {
+      this.state.nlrWorkbooks = nlrResult.value.workbooks || [];
+      cacheData.nlrWorkbooks = this.state.nlrWorkbooks;
       for (const wb of this.state.nlrWorkbooks) {
-        if (wb.tabs && wb.tabs.length) {
-          this.state.nlrTabsCache[wb.id] = wb.tabs;
-        }
+        if (wb.tabs && wb.tabs.length) this.state.nlrTabsCache[wb.id] = wb.tabs;
       }
-    } else {
-      console.warn('[OwnerDev] Failed to load NLR workbooks:', results[4].reason || results[4].value);
+    } else if (!this.state.nlrWorkbooks.length) {
       this.state.nlrWorkbooks = [];
     }
 
-    // Process campaign tab map (source tab overrides)
-    if (results[5].status === 'fulfilled' && results[5].value.success) {
-      this.state.campaignTabMap = results[5].value.mappings || [];
-      // Also merge in campaignTabs from tab map endpoint (may be more up-to-date)
-      const ct = results[5].value.campaignTabs || {};
+    if (tabMapResult.status === 'fulfilled' && tabMapResult.value.success) {
+      this.state.campaignTabMap = tabMapResult.value.mappings || [];
+      cacheData.campaignTabMap = this.state.campaignTabMap;
+      const ct = tabMapResult.value.campaignTabs || {};
+      cacheData.campaignTabs = ct;
       for (const [key, tabs] of Object.entries(ct)) {
         if (tabs.length) this.state.campaignTabsCache[key] = tabs;
       }
-    } else {
-      console.warn('[OwnerDev] Failed to load campaign tab map:', results[5].reason || results[5].value);
+    } else if (!this.state.campaignTabMap.length) {
       this.state.campaignTabMap = [];
     }
 
@@ -457,20 +573,68 @@ const OwnerDev = {
       campaignTabsCached: Object.keys(this.state.campaignTabsCache).length
     });
 
-    // Run Cam auto-map immediately (data already loaded)
-    if (this.state.clientToBusinessMap.length > 0) {
-      await this._autoMapCamCompanies();
+    // Write to cache if we got campaign data
+    if (cacheData.campaigns) {
+      this._writeCache(cacheData);
     }
 
-    // NLR auto-map: match files first, then fetch tabs only for matched workbooks
-    if (this.state.nlrWorkbooks.length > 0) {
-      await this._autoMapNlrFiles();
+    // Run auto-mapping
+    const hasOwners = Object.values(this.state.campaigns).some(c => c.owners?.length > 0);
+    if (hasOwners) {
+      if (this.state.clientToBusinessMap.length > 0) await this._autoMapCamCompanies();
+      if (this.state.nlrWorkbooks.length > 0) await this._autoMapNlrFiles();
+      if (Object.keys(this.state.campaignTabsCache).length > 0) await this._autoMapCampaignTabs();
     }
 
-    // Campaign tab auto-map: match owner names to tab names in each campaign spreadsheet
-    if (Object.keys(this.state.campaignTabsCache).length > 0) {
-      await this._autoMapCampaignTabs();
+    // Final re-render with all data (auto-mapping may have updated statuses)
+    this._renderFilterPills();
+    this._renderStats();
+    this.renderMapping();
+  },
+
+  /**
+   * Show a retry banner when data fails to load
+   */
+  _showRetryBanner() {
+    const existing = document.getElementById('retry-banner');
+    if (existing) existing.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'retry-banner';
+    banner.style.cssText = `
+      background:#fef3cd; border:1px solid #ffc107; border-radius:8px;
+      padding:16px 24px; margin:16px auto; max-width:600px;
+      display:flex; align-items:center; gap:12px; font-size:14px;
+      color:#856404; font-family:var(--font,Inter,sans-serif);
+    `;
+    banner.innerHTML = `
+      <span style="font-size:20px">&#x26A0;&#xFE0F;</span>
+      <span style="flex:1">Owner data failed to load. The server may be slow — please try again.</span>
+      <button onclick="OwnerDev.retryLoad()" style="
+        background:#0099cc; color:#fff; border:none; border-radius:6px;
+        padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer;
+      ">Retry</button>
+    `;
+
+    const content = document.getElementById('view-mapping');
+    content.insertBefore(banner, content.firstChild);
+  },
+
+  /**
+   * Retry loading all data (force server fetch, bypass cache)
+   */
+  async retryLoad() {
+    const banner = document.getElementById('retry-banner');
+    if (banner) banner.remove();
+
+    this._showLoading('Retrying data load...');
+    try {
+      await this._refreshFromServer();
+    } catch (err) {
+      console.error('[OwnerDev] Retry failed:', err);
+      this._toast('Retry failed. Please refresh the page.', 'error');
     }
+    this._hideLoading();
   },
 
   // ══════════════════════════════════════════════════════
@@ -741,7 +905,8 @@ const OwnerDev = {
       if (typeof NationalApp !== 'undefined') {
         NationalApp.initCoachView({
           email: this.state.session.email,
-          name: this.state.session.name
+          name: this.state.session.name,
+          campaign: (this.state.activeCampaign && this.state.activeCampaign !== 'all') ? this.state.activeCampaign : null
         });
       }
     }
@@ -1584,17 +1749,14 @@ const OwnerDev = {
   async addMember() {
     const emailInput = document.getElementById('add-email');
     const nameInput = document.getElementById('add-name');
-    const pinInput = document.getElementById('add-pin');
     const error = document.getElementById('add-member-error');
     error.textContent = '';
 
     const email = emailInput.value.trim().toLowerCase();
     const name = nameInput.value.trim();
-    const pin = pinInput.value.trim();
 
     if (!email) { error.textContent = 'Email is required'; return; }
     if (!name) { error.textContent = 'Name is required'; return; }
-    if (!pin || pin.length < 4) { error.textContent = 'PIN must be 4-6 digits'; return; }
 
     const btn = document.querySelector('.btn-add-member');
     btn.disabled = true;
@@ -1603,8 +1765,7 @@ const OwnerDev = {
       const res = await this._post('odSaveUser', {
         email,
         name,
-        pin,
-        team: this.state.session.team,
+        team: this._getEffectiveTeam(),
         role: 'member',
         addedBy: this.state.session.email
       });
@@ -1613,7 +1774,6 @@ const OwnerDev = {
         this._toast('Member added', 'success');
         emailInput.value = '';
         nameInput.value = '';
-        pinInput.value = '';
 
         // Re-fetch users and re-render
         try {
