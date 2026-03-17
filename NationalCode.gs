@@ -10,7 +10,7 @@ var NC_API_KEY = 'national-dash-2026-secret'; // Must match Script Properties > 
 // External sheet IDs
 // ── Owner Development (OD) Config ──
 var OD_CAMPAIGNS = {
-  'frontier':     { label: 'Frontier',           sheetId: '1OULSC_r8dCW2dlvIGeP6zLtNKANJ3mZMDPyE15tH3gM' },
+  'frontier':     { label: 'Frontier',           sheetId: '1WWpLQTCyvPmJbx3jjowFszwOF_JUnjS6tzu-eAASwk0' },
   'verizon-fios': { label: 'Verizon Fios',       sheetId: '12J3HBdFQrqq5D7YwWEp93US40vmZz5n9mS-KMKXaXxA' },
   'att-nds':      { label: 'AT&T NDS/Verizon',   sheetId: '1kcUWR3EKgP-9wDct4vDyuQJ7IuS0cbcetY97dmVTY64' },
   'att-res':      { label: 'AT&T Residential',   sheetId: '1HvWJYox3JXvxmza63YBWAqKPtUGPFuaV-s-BOfbWGKM' },
@@ -4345,12 +4345,17 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
   var allTabs = srcSS.getSheets();
 
   // Get owner names from first tab column A (same method as odGetCampaignOwners)
+  // Skip header row, totals rows, and any row containing "totals", "template", "campaign"
   var ownerNames = [];
   if (allTabs.length > 0) {
     var firstTabData = allTabs[0].getDataRange().getValues();
-    for (var i = 1; i < firstTabData.length - 1; i++) {
+    for (var i = 1; i < firstTabData.length; i++) {
       var v = String(firstTabData[i][0] || '').trim();
-      if (v) ownerNames.push(v);
+      if (!v) continue;
+      var vLower = v.toLowerCase();
+      if (vLower.indexOf('total') >= 0 || vLower.indexOf('template') >= 0 ||
+          vLower.indexOf('campaign') >= 0 || vLower.indexOf('summary') >= 0) continue;
+      ownerNames.push(v);
     }
   }
 
@@ -4380,9 +4385,18 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
     if (tn) tabByName[tn.toLowerCase()] = allTabs[t];
   }
 
+  // Build list of all tab names for fuzzy matching
+  var allTabNames = [];
+  for (var t = 0; t < allTabs.length; t++) {
+    var tn = allTabs[t].getName().trim();
+    if (tn && SKIP_TABS_.indexOf(tn.toLowerCase()) < 0) {
+      allTabNames.push(tn);
+    }
+  }
+
   var rows = [];
 
-  // Process each owner: use saved tab mapping if available, else fallback to name match
+  // Process each owner: saved mapping → exact match → fuzzy match → skip (but still include in owner list)
   for (var oi = 0; oi < ownerNames.length; oi++) {
     var ownerName = ownerNames[oi];
     var ownerLower = ownerName.toLowerCase();
@@ -4392,23 +4406,48 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
     var tab = null;
 
     if (targetTabName) {
-      // Use saved mapping
-      tab = tabByName[targetTabName.toLowerCase()] || null;
+      // Use saved mapping (skip "non-partner" entries)
+      if (targetTabName.toLowerCase() !== 'non-partner') {
+        tab = tabByName[targetTabName.toLowerCase()] || null;
+      }
     }
-    if (!tab) {
-      // Fallback: find tab by owner name match
+    if (!tab && !targetTabName) {
+      // Fallback 1: exact name match
       tab = tabByName[ownerLower] || null;
+
+      // Fallback 2: fuzzy matching — try contains, first+last name, initials
+      if (!tab) {
+        tab = _fuzzyFindTab_(ownerName, allTabNames, tabByName);
+        if (tab) {
+          Logger.log('consolidateCampaign_ FUZZY matched: "' + ownerName + '" → tab "' + tab.getName() + '"');
+        }
+      }
     }
-    if (!tab) continue; // no tab found for this owner
+
+    if (!tab) {
+      Logger.log('consolidateCampaign_ NO TAB for: "' + ownerName + '" in ' + campaignKey);
+      // No tab found — still include owner with a minimal placeholder row
+      // so they appear in the owner list (with no data)
+      var campaignHeaders = getConsolidatedHeaders_(campaignKey);
+      var emptyRow = [new Date(), ownerName];
+      for (var ei = 2; ei < campaignHeaders.length; ei++) emptyRow.push(0);
+      rows.push(emptyRow);
+      continue;
+    }
 
     try {
-      var data = tab.getDataRange().getValues();
+      var range = tab.getDataRange();
+      var data = range.getValues();
+      // Also get display values — needed for production/goals columns
+      // where Google Sheets may auto-parse "90/6" as a Date instead of text
+      var displayData = range.getDisplayValues();
       if (!data || data.length < 2) continue;
 
       var sections = findSections(data);
 
       // Extract health rows (Section 1): [{date, active, leaders, dist, training, production, goals}]
-      var healthRows = extractHealthRows_(data, sections.section1Start, sections.section1End);
+      // Pass displayData so slash-separated values like "90/6" are read as text
+      var healthRows = extractHealthRows_(data, sections.section1Start, sections.section1End, displayData);
 
       // Extract recruiting rows (Section 2 — transposed): [{date, metrics[12]}]
       var recruitingRows = extractRecruitingRows_(data, sections.section2Start, sections.section2End);
@@ -4455,7 +4494,7 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
  * Extract health (Section 1) data as flat rows.
  * Returns: [{ date: Date, active, leaders, dist, training, production, goals }]
  */
-function extractHealthRows_(data, start, end) {
+function extractHealthRows_(data, start, end, displayData) {
   if (start < 0 || end < start) return [];
 
   var headers = data[start].map(function(h) { return String(h).toLowerCase().trim(); });
@@ -4465,8 +4504,8 @@ function extractHealthRows_(data, start, end) {
     leaders: findCol(headers, ['leaders']),
     dist: findCol(headers, ['dist']),
     training: findCol(headers, ['training']),
-    production: findCol(headers, ['production lw', 'production']),
-    goals: findCol(headers, ['production goals', 'goals'])
+    production: findCol(headers, ['production lw', 'production', 'total production']),
+    goals: findCol(headers, ['production goals', 'production goal', 'goals'])
   };
 
   var result = [];
@@ -4478,16 +4517,26 @@ function extractHealthRows_(data, start, end) {
     var d = (dateVal instanceof Date) ? dateVal : _parseTabDate(String(dateVal));
     if (!d) continue;
 
-    // Keep production and goals as RAW strings — they may contain "/" separated values
-    // e.g. "5/3/2" for Frontier/Cell/TV. Splitting happens in mergeHealthRecruiting_.
+    // For production and goals: use DISPLAY values (strings as shown in the sheet)
+    // because Google Sheets may auto-parse "90/6" as a Date object.
+    // Display values preserve the original text like "90/6", "110/12/10".
+    var prodRaw, goalsRaw;
+    if (displayData && displayData[i]) {
+      prodRaw = (colMap.production >= 0) ? displayData[i][colMap.production] : '';
+      goalsRaw = (colMap.goals >= 0) ? displayData[i][colMap.goals] : '';
+    } else {
+      prodRaw = (colMap.production >= 0) ? row[colMap.production] : '';
+      goalsRaw = (colMap.goals >= 0) ? row[colMap.goals] : '';
+    }
+
     result.push({
       date: d,
       active: num(row[colMap.active]),
       leaders: num(row[colMap.leaders]),
       dist: num(row[colMap.dist]),
       training: num(row[colMap.training]),
-      productionRaw: row[colMap.production],
-      goalsRaw: row[colMap.goals]
+      productionRaw: prodRaw,
+      goalsRaw: goalsRaw
     });
   }
   return result;
@@ -4689,6 +4738,80 @@ function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignK
 }
 
 /** Normalize date to key string for dedup */
+/**
+ * Fuzzy-match an owner name to a tab name in the spreadsheet.
+ * Tries multiple strategies:
+ *  1. Contains: tab contains owner name or vice versa
+ *  2. First + Last name match: owner "Adam Cole" matches tab "Adam C" or "A. Cole"
+ *  3. Token overlap: >50% of name tokens match
+ * Returns the Sheet object or null.
+ */
+function _fuzzyFindTab_(ownerName, allTabNames, tabByName) {
+  var ownerLower = ownerName.toLowerCase().trim();
+  var ownerTokens = ownerLower.split(/\s+/);
+
+  var bestTab = null;
+  var bestScore = 0;
+
+  for (var i = 0; i < allTabNames.length; i++) {
+    var tabName = allTabNames[i];
+    var tabLower = tabName.toLowerCase().trim();
+
+    // Skip if tab is the totals/summary tab
+    if (tabLower.indexOf('total') >= 0 || tabLower.indexOf('template') >= 0) continue;
+
+    var score = 0;
+
+    // Strategy 1: Contains match
+    if (tabLower.indexOf(ownerLower) >= 0 || ownerLower.indexOf(tabLower) >= 0) {
+      score = 90;
+    }
+
+    // Strategy 2: First name + last initial, or last name match
+    if (score === 0 && ownerTokens.length >= 2) {
+      var tabTokens = tabLower.split(/\s+/);
+      var firstName = ownerTokens[0];
+      var lastName = ownerTokens[ownerTokens.length - 1];
+
+      // "Adam Cole" matches "Adam C" or "Adam C."
+      if (tabTokens.length >= 2 && tabTokens[0] === firstName) {
+        var tabLast = tabTokens[tabTokens.length - 1].replace(/\./g, '');
+        if (tabLast === lastName || tabLast === lastName.charAt(0)) {
+          score = 80;
+        }
+      }
+      // "Adam Cole" matches "A Cole" or "A. Cole"
+      if (score === 0 && tabTokens.length >= 2) {
+        var tabFirst = tabTokens[0].replace(/\./g, '');
+        var tabLastFull = tabTokens[tabTokens.length - 1];
+        if ((tabFirst === firstName.charAt(0) || tabFirst === firstName) && tabLastFull === lastName) {
+          score = 80;
+        }
+      }
+    }
+
+    // Strategy 3: Token overlap (>= 50% of owner tokens found in tab name)
+    if (score === 0 && ownerTokens.length >= 2) {
+      var matches = 0;
+      for (var t = 0; t < ownerTokens.length; t++) {
+        if (tabLower.indexOf(ownerTokens[t]) >= 0) matches++;
+      }
+      var overlap = matches / ownerTokens.length;
+      if (overlap >= 0.5) {
+        score = Math.round(overlap * 60);
+      }
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestTab = tabByName[tabLower] || null;
+    }
+  }
+
+  // Only return if we have a decent match (score >= 30)
+  return bestScore >= 30 ? bestTab : null;
+}
+
 function _normalizeDateKey_(d) {
   if (!d) return '';
   if (!(d instanceof Date)) d = new Date(d);
