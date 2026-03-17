@@ -3964,7 +3964,8 @@ function odLogin(email, pin, createPin) {
 
 /**
  * action=odCamCompanies
- * Read Performance Audit sheet, get unique values from "Client Name" column.
+ * Read Performance Audit sheet, get unique Business Name values.
+ * Falls back to Client Name if Business Name column not found.
  */
 function odGetCamCompanies() {
   var ss = SpreadsheetApp.openById(SHEETS.PERFORMANCE_AUDIT);
@@ -3976,26 +3977,27 @@ function odGetCamCompanies() {
   var data = sheet.getDataRange().getValues();
   if (data.length < 2) return { success: true, companies: [] };
 
-  // Scan first 5 rows for "Client Name" header (header row may not be row 1)
+  // Scan first 5 rows for header row — look for both "Business Name" and "Client Name"
   var headerRowIdx = -1;
+  var bizCol = -1;
   var clientCol = -1;
   for (var r = 0; r < Math.min(5, data.length); r++) {
     for (var c = 0; c < data[r].length; c++) {
       var h = String(data[r][c]).trim().toLowerCase();
-      if (h === 'client name') {
-        headerRowIdx = r;
-        clientCol = c;
-        break;
-      }
+      if (h === 'business name') { bizCol = c; headerRowIdx = r; }
+      if (h === 'client name') { clientCol = c; if (headerRowIdx < 0) headerRowIdx = r; }
     }
     if (headerRowIdx >= 0) break;
   }
-  if (clientCol < 0) return { success: true, companies: [] };
+
+  // Prefer Business Name; fall back to Client Name
+  var useCol = bizCol >= 0 ? bizCol : clientCol;
+  if (useCol < 0) return { success: true, companies: [] };
 
   var seen = {};
   var companies = [];
   for (var i = headerRowIdx + 1; i < data.length; i++) {
-    var val = String(data[i][clientCol] || '').trim();
+    var val = String(data[i][useCol] || '').trim();
     if (val && !seen[val]) {
       seen[val] = true;
       companies.push(val);
