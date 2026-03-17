@@ -36,7 +36,6 @@ const NationalApp = {
     'att-nds':         ['references/logos/logo-att.png', 'references/logos/logo-verizon.png'],
     'att-res':         'references/logos/logo-att.png',
     'frontier':        'references/logos/logo-frontier.png',
-    'frontier-retail': 'references/logos/logo-frontier.png',
     'leafguard':       'references/logos/logo-leafguard.png',
     'lumen':           'references/logos/logo-lumen.png',
     'rogers':          'references/logos/logo-rogers.png',
