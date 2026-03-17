@@ -862,6 +862,17 @@ const NationalApp = {
     const allWeeksChron = [...allWeeks].reverse();
     const allLabels = allWeeksChron.map(w => w.tabName);
 
+    // DEBUG: Log raw week data for first owner to verify data source
+    if (ownerNames.length > 0) {
+      const debugName = ownerNames.find(n => n.toLowerCase().includes('ethan')) || ownerNames[0];
+      console.log('[NationalApp] DEBUG raw weeks for', debugName, ':',
+        allWeeks.slice(0, 4).map(w => ({
+          date: w.tabName,
+          metrics: w.data && w.data[debugName] ? (w.data[debugName].metrics || w.data[debugName]) : 'NO DATA'
+        }))
+      );
+    }
+
     this.state.owners = ownerNames.map(name => {
       // Helper: extract metrics array from owner data
       // Handles both new format {metrics:[...], health:{...}} and legacy array format
