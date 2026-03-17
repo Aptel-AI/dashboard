@@ -2932,6 +2932,21 @@ const NationalApp = {
   },
 
   renderSalesTab(owner) {
+    // Check if owner is Non-Partner for NLR
+    if (this._isNonPartner(owner.name, 'nlrWorkbookId')) {
+      const summaryEl = document.getElementById('sales-summary');
+      if (summaryEl) summaryEl.innerHTML = `
+        <div class="empty-state" style="padding:40px 20px;">
+          <div class="empty-state-icon">🚫</div>
+          <div class="empty-state-text" style="font-size:1.1rem;color:#4a7090;">
+            Not Utilizing NLR Services
+          </div>
+        </div>`;
+      const detailEl = document.getElementById('sales-detail');
+      if (detailEl) detailEl.innerHTML = '';
+      return;
+    }
+
     const s = owner.sales;
     const sm = s.summary;
     const isNDS = this.state.campaign && (this.state.campaign.indexOf('nds') >= 0 || this.state.campaign.indexOf('NDS') >= 0);
@@ -3133,10 +3148,47 @@ const NationalApp = {
   // RENDER: Audit Tab (Online Presence)
   // ══════════════════════════════════════════════════
 
+  /**
+   * Check if an owner is marked as Non-Partner for a specific column.
+   * Reads from OwnerDev.state.mappings if available (embedded mode).
+   * @param {string} ownerName
+   * @param {string} field - 'camCompany', 'nlrWorkbookId', or 'nlrTab'
+   * @returns {boolean}
+   */
+  _isNonPartner(ownerName, field) {
+    if (typeof OwnerDev === 'undefined' || !OwnerDev.state?.mappings) return false;
+    const campaign = this.state.campaign || '';
+    const mapping = OwnerDev.state.mappings.find(
+      m => m.campaign === campaign && (m.ownerName || '').toLowerCase() === (ownerName || '').toLowerCase()
+    );
+    if (!mapping) return false;
+    return (mapping[field] || '').toLowerCase() === 'non-partner';
+  },
+
   renderAuditTab(owner) {
     const a = owner.audit;
     const bizList = a.businesses || [];
     const total = bizList.length;
+
+    // ── Check if owner is Non-Partner for BIS ──
+    if (this._isNonPartner(owner.name, 'camCompany')) {
+      const grades = document.getElementById('audit-grades');
+      grades.innerHTML = `
+        <div class="bis-report-header">
+          <img src="https://betterimagesolutions.com/wp-content/uploads/2025/12/cropped-BIS_Standard-scaled-e1766050595589.png"
+               alt="Better Image Solutions" class="bis-logo" onerror="this.style.display='none'">
+          <div class="bis-report-title">Monthly Performance Audit Report</div>
+        </div>`;
+      const details = document.getElementById('audit-details');
+      details.innerHTML = `
+        <div class="empty-state" style="padding:40px 20px;">
+          <div class="empty-state-icon">🚫</div>
+          <div class="empty-state-text" style="font-size:1.1rem;color:#4a7090;">
+            Not Utilizing BIS Services
+          </div>
+        </div>`;
+      return;
+    }
 
     // ── BIS-style report header ──
     const grades = document.getElementById('audit-grades');
