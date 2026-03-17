@@ -17,10 +17,10 @@ const NATIONAL_CONFIG = {
   // ── Data Source Sheets ──
   // These are external sheets shared with the NC. NationalCode.gs reads them via openById().
   sheets: {
-    // Sheet 1: Maddy's weekly recruiting stats (one tab per week, named by date)
-    recruitingWeekly: {
+    // Consolidated per-campaign data (auto-populated by refreshAllCampaigns from source spreadsheets)
+    consolidated: {
       id: '1MNLqi8A329444SeZpKbYbcRe3dMxaOPLVdMy-7F1DPk',
-      label: 'All Campaigns Stats Tracker 2026'
+      label: 'Consolidated Campaign Data'
     },
     // Sheet 1 Alt: Daily recruiting scoreboard
     recruitingDaily: {

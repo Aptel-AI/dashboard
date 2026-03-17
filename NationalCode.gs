@@ -22,7 +22,8 @@ var OD_NLR_FOLDER = '1hARjh3UH48CWhbYrYBJxFVwgynxapCjG';
 
 // External sheet IDs
 var SHEETS = {
-  RECRUITING_WEEKLY:  '1MNLqi8A329444SeZpKbYbcRe3dMxaOPLVdMy-7F1DPk',  // All Campaigns Stats Tracker 2026
+  CONSOLIDATED:       '1MNLqi8A329444SeZpKbYbcRe3dMxaOPLVdMy-7F1DPk',  // Consolidated per-campaign data (wiped & repurposed)
+  RECRUITING_WEEKLY:  '1MNLqi8A329444SeZpKbYbcRe3dMxaOPLVdMy-7F1DPk',  // DEPRECATED — same sheet, kept for backward compat
   RECRUITING_DAILY:   '1ytTGen_AlzfDPW3HGYU1JKNLz1kfHrrhAFCVnmRS3fg',  // Recruiting Scoreboard Daily
   CAMPAIGN_TRACKER:   '1HvWJYox3JXvxmza63YBWAqKPtUGPFuaV-s-BOfbWGKM',  // ATT Campaign Tracker
   PERFORMANCE_AUDIT:  '15WCMzKnqvyyRMx2ae4tC1a12_-aoSRDh3McOuRAKuHk',  // Performance Audit
@@ -64,10 +65,16 @@ function doGet(e) {
   const owner = (e && e.parameter && e.parameter.owner) || '';
 
   try {
-    // ── National recruiting data from Ken's sheet ──
+    // ── Consolidated recruiting data (per-campaign tabs) ──
     if (action === 'recruiting') {
       var weeks = parseInt(e.parameter.weeks) || 6;
-      return jsonResp(readNationalRecruiting(weeks));
+      var campaignFilter = (e.parameter.campaign !== 'att-b2b') ? e.parameter.campaign : '';
+      return jsonResp(readConsolidatedRecruiting(weeks, campaignFilter));
+    }
+
+    // ── Refresh: pull latest data from source spreadsheets into consolidated tabs ──
+    if (action === 'refreshCampaigns') {
+      return jsonResp(refreshAllCampaigns());
     }
 
     // ── Owner → Cam Company mapping from _OwnerCamMapping tab ──
@@ -204,6 +211,9 @@ function doPost(e) {
     switch (body.action) {
       case 'importRecruiting':
         result = importLatestRecruiting(typeof body.weeks === 'number' ? body.weeks : 1);
+        break;
+      case 'refreshCampaigns':
+        result = refreshAllCampaigns();
         break;
       case 'claimCompany':
         result = claimCompany(body.ownerName, body.companyName);
@@ -4288,5 +4298,568 @@ function odDeleteUser(body) {
   }
 
   return { success: false, message: 'User not found' };
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// CONSOLIDATED CAMPAIGN DATA
+// Reads per-campaign source spreadsheets (OD_CAMPAIGNS),
+// extracts health + recruiting per owner per week,
+// writes flat rows to per-campaign tabs in CONSOLIDATED sheet.
+// ══════════════════════════════════════════════════════════════
+
+// Headers for consolidated per-campaign tabs
+var CONSOLIDATED_HEADERS = [
+  'Week',            // 0: date (from Section 1 or Section 2)
+  'Owner',           // 1: owner name (tab name in source sheet)
+  'Active HC',       // 2: from Section 1
+  'Leaders',         // 3: from Section 1
+  'Dist',            // 4: from Section 1
+  'Training',        // 5: from Section 1
+  'Production',      // 6: from Section 1
+  'Goals',           // 7: from Section 1
+  'Calls Received',  // 8: from Section 2 (applies)
+  'Sent to List',    // 9: from Section 2 (no list)
+  '1st Booked',      // 10: from Section 2
+  '1st Showed',      // 11: from Section 2
+  '1st Retention',   // 12: from Section 2 (rate)
+  'Conversion',      // 13: from Section 2 (rate)
+  '2nd Booked',      // 14: from Section 2
+  '2nd Showed',      // 15: from Section 2
+  '2nd Retention',   // 16: from Section 2 (rate)
+  'NS Booked',       // 17: from Section 2
+  'NS Showed',       // 18: from Section 2
+  'NS Retention'     // 19: from Section 2 (rate)
+];
+
+// Tabs to skip when scanning campaign spreadsheets for owner tabs
+var SKIP_TABS_ = ['campaign totals', 'template', 'instructions', 'summary', 'master',
+                  'data', 'config', 'sheet1', 'dashboard', 'overview', 'totals'];
+
+/**
+ * Master refresh: iterate all campaigns in OD_CAMPAIGNS,
+ * read source spreadsheets, write consolidated tabs.
+ */
+function refreshAllCampaigns() {
+  var destSS;
+  try {
+    destSS = SpreadsheetApp.openById(SHEETS.CONSOLIDATED);
+  } catch (err) {
+    return { ok: false, error: 'Cannot open consolidated sheet: ' + err.message };
+  }
+
+  var results = {};
+  var keys = Object.keys(OD_CAMPAIGNS);
+
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    var campaign = OD_CAMPAIGNS[key];
+    if (!campaign.sheetId) {
+      results[key] = { ok: false, error: 'No sheetId configured' };
+      continue;
+    }
+    try {
+      var count = consolidateCampaign_(key, campaign, destSS);
+      results[key] = { ok: true, rows: count };
+    } catch (err) {
+      Logger.log('refreshAllCampaigns error for ' + key + ': ' + err.message + '\n' + err.stack);
+      results[key] = { ok: false, error: err.message };
+    }
+  }
+
+  return { ok: true, results: results, timestamp: new Date().toISOString() };
+}
+
+/**
+ * Consolidate a single campaign: read source spreadsheet,
+ * extract health + recruiting from each owner tab,
+ * write flat rows to destination tab.
+ */
+function consolidateCampaign_(campaignKey, campaign, destSS) {
+  var srcSS = SpreadsheetApp.openById(campaign.sheetId);
+  var allTabs = srcSS.getSheets();
+
+  // Get owner names from first tab column A (same method as odGetCampaignOwners)
+  var ownerNames = [];
+  if (allTabs.length > 0) {
+    var firstTabData = allTabs[0].getDataRange().getValues();
+    for (var i = 1; i < firstTabData.length - 1; i++) {
+      var v = String(firstTabData[i][0] || '').trim();
+      if (v) ownerNames.push(v);
+    }
+  }
+
+  // Build set of valid owner tab names (case-insensitive lookup)
+  var ownerTabMap = {}; // lowercase → original name
+  for (var i = 0; i < ownerNames.length; i++) {
+    ownerTabMap[ownerNames[i].toLowerCase()] = ownerNames[i];
+  }
+
+  var rows = [];
+
+  for (var t = 0; t < allTabs.length; t++) {
+    var tab = allTabs[t];
+    var tabName = tab.getName().trim();
+    if (!tabName) continue;
+    if (tabName.charAt(0) === '_') continue;
+    if (SKIP_TABS_.indexOf(tabName.toLowerCase()) >= 0) continue;
+
+    // Only process tabs that match a known owner name
+    var canonicalName = ownerTabMap[tabName.toLowerCase()];
+    if (!canonicalName && ownerNames.length > 0) continue;
+    var ownerName = canonicalName || tabName;
+
+    try {
+      var data = tab.getDataRange().getValues();
+      if (!data || data.length < 2) continue;
+
+      var sections = findSections(data);
+
+      // Extract health rows (Section 1): [{date, active, leaders, dist, training, production, goals}]
+      var healthRows = extractHealthRows_(data, sections.section1Start, sections.section1End);
+
+      // Extract recruiting rows (Section 2 — transposed): [{date, metrics[12]}]
+      var recruitingRows = extractRecruitingRows_(data, sections.section2Start, sections.section2End);
+
+      // Merge by date → flat output rows
+      var merged = mergeHealthRecruiting_(ownerName, healthRows, recruitingRows);
+
+      for (var r = 0; r < merged.length; r++) {
+        rows.push(merged[r]);
+      }
+    } catch (err) {
+      Logger.log('consolidateCampaign_ tab error (' + campaignKey + '/' + tabName + '): ' + err.message);
+    }
+  }
+
+  // Get or create destination tab
+  var destTab = destSS.getSheetByName(campaign.label);
+  if (!destTab) {
+    destTab = destSS.insertSheet(campaign.label);
+  }
+
+  // Clear and write
+  destTab.clear();
+  destTab.getRange(1, 1, 1, CONSOLIDATED_HEADERS.length).setValues([CONSOLIDATED_HEADERS]);
+
+  if (rows.length > 0) {
+    // Sort by date descending, then owner ascending
+    rows.sort(function(a, b) {
+      var dateA = (a[0] instanceof Date) ? a[0].getTime() : new Date(a[0]).getTime() || 0;
+      var dateB = (b[0] instanceof Date) ? b[0].getTime() : new Date(b[0]).getTime() || 0;
+      if (dateA !== dateB) return dateB - dateA;
+      return String(a[1]).localeCompare(String(b[1]));
+    });
+    destTab.getRange(2, 1, rows.length, CONSOLIDATED_HEADERS.length).setValues(rows);
+  }
+
+  return rows.length;
+}
+
+/**
+ * Extract health (Section 1) data as flat rows.
+ * Returns: [{ date: Date, active, leaders, dist, training, production, goals }]
+ */
+function extractHealthRows_(data, start, end) {
+  if (start < 0 || end < start) return [];
+
+  var headers = data[start].map(function(h) { return String(h).toLowerCase().trim(); });
+  var colMap = {
+    dates: findCol(headers, ['dates', 'date']),
+    active: findCol(headers, ['active']),
+    leaders: findCol(headers, ['leaders']),
+    dist: findCol(headers, ['dist']),
+    training: findCol(headers, ['training']),
+    production: findCol(headers, ['production lw', 'production']),
+    goals: findCol(headers, ['production goals', 'goals'])
+  };
+
+  var result = [];
+  for (var i = start + 1; i <= end; i++) {
+    var row = data[i];
+    var dateVal = row[colMap.dates];
+    if (!dateVal) continue;
+    // Parse date
+    var d = (dateVal instanceof Date) ? dateVal : _parseTabDate(String(dateVal));
+    if (!d) continue;
+
+    result.push({
+      date: d,
+      active: num(row[colMap.active]),
+      leaders: num(row[colMap.leaders]),
+      dist: num(row[colMap.dist]),
+      training: num(row[colMap.training]),
+      production: num(row[colMap.production]),
+      goals: num(row[colMap.goals])
+    });
+  }
+  return result;
+}
+
+/**
+ * Extract recruiting (Section 2) data by transposing metric-rows × date-columns.
+ * Returns: [{ date: Date, metrics: [12 values matching RECRUITING_LABELS order] }]
+ *
+ * Section 2 layout in source sheets:
+ *   Row with "Actual"/"Projected" has week dates in columns B, C, D...
+ *   Below that: metric labels in col A, values in corresponding date columns.
+ */
+function extractRecruitingRows_(data, start, end) {
+  if (start < 0 || end < start) return [];
+
+  // Step 1: Find the row with date columns
+  var dateRowIdx = -1;
+  var dateCols = []; // [{colIdx, date}]
+
+  // Scan first few rows of section for date-like values in columns B+
+  for (var i = start; i <= Math.min(start + 4, end); i++) {
+    var foundDates = [];
+    for (var j = 1; j < data[i].length; j++) {
+      var cellVal = data[i][j];
+      var d = null;
+      if (cellVal instanceof Date) {
+        d = cellVal;
+      } else {
+        var s = String(cellVal || '').trim();
+        if (s) d = _parseTabDate(s);
+      }
+      if (d) foundDates.push({ colIdx: j, date: d });
+    }
+    if (foundDates.length >= 2) {
+      dateRowIdx = i;
+      dateCols = foundDates;
+      break;
+    }
+  }
+
+  if (dateCols.length === 0) return [];
+
+  // Step 2: Find metric rows below the date row
+  var metricsMap = {};
+  var metricsStart = dateRowIdx + 1;
+
+  for (var i = metricsStart; i <= end; i++) {
+    var label = String(data[i][0] || '').trim().toLowerCase();
+    if (!label) continue;
+
+    if (label.indexOf('calls received') >= 0 || label.indexOf('applies') >= 0) metricsMap.callsReceived = data[i];
+    else if (label.indexOf('no list') >= 0 || label.indexOf('sent to list') >= 0) metricsMap.noList = data[i];
+    else if ((label === 'booked' || (label.indexOf('1st') >= 0 && label.indexOf('book') >= 0)) && !metricsMap.booked) metricsMap.booked = data[i];
+    else if ((label === 'showed' || (label.indexOf('1st') >= 0 && label.indexOf('show') >= 0)) && !metricsMap.showed) metricsMap.showed = data[i];
+    else if (label.indexOf('retention') >= 0 && !metricsMap.retention1) metricsMap.retention1 = data[i];
+    else if (label.indexOf('conversion') >= 0 || label.indexOf('% call') >= 0 || label.indexOf('turned to 2nd') >= 0) metricsMap.conversion = data[i];
+    else if (label.indexOf('2nd') >= 0 && label.indexOf('book') >= 0) metricsMap.booked2 = data[i];
+    else if (label.indexOf('2nd') >= 0 && label.indexOf('show') >= 0) metricsMap.showed2 = data[i];
+    else if (label.indexOf('retention') >= 0 && metricsMap.retention1 && !metricsMap.retention2) metricsMap.retention2 = data[i];
+    else if (label.indexOf('start') >= 0 && label.indexOf('book') >= 0) metricsMap.startsBooked = data[i];
+    else if (label.indexOf('start') >= 0 && label.indexOf('show') >= 0) metricsMap.startsShowed = data[i];
+    else if (label.indexOf('start') >= 0 && label.indexOf('retention') >= 0) metricsMap.startRetention = data[i];
+    else if (label.indexOf('retention') >= 0 && metricsMap.retention1 && metricsMap.retention2 && !metricsMap.retention3) metricsMap.retention3 = data[i];
+  }
+
+  // Step 3: Transpose — for each date column, collect all metric values
+  var result = [];
+  for (var d = 0; d < dateCols.length; d++) {
+    var colIdx = dateCols[d].colIdx;
+    var date = dateCols[d].date;
+
+    var metrics = [
+      num(metricsMap.callsReceived ? metricsMap.callsReceived[colIdx] : 0),
+      num(metricsMap.noList ? metricsMap.noList[colIdx] : 0),
+      num(metricsMap.booked ? metricsMap.booked[colIdx] : 0),
+      num(metricsMap.showed ? metricsMap.showed[colIdx] : 0),
+      _pctNum(metricsMap.retention1 ? metricsMap.retention1[colIdx] : 0),
+      _pctNum(metricsMap.conversion ? metricsMap.conversion[colIdx] : 0),
+      num(metricsMap.booked2 ? metricsMap.booked2[colIdx] : 0),
+      num(metricsMap.showed2 ? metricsMap.showed2[colIdx] : 0),
+      _pctNum(metricsMap.retention2 ? metricsMap.retention2[colIdx] : 0),
+      num(metricsMap.startsBooked ? metricsMap.startsBooked[colIdx] : 0),
+      num(metricsMap.startsShowed ? metricsMap.startsShowed[colIdx] : 0),
+      _pctNum((metricsMap.startRetention || metricsMap.retention3) ?
+        (metricsMap.startRetention || metricsMap.retention3)[colIdx] : 0)
+    ];
+
+    // Only include if there's at least some non-zero data
+    var hasData = metrics.some(function(v) { return v !== 0; });
+    if (hasData) {
+      result.push({ date: date, metrics: metrics });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Merge health rows and recruiting rows by date.
+ * Produces flat arrays matching CONSOLIDATED_HEADERS.
+ */
+function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows) {
+  var dateMap = {};
+
+  for (var i = 0; i < healthRows.length; i++) {
+    var key = _normalizeDateKey_(healthRows[i].date);
+    if (!dateMap[key]) dateMap[key] = { date: healthRows[i].date };
+    dateMap[key].health = healthRows[i];
+  }
+
+  for (var i = 0; i < recruitingRows.length; i++) {
+    var key = _normalizeDateKey_(recruitingRows[i].date);
+    if (!dateMap[key]) dateMap[key] = { date: recruitingRows[i].date };
+    dateMap[key].recruiting = recruitingRows[i];
+  }
+
+  // Fuzzy date matching (±3 days) for health→recruiting alignment
+  var dateKeys = Object.keys(dateMap);
+  for (var i = 0; i < dateKeys.length; i++) {
+    var entry = dateMap[dateKeys[i]];
+    if (entry.health && !entry.recruiting) {
+      for (var j = 0; j < recruitingRows.length; j++) {
+        var diff = Math.abs(entry.date.getTime() - recruitingRows[j].date.getTime());
+        if (diff <= 3 * 86400000) {
+          entry.recruiting = recruitingRows[j];
+          break;
+        }
+      }
+    }
+  }
+
+  var result = [];
+  var keys2 = Object.keys(dateMap);
+  for (var i = 0; i < keys2.length; i++) {
+    var entry = dateMap[keys2[i]];
+    var h = entry.health || {};
+    var r = entry.recruiting ? entry.recruiting.metrics : [0,0,0,0,0,0,0,0,0,0,0,0];
+
+    result.push([
+      entry.date,          // 0: Week
+      ownerName,           // 1: Owner
+      h.active || 0,       // 2: Active HC
+      h.leaders || 0,      // 3: Leaders
+      h.dist || 0,         // 4: Dist
+      h.training || 0,     // 5: Training
+      h.production || 0,   // 6: Production
+      h.goals || 0,        // 7: Goals
+      r[0],                // 8: Calls Received
+      r[1],                // 9: Sent to List
+      r[2],                // 10: 1st Booked
+      r[3],                // 11: 1st Showed
+      r[4],                // 12: 1st Retention
+      r[5],                // 13: Conversion
+      r[6],                // 14: 2nd Booked
+      r[7],                // 15: 2nd Showed
+      r[8],                // 16: 2nd Retention
+      r[9],                // 17: NS Booked
+      r[10],               // 18: NS Showed
+      r[11]                // 19: NS Retention
+    ]);
+  }
+
+  return result;
+}
+
+/** Normalize date to key string for dedup */
+function _normalizeDateKey_(d) {
+  if (!d) return '';
+  if (!(d instanceof Date)) d = new Date(d);
+  return ('0' + (d.getMonth() + 1)).slice(-2) + '/' + ('0' + d.getDate()).slice(-2) + '/' + d.getFullYear();
+}
+
+/**
+ * Read consolidated per-campaign tabs and return data
+ * in the same format the frontend expects:
+ * { campaigns: { slug: { label, owners[], weeks[{ tabName, data }] } } }
+ */
+function readConsolidatedRecruiting(weekCount, campaignFilter) {
+  weekCount = weekCount || 6;
+
+  var ss;
+  try {
+    ss = SpreadsheetApp.openById(SHEETS.CONSOLIDATED);
+  } catch (err) {
+    Logger.log('readConsolidatedRecruiting fallback: ' + err.message);
+    return readNationalRecruiting(weekCount);
+  }
+
+  var campaigns = {};
+  var keys = Object.keys(OD_CAMPAIGNS);
+
+  for (var k = 0; k < keys.length; k++) {
+    var key = keys[k];
+    var campaign = OD_CAMPAIGNS[key];
+    if (!campaign.sheetId) continue;
+    if (campaignFilter && key !== campaignFilter) continue;
+
+    var tab = ss.getSheetByName(campaign.label);
+    if (!tab) {
+      campaigns[key] = { label: campaign.label, owners: [], weeks: [] };
+      continue;
+    }
+
+    var data = tab.getDataRange().getValues();
+    if (data.length < 2) {
+      campaigns[key] = { label: campaign.label, owners: [], weeks: [] };
+      continue;
+    }
+
+    // Parse headers (row 0)
+    var headers = data[0].map(function(h) { return String(h).toLowerCase().trim(); });
+    var colWeek = findCol(headers, ['week']);
+    var colOwner = findCol(headers, ['owner']);
+    var colCalls = findCol(headers, ['calls received', 'applies']);
+    var colSTL = findCol(headers, ['sent to list', 'no list']);
+    var col1B = findCol(headers, ['1st booked']);
+    var col1S = findCol(headers, ['1st showed']);
+    var col1R = findCol(headers, ['1st retention']);
+    var colConv = findCol(headers, ['conversion']);
+    var col2B = findCol(headers, ['2nd booked']);
+    var col2S = findCol(headers, ['2nd showed']);
+    var col2R = findCol(headers, ['2nd retention']);
+    var colNSB = findCol(headers, ['ns booked']);
+    var colNSS = findCol(headers, ['ns showed']);
+    var colNSR = findCol(headers, ['ns retention']);
+    var colHC = findCol(headers, ['active hc', 'active']);
+    var colLeaders = findCol(headers, ['leaders']);
+    var colDist = findCol(headers, ['dist']);
+    var colTraining = findCol(headers, ['training']);
+    var colProd = findCol(headers, ['production']);
+    var colGoals = findCol(headers, ['goals']);
+
+    // Group by week date
+    var weekMap = {};
+    var ownerSet = {};
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var dateVal = row[colWeek];
+      var owner = String(row[colOwner] || '').trim();
+      if (!dateVal || !owner) continue;
+
+      var dateKey = formatDate(dateVal);
+      ownerSet[owner] = true;
+
+      if (!weekMap[dateKey]) {
+        weekMap[dateKey] = {
+          tabName: dateKey,
+          date: (dateVal instanceof Date) ? dateVal : _parseTabDate(String(dateVal)),
+          data: {}
+        };
+      }
+
+      // 12-value recruiting array
+      var recruitVals = [
+        num(row[colCalls]),
+        num(row[colSTL]),
+        num(row[col1B]),
+        num(row[col1S]),
+        _pctNum(row[col1R]),
+        _pctNum(row[colConv]),
+        num(row[col2B]),
+        num(row[col2S]),
+        _pctNum(row[col2R]),
+        num(row[colNSB]),
+        num(row[colNSS]),
+        _pctNum(row[colNSR])
+      ];
+
+      // Attach health data as extra property
+      recruitVals.health = {
+        active: num(row[colHC]),
+        leaders: num(row[colLeaders]),
+        dist: num(row[colDist]),
+        training: num(row[colTraining]),
+        production: num(row[colProd]),
+        goals: num(row[colGoals])
+      };
+
+      weekMap[dateKey].data[owner] = recruitVals;
+    }
+
+    // Sort by date descending, limit to weekCount
+    var weekEntries = Object.keys(weekMap).map(function(wk) { return weekMap[wk]; });
+    weekEntries.sort(function(a, b) {
+      var da = a.date ? a.date.getTime() : 0;
+      var db = b.date ? b.date.getTime() : 0;
+      return db - da;
+    });
+    if (weekCount > 0 && weekEntries.length > weekCount) {
+      weekEntries = weekEntries.slice(0, weekCount);
+    }
+
+    campaigns[key] = {
+      label: campaign.label,
+      owners: Object.keys(ownerSet).sort(),
+      weeks: weekEntries
+    };
+  }
+
+  return { campaigns: campaigns };
+}
+
+/**
+ * Setup a daily trigger to refresh campaign data at 1 AM.
+ * Run this ONCE from the script editor to install the trigger.
+ */
+function setupDailyRefreshTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'refreshAllCampaigns') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+
+  ScriptApp.newTrigger('refreshAllCampaigns')
+    .timeBased()
+    .everyDays(1)
+    .atHour(1)
+    .nearMinute(0)
+    .create();
+
+  Logger.log('Daily refresh trigger installed: refreshAllCampaigns at 1 AM');
+  return { ok: true, message: 'Trigger set: refreshAllCampaigns runs daily at 1 AM' };
+}
+
+/**
+ * Setup refresh trigger for specific weekdays only.
+ * @param {number[]} days - Array of weekday numbers (1=Mon, 2=Tue, ..., 7=Sun)
+ * Run from script editor: setupWeekdayRefreshTrigger([1, 3, 5]) for Mon/Wed/Fri
+ */
+function setupWeekdayRefreshTrigger(days) {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'scheduledRefreshCampaigns_') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+
+  if (days && days.length > 0) {
+    PropertiesService.getScriptProperties().setProperty('REFRESH_DAYS', JSON.stringify(days));
+  }
+
+  ScriptApp.newTrigger('scheduledRefreshCampaigns_')
+    .timeBased()
+    .everyDays(1)
+    .atHour(1)
+    .nearMinute(0)
+    .create();
+
+  Logger.log('Weekday refresh trigger installed for days: ' + JSON.stringify(days));
+  return { ok: true, message: 'Trigger set for days: ' + JSON.stringify(days) };
+}
+
+/**
+ * Trigger handler that checks if today is an allowed refresh day.
+ */
+function scheduledRefreshCampaigns_() {
+  var daysJson = PropertiesService.getScriptProperties().getProperty('REFRESH_DAYS');
+  if (daysJson) {
+    var days = JSON.parse(daysJson);
+    var today = new Date().getDay();
+    var todayMon = today === 0 ? 7 : today; // 1=Mon...7=Sun
+    if (days.indexOf(todayMon) < 0) {
+      Logger.log('scheduledRefreshCampaigns_: skipping (today=' + todayMon + ')');
+      return;
+    }
+  }
+  refreshAllCampaigns();
 }
 

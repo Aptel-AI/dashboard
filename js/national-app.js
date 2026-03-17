@@ -1246,8 +1246,9 @@ const NationalApp = {
   },
 
   // ══════════════════════════════════════════════════
-  // IMPORT LATEST RECRUITING
-  // Copies latest tab from source tracker → Ken's sheet
+  // REFRESH CAMPAIGN DATA
+  // Pulls latest data from per-campaign source spreadsheets
+  // into consolidated tabs, then reloads the view.
   // ══════════════════════════════════════════════════
 
   async importLatestRecruiting() {
@@ -1258,109 +1259,56 @@ const NationalApp = {
 
     const btn = document.getElementById('btn-import-recruiting');
     const status = document.getElementById('import-status');
-    const weeksSelect = document.getElementById('import-weeks');
-    const weeks = weeksSelect ? parseInt(weeksSelect.value, 10) : 1;
 
-    if (btn) { btn.disabled = true; btn.textContent = 'Importing...'; }
-    if (weeksSelect) weeksSelect.disabled = true;
+    if (btn) { btn.disabled = true; btn.textContent = 'Refreshing...'; }
     if (status) { status.textContent = ''; status.className = 'import-status'; }
 
     try {
+      // Step 1: Refresh consolidated data from source spreadsheets
       const resp = await this._fetchWithTimeout(
         fetch(NATIONAL_CONFIG.appsScriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({
             key: NATIONAL_CONFIG.apiKey,
-            action: 'importRecruiting',
-            weeks: weeks
+            action: 'refreshCampaigns'
           })
         }),
-        60000 // 60s — import does heavy server-side work
+        120000 // 120s — reads multiple source spreadsheets
       );
 
       const result = await resp.json();
       if (result.error) throw new Error(result.error);
 
-      // Clear cached data so next load fetches fresh
+      // Step 2: Clear cache and reload campaign data
       this._allCampaignsData = null;
-
-      // Update state with fresh data returned by the import
-      if (result.recruiting && result.recruiting.campaigns) {
-        this._allCampaignsData = result.recruiting.campaigns; // re-cache with fresh data
-        this._populateCampaignSelector(result.recruiting.campaigns);
-        const campaignKey = this.state.campaign;
-        const campaignData = result.recruiting.campaigns[campaignKey];
-        if (campaignData) {
-          this._buildOwnersFromSheet(campaignKey, {
-            owners: campaignData.owners || [],
-            weeks: campaignData.weeks || [],
-            label: campaignData.label || ''
-          });
-        }
-
-        // Re-enrich owners with weekly data (headcount + production)
-        // CPA/Indeed costs are monthly and don't change on weekly import — skip
-        if (campaignKey === 'att-b2b' && NATIONAL_CONFIG.appsScriptUrl) {
-          const [hcRes, prodRes] = await Promise.allSettled([
-            this._fetchWithTimeout(this._fetchB2BHeadcount()),
-            this._fetchWithTimeout(this._fetchB2BProduction())
-          ]);
-          if (hcRes.status === 'fulfilled' && hcRes.value?.owners && Object.keys(hcRes.value.owners).length) {
-            this._enrichOwnersWithNLR(hcRes.value.owners);
-          }
-          if (prodRes.status === 'fulfilled' && prodRes.value?.owners && Object.keys(prodRes.value.owners).length) {
-            this._enrichOwnersWithProduction(prodRes.value.owners);
-          }
-        }
-
-        // Re-enrich NDS owners with headcount + production data
-        const isNDS = campaignKey.indexOf('nds') >= 0 || campaignKey.indexOf('NDS') >= 0;
-        if (isNDS && NATIONAL_CONFIG.appsScriptUrl) {
-          const [ndsHcRes, ndsProdRes] = await Promise.allSettled([
-            this._fetchWithTimeout(this._fetchNDSHeadcount()),
-            this._fetchWithTimeout(this._fetchNDSProduction())
-          ]);
-          if (ndsHcRes.status === 'fulfilled' && ndsHcRes.value?.owners && Object.keys(ndsHcRes.value.owners).length) {
-            this._enrichOwnersWithNLR(ndsHcRes.value.owners);
-          }
-          if (ndsProdRes.status === 'fulfilled' && ndsProdRes.value?.owners && Object.keys(ndsProdRes.value.owners).length) {
-            this._enrichOwnersWithProduction(ndsProdRes.value.owners);
-          }
-        }
-
-        // Re-map audit data to owners if cached
-        if (this._cachedAuditBusinesses && this._cachedAuditBusinesses.length) {
-          this._mapAuditToOwners(this._cachedAuditBusinesses, this.state.camMapping);
-        }
-      }
+      const campaignKey = this.state.campaign || 'att-b2b';
+      await this.loadCampaignData(campaignKey);
 
       // Re-render dashboard
       this.renderCampaignOverview();
       this.renderOwnersList();
 
-      // Show success
-      const tabCount = result.imported?.tabCount || 1;
-      const tabNames = result.imported?.tabNames || [result.imported?.tabName || 'latest'];
-      const msg = tabCount === 1
-        ? 'Imported: ' + tabNames[0]
-        : 'Imported ' + tabCount + ' weeks (' + tabNames[0] + ' → ' + tabNames[tabNames.length - 1] + ')';
+      // Show success summary
+      const results = result.results || {};
+      const successCount = Object.values(results).filter(r => r.ok).length;
+      const totalRows = Object.values(results).reduce((sum, r) => sum + (r.rows || 0), 0);
+      const msg = `Refreshed ${successCount} campaigns (${totalRows} rows)`;
       if (status) {
         status.textContent = msg;
         status.className = 'import-status import-success';
         setTimeout(() => { status.textContent = ''; status.className = 'import-status'; }, 6000);
       }
-      console.log('[NationalApp] Import successful:', result.imported);
+      console.log('[NationalApp] Refresh successful:', result);
 
     } catch (err) {
-      console.error('[NationalApp] Import failed:', err);
+      console.error('[NationalApp] Refresh failed:', err);
       if (status) {
-        status.textContent = 'Import failed: ' + err.message;
+        status.textContent = 'Refresh failed: ' + err.message;
         status.className = 'import-status import-error';
       }
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Import Recruiting'; }
-      if (weeksSelect) weeksSelect.disabled = false;
+      if (btn) { btn.disabled = false; btn.textContent = 'Refresh Data'; }
     }
   },
 
