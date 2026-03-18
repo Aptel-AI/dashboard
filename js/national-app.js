@@ -3546,17 +3546,14 @@ const NationalApp = {
         <div class="bis-report-sub">Powered by Better Image Solutions · ${auditMonth}</div>
       </div>`;
 
-    // ── Reports then Claim Section (below) ──
     const details = document.getElementById('audit-details');
-    const claimHTML = this._renderClaimSection(owner);
 
     if (!bizList.length) {
       details.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">🏢</div>
-          <div class="empty-state-text">No companies claimed for this owner yet.<br>
-          Use the search below to claim companies from Cam's report.</div>
-        </div>` + claimHTML;
+          <div class="empty-state-text">No companies mapped for this owner.</div>
+        </div>`;
       return;
     }
 
@@ -3576,16 +3573,14 @@ const NationalApp = {
         </div>
         <div class="bis-reports" id="bis-reports-container">
           ${this._renderBizReport(bizList[0], auditMonth)}
-        </div>
-        ${claimHTML}`;
+        </div>`;
       this._currentBizList = bizList;
       this._currentAuditMonth = auditMonth;
     } else {
       details.innerHTML = `
         <div class="bis-reports">
           ${this._renderBizReport(bizList[0], auditMonth)}
-        </div>
-        ${claimHTML}`;
+        </div>`;
     }
   },
 
