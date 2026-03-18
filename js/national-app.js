@@ -251,10 +251,11 @@ const NationalApp = {
     if (hasNational) fetchPromises.recruiting = this._fetchWithTimeout(this._fetchRecruitingFromSheet(campaignKey));
     if (hasApi)      fetchPromises.audit      = this._fetchWithTimeout(this._fetchOnlinePresence());
     if (hasApi)      fetchPromises.camMapping  = this._fetchWithTimeout(this._fetchOwnerCamMapping());
-    if (isB2B && hasApi) fetchPromises.headcount  = this._fetchWithTimeout(this._fetchB2BHeadcount());
-    if (isB2B && hasApi) fetchPromises.production = this._fetchWithTimeout(this._fetchB2BProduction());
-    if (isNDS && hasApi) fetchPromises.ndsHeadcount  = this._fetchWithTimeout(this._fetchNDSHeadcount());
-    if (isNDS && hasApi) fetchPromises.ndsProduction = this._fetchWithTimeout(this._fetchNDSProduction());
+    // NLR headcount/production enrichment — run for ALL campaigns (not just B2B/NDS)
+    if (hasApi) fetchPromises.headcount  = this._fetchWithTimeout(this._fetchB2BHeadcount());
+    if (hasApi) fetchPromises.production = this._fetchWithTimeout(this._fetchB2BProduction());
+    if (hasApi) fetchPromises.ndsHeadcount  = this._fetchWithTimeout(this._fetchNDSHeadcount());
+    if (hasApi) fetchPromises.ndsProduction = this._fetchWithTimeout(this._fetchNDSProduction());
     // Indeed/recruiting costs excluded from initial load — fetched only via Import button
 
     const keys = Object.keys(fetchPromises);
@@ -862,16 +863,6 @@ const NationalApp = {
     const allWeeksChron = [...allWeeks].reverse();
     const allLabels = allWeeksChron.map(w => w.tabName);
 
-    // DEBUG: Log raw week data for first owner to verify data source
-    if (ownerNames.length > 0) {
-      const debugName = ownerNames.find(n => n.toLowerCase().includes('ethan')) || ownerNames[0];
-      console.log('[NationalApp] DEBUG raw weeks for', debugName, ':',
-        allWeeks.slice(0, 4).map(w => ({
-          date: w.tabName,
-          metrics: w.data && w.data[debugName] ? (w.data[debugName].metrics || w.data[debugName]) : 'NO DATA'
-        }))
-      );
-    }
 
     this.state.owners = ownerNames.map(name => {
       // Helper: extract metrics array from owner data
