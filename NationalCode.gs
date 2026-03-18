@@ -1080,32 +1080,49 @@ function _campaignSlug(label) {
 
 function readOwnerCamMapping() {
   var ss = SpreadsheetApp.openById(SHEETS.NATIONAL);
-  var sheet = ss.getSheetByName('_OwnerCamMapping');
-  if (!sheet) return { mapping: {}, costSheets: {} };
-
-  var data = sheet.getDataRange().getValues();
-  if (data.length < 2) return { mapping: {}, costSheets: {} };
-
-  // Expect headers: Owner Name | Cam Company Name | Cost Sheet ID
   var mapping = {};
   var costSheets = {};
-  for (var i = 1; i < data.length; i++) {
-    var ownerName = String(data[i][0] || '').trim();
-    var camCompany = String(data[i][1] || '').trim();
-    var costSheetId = String(data[i][2] || '').trim();
-    if (!ownerName) continue;
 
-    // Cam company mapping (col B)
-    if (camCompany) {
-      if (!mapping[ownerName]) mapping[ownerName] = [];
-      mapping[ownerName].push(camCompany);
+  // Try legacy _OwnerCamMapping tab first
+  var sheet = ss.getSheetByName('_OwnerCamMapping');
+  if (sheet) {
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var ownerName = String(data[i][0] || '').trim();
+      var camCompany = String(data[i][1] || '').trim();
+      var costSheetId = String(data[i][2] || '').trim();
+      if (!ownerName) continue;
+      if (camCompany) {
+        if (!mapping[ownerName]) mapping[ownerName] = [];
+        mapping[ownerName].push(camCompany);
+      }
+      if (costSheetId && !costSheets[ownerName]) {
+        var idMatch = costSheetId.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+        costSheets[ownerName] = idMatch ? idMatch[1] : costSheetId;
+      }
     }
+  }
 
-    // Cost sheet ID (col C) — take first non-empty value per owner
-    if (costSheetId && !costSheets[ownerName]) {
-      // Extract spreadsheet ID from URL if a full link was pasted
-      var idMatch = costSheetId.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-      costSheets[ownerName] = idMatch ? idMatch[1] : costSheetId;
+  // Also read camCompany from _OD_Mappings tab
+  var odSheet = ss.getSheetByName('_OD_Mappings');
+  if (odSheet) {
+    var odData = odSheet.getDataRange().getValues();
+    if (odData.length >= 2) {
+      var odHeaders = odData[0].map(function(h) { return String(h).toLowerCase().trim(); });
+      var colOwner = findCol(odHeaders, ['ownername', 'owner']);
+      var colCam = findCol(odHeaders, ['camcompany', 'cam company']);
+      if (colOwner >= 0 && colCam >= 0) {
+        for (var j = 1; j < odData.length; j++) {
+          var oName = String(odData[j][colOwner] || '').trim();
+          var cName = String(odData[j][colCam] || '').trim();
+          if (!oName || !cName) continue;
+          // Only add if not already mapped from _OwnerCamMapping
+          if (!mapping[oName]) mapping[oName] = [];
+          if (mapping[oName].indexOf(cName) < 0) {
+            mapping[oName].push(cName);
+          }
+        }
+      }
     }
   }
 
