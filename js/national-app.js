@@ -456,37 +456,17 @@ const NationalApp = {
         console.log('[NationalApp] No NLR mapping for', owner.name);
         return;
       }
-      if (!result.current) {
-        console.log('[NationalApp] NLR mapped but no data for', owner.name, result._debug || '');
+      if (!result.trend || result.trend.length === 0) {
+        console.log('[NationalApp] NLR mapped but no data for', owner.name);
         return;
       }
 
-      // Enrich owner with NLR headcount data
-      console.log('[NationalApp] NLR data loaded for', owner.name, ':', result.trend?.length, 'weeks');
-      owner.headcount.active = result.current.active || 0;
-      owner.headcount.leaders = result.current.leaders || 0;
-      owner.headcount.training = result.current.training || 0;
-
-      // Rebuild headcount history from NLR trend
-      if (result.trend && result.trend.length) {
-        owner.headcountHistory = result.trend.map(t => ({
-          date: t.date,
-          active: t.active || 0,
-          leaders: t.leaders || 0,
-          training: t.training || 0
-        }));
-      }
-
-      // Recalculate recruiting projected values with updated leader count
-      if (owner.headcount.leaders && owner.recruiting && owner.recruiting.rows.length) {
-        owner.recruiting.leaders = owner.headcount.leaders;
-        const actuals = owner.recruiting.rows.map(r => r.values);
-        owner.recruiting.rows = this._buildRows(owner.headcount.leaders, actuals);
-      }
+      // Store NLR data on the owner object
+      console.log('[NationalApp] NLR data loaded for', owner.name, ':', result.trend.length, 'weeks');
+      owner.nlrData = result.trend;
 
       // Re-render if this owner is still selected
       if (this.state.selectedOwner === owner) {
-        this.renderHealthTab(owner);
         if (this.state.currentTab === 'recruiting') {
           this.renderRecruitingTab(owner);
         }
