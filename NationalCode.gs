@@ -493,7 +493,7 @@ function parseSection1(data, start, end) {
     dates: findCol(headers, ['dates', 'date']),
     active: findCol(headers, ['active']),
     leaders: findCol(headers, ['leaders']),
-    dist: findCol(headers, ['dist']),
+    dist: findCol(headers, ['dist', 'distributors', 'distibutors']),
     training: findCol(headers, ['training']),
     productionLW: findCol(headers, ['production lw', 'production']),
     dtv: findCol(headers, ['dtv']),
@@ -4814,7 +4814,7 @@ function extractHealthRows_(data, start, end, displayData) {
     dates: findCol(headers, ['dates', 'date']),
     active: findCol(headers, ['active', 'total agents', 'agents']),
     leaders: findCol(headers, ['leaders']),
-    dist: findCol(headers, ['dist']),
+    dist: findCol(headers, ['dist', 'distributors', 'distibutors']),
     training: findCol(headers, ['training']),
     production: findCol(headers, ['production lw', 'production', 'total production']),
     goals: findCol(headers, ['production goals', 'production goal', 'goals'])
@@ -5673,8 +5673,8 @@ function TEST_lumen_refresh() {
   Logger.log('Result: ' + JSON.stringify(result));
 }
 
-// Debug: show raw dates from Angel Padilla's health + recruiting sections
-function TEST_angel_dates() {
+// Debug: show column mapping + sample data from Angel's tab
+function TEST_angel_columns() {
   var ss = SpreadsheetApp.openById('1P4DYlcV1hgNkaAapk3tWD7ytcRXw4K1n7R6EMKPCoSA');
   var tab = ss.getSheetByName('Angel');
   if (!tab) { Logger.log('No Angel tab'); return; }
@@ -5682,13 +5682,26 @@ function TEST_angel_dates() {
   var sections = findSections(data);
   Logger.log('Sections: ' + JSON.stringify(sections));
 
-  // Health dates
+  // Show headers
+  var headerIdx = sections.section1Start;
+  for (var hi = sections.section1Start; hi <= Math.min(sections.section1Start + 3, sections.section1End); hi++) {
+    var rowText = data[hi].map(function(c) { return String(c).trim(); }).join('');
+    if (rowText.length > 0) { headerIdx = hi; break; }
+  }
+  var headers = data[headerIdx].map(function(h) { return String(h).toLowerCase().trim(); });
+  Logger.log('Header row ' + headerIdx + ': ' + JSON.stringify(headers.slice(0, 15)));
+  Logger.log('active col: ' + findCol(headers, ['active', 'total agents', 'agents']));
+  Logger.log('leaders col: ' + findCol(headers, ['leaders']));
+  Logger.log('dist col: ' + findCol(headers, ['dist', 'distributors', 'distibutors']));
+  Logger.log('training col: ' + findCol(headers, ['training']));
+
+  // Health extraction
   var healthRows = extractHealthRows_(data, sections.section1Start, sections.section1End, tab.getDataRange().getDisplayValues());
   Logger.log('Health rows: ' + healthRows.length);
-  for (var i = 0; i < Math.min(healthRows.length, 5); i++) {
+  // Show last 3 rows (most recent)
+  for (var i = Math.max(0, healthRows.length - 3); i < healthRows.length; i++) {
     var h = healthRows[i];
-    var d = h.date;
-    Logger.log('Health[' + i + '] date=' + d + ' type=' + typeof d + ' isDate=' + (d instanceof Date) + ' key=' + _normalizeDateKey_(d));
+    Logger.log('Health[' + i + '] date=' + h.date + ' active=' + h.active + ' leaders=' + h.leaders + ' dist=' + h.dist + ' training=' + h.training + ' prod=' + h.productionRaw + ' goals=' + h.goalsRaw);
   }
 
   // Recruiting dates
