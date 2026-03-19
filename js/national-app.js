@@ -944,6 +944,7 @@ const NationalApp = {
       // New format: ownerData is {metrics:[...], health:{...}}
       // Legacy format: ownerData is array with .health property (lost in JSON)
       let latestHealth = {};
+      let lastNonZeroLeaders = 0; // Track last non-zero leader count for recruiting table
       const hcHistory = [];
       const prodHistory = [];
       // allWeeks is newest-first; allWeeksChron is oldest-first
@@ -954,6 +955,7 @@ const NationalApp = {
         if (health) {
           const h = health;
           latestHealth = h; // keep overwriting — last one is most recent
+          if ((h.leaders || 0) > 0) lastNonZeroLeaders = h.leaders;
           const hcActive = h.active || 0, hcLeaders = h.leaders || 0, hcTraining = h.training || 0;
           if (hcActive > 0 || hcLeaders > 0 || hcTraining > 0) {
             hcHistory.push({ date: allWeeksChron[wi].tabName, active: hcActive, leaders: hcLeaders, training: hcTraining });
@@ -1019,14 +1021,14 @@ const NationalApp = {
         productionHistory: prodHistory,
         nextGoals: { totalUnits: 0, wirelessUnits: 0 },
         recruiting: {
-          leaders: latestHealth.leaders || 0,
+          leaders: lastNonZeroLeaders || latestHealth.leaders || 0,
           weeks: campaignLabels,
-          rows: this._buildRows(latestHealth.leaders || 0, actuals4)
+          rows: this._buildRows(lastNonZeroLeaders || latestHealth.leaders || 0, actuals4)
         },
         recruitingFull: {
-          leaders: latestHealth.leaders || 0,
+          leaders: lastNonZeroLeaders || latestHealth.leaders || 0,
           weeks: allLabels,
-          rows: this._buildRows(latestHealth.leaders || 0, actualsFull)
+          rows: this._buildRows(lastNonZeroLeaders || latestHealth.leaders || 0, actualsFull)
         },
         sales: {
           summary: null,
