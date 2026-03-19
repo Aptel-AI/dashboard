@@ -1992,9 +1992,9 @@ const NationalApp = {
             </div>
             <div class="hc-chart-legend">
               <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-leaders"></span>Leaders</span>
-              <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-dist"></span>${isLeafGuard ? 'Lead Gen' : 'Distributors'}</span>
+              <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-dist"></span>Distributors</span>
               <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-training"></span>Training</span>
-              ${isLeafGuard ? '<span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch" style="background:#f59e0b"></span>Closers</span>' : ''}
+              ${isLeafGuard ? '<span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch" style="background:#f59e0b"></span>Closers</span><span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch" style="background:#22c55e"></span>Lead Gen</span>' : ''}
             </div>
           </div>
           <div class="flip-card-back">
@@ -2096,40 +2096,63 @@ const NationalApp = {
       const cx = x + d.barW / 2;
 
       if (isLG) {
-        // LeafGuard: Closers (orange, bottom) + Lead Gen (teal, middle) + Training (dashed)
-        const closers = r.closers || 0;
-        const leadGen = Math.max(active - closers, 0);
-        const closerH = closers * yScale;
-        const lgH = leadGen * yScale;
+        // LeafGuard: TWO bars per week side by side
+        // Bar 1 (left): Standard — Leaders (blue) + Dist (teal) + Training (dashed)
+        // Bar 2 (right): Closers (orange) + Lead Gen (green)
+        const halfW = d.barW * 0.46;
+        const gap = d.barW * 0.08;
+        const x1 = x, x2 = x + halfW + gap;
+        const cx1 = x1 + halfW / 2, cx2 = x2 + halfW / 2;
+
+        // Bar 1: Standard headcount
+        const dist = Math.max(active - leaders, 0);
+        const leaderH = leaders * yScale;
+        const distH = dist * yScale;
         const solidH = active * yScale;
         const trainH = training * yScale;
         const solidTop = d.baseY - solidH;
         const trainTop = solidTop - trainH;
-        const topmost = trainH > 0 ? 'training' : (lgH > 0 ? 'lg' : 'closer');
+        const topmost1 = trainH > 0 ? 'training' : (distH > 0 ? 'dist' : 'leader');
 
-        // Closers (bottom — orange)
-        if (closerH > 0) {
-          if (topmost === 'closer') {
-            svg += `<path d="${roundTop(x, d.baseY - closerH, d.barW, closerH, d.BAR_R)}" fill="#f59e0b" opacity="0.9"/>`;
-          } else {
-            svg += `<rect x="${x}" y="${d.baseY - closerH}" width="${d.barW}" height="${closerH}" fill="#f59e0b" opacity="0.9"/>`;
-          }
-          svg += segLabel(cx, d.baseY - closerH, closerH, closers, '#fff');
+        if (leaderH > 0) {
+          svg += topmost1 === 'leader'
+            ? `<path d="${roundTop(x1, d.baseY - leaderH, halfW, leaderH, d.BAR_R)}" fill="#5b9cf6" opacity="0.9"/>`
+            : `<rect x="${x1}" y="${d.baseY - leaderH}" width="${halfW}" height="${leaderH}" fill="#5b9cf6" opacity="0.9"/>`;
+          svg += segLabel(cx1, d.baseY - leaderH, leaderH, leaders, '#fff');
         }
-        // Lead Gen (middle — teal)
-        if (lgH > 0) {
-          if (topmost === 'lg') {
-            svg += `<path d="${roundTop(x, solidTop, d.barW, lgH, d.BAR_R)}" fill="#0ea5a0" opacity="0.85"/>`;
-          } else {
-            svg += `<rect x="${x}" y="${solidTop}" width="${d.barW}" height="${lgH}" fill="#0ea5a0" opacity="0.85"/>`;
-          }
-          svg += segLabel(cx, solidTop, lgH, leadGen, '#fff');
+        if (distH > 0) {
+          svg += topmost1 === 'dist'
+            ? `<path d="${roundTop(x1, solidTop, halfW, distH, d.BAR_R)}" fill="#0ea5a0" opacity="0.85"/>`
+            : `<rect x="${x1}" y="${solidTop}" width="${halfW}" height="${distH}" fill="#0ea5a0" opacity="0.85"/>`;
+          svg += segLabel(cx1, solidTop, distH, dist, '#fff');
         }
-        // Training extension (dashed purple)
         if (trainH > 0) {
-          svg += `<path d="${roundTop(x + 0.5, trainTop + 0.5, d.barW - 1, trainH - 1, d.BAR_R)}" fill="rgba(139,92,246,0.08)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 2"/>`;
-          svg += segLabel(cx, trainTop, trainH, training, '#7c3aed');
+          svg += `<path d="${roundTop(x1 + 0.5, trainTop + 0.5, halfW - 1, trainH - 1, d.BAR_R)}" fill="rgba(139,92,246,0.08)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 2"/>`;
+          svg += segLabel(cx1, trainTop, trainH, training, '#7c3aed');
         }
+
+        // Bar 2: Closers + Lead Gen
+        const closers = r.closers || 0;
+        const leadGen = Math.max(active - closers, 0);
+        const closerH = closers * yScale;
+        const lgH = leadGen * yScale;
+        const bar2Top = d.baseY - solidH; // same total height as active
+        const topmost2 = lgH > 0 ? 'lg' : 'closer';
+
+        if (closerH > 0) {
+          svg += topmost2 === 'closer'
+            ? `<path d="${roundTop(x2, d.baseY - closerH, halfW, closerH, d.BAR_R)}" fill="#f59e0b" opacity="0.9"/>`
+            : `<rect x="${x2}" y="${d.baseY - closerH}" width="${halfW}" height="${closerH}" fill="#f59e0b" opacity="0.9"/>`;
+          svg += segLabel(cx2, d.baseY - closerH, closerH, closers, '#fff');
+        }
+        if (lgH > 0) {
+          svg += topmost2 === 'lg'
+            ? `<path d="${roundTop(x2, bar2Top, halfW, lgH, d.BAR_R)}" fill="#22c55e" opacity="0.85"/>`
+            : `<rect x="${x2}" y="${bar2Top}" width="${halfW}" height="${lgH}" fill="#22c55e" opacity="0.85"/>`;
+          svg += segLabel(cx2, bar2Top, lgH, leadGen, '#fff');
+        }
+
+        // Hover target spans both bars
         const totalH = solidH + trainH;
         const topY = trainH > 0 ? trainTop : solidTop;
         svg += `<rect x="${x}" y="${Math.min(topY, d.baseY - 1)}" width="${d.barW}" height="${Math.max(totalH, 4)}" fill="transparent" style="cursor:pointer" onmouseenter="NationalApp._showHcTooltip(event,${origIdx},${d.ownerIdx})" onmouseleave="NationalApp._hideHcTooltip()"/>`;
