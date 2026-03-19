@@ -5134,8 +5134,12 @@ function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignK
     var goalParts = _splitSlashValues(h.goalsRaw);
 
     // Build the row: base columns first
+    // Use Monday-snapped date so all owners share the same week date in consolidated tab
+    var snapKey = keys2[i]; // already "MM/DD/YYYY" Monday format from _normalizeDateKey_
+    var snapParts = snapKey.split('/');
+    var mondayDate = new Date(Number(snapParts[2]), Number(snapParts[0]) - 1, Number(snapParts[1]));
     var row = [
-      entry.date,          // 0: Week
+      mondayDate,          // 0: Week (Monday of ISO week)
       ownerName,           // 1: Owner
       h.active || 0,       // 2: Active HC
       h.leaders || 0,      // 3: Leaders
