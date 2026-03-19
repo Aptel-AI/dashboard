@@ -954,12 +954,10 @@ const NationalApp = {
         if (health) {
           const h = health;
           latestHealth = h; // keep overwriting — last one is most recent
-          hcHistory.push({
-            date: allWeeksChron[wi].tabName,
-            active: h.active || 0,
-            leaders: h.leaders || 0,
-            training: h.training || 0
-          });
+          const hcActive = h.active || 0, hcLeaders = h.leaders || 0, hcTraining = h.training || 0;
+          if (hcActive > 0 || hcLeaders > 0 || hcTraining > 0) {
+            hcHistory.push({ date: allWeeksChron[wi].tabName, active: hcActive, leaders: hcLeaders, training: hcTraining });
+          }
           // Production history — handle both old format (single numbers) and new format (per-product objects)
           const prod = h.production;
           if (prod && typeof prod === 'object' && !Array.isArray(prod)) {
@@ -976,15 +974,15 @@ const NationalApp = {
             // Sum across products (no separate Total column)
             entry.tA = totalProd;
             entry.tG = totalGoal;
-            prodHistory.push(entry);
+            // Skip weeks where all data is zero
+            if (totalProd > 0 || totalGoal > 0) prodHistory.push(entry);
           } else {
             // Legacy single-value format
-            prodHistory.push({
-              date: allWeeksChron[wi].tabName,
-              tA: (typeof prod === 'number') ? prod : 0,
-              tG: (typeof h.goals === 'number') ? h.goals : 0,
-              products: {}
-            });
+            const legA = (typeof prod === 'number') ? prod : 0;
+            const legG = (typeof h.goals === 'number') ? h.goals : 0;
+            if (legA > 0 || legG > 0) {
+              prodHistory.push({ date: allWeeksChron[wi].tabName, tA: legA, tG: legG, products: {} });
+            }
           }
         }
       }
