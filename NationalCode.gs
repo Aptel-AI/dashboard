@@ -4511,7 +4511,7 @@ var CAMPAIGN_PRODUCTS = {
   'verizon-fios':    ['Units', 'Wireless'],
   'att-nds':         ['NDS'],       // single product — will update
   'att-res':         ['Residential'],// single product — will update
-  'rogers':          ['Rogers'],    // single product — will update
+  'rogers':          ['Units', 'Mobility'],
   'leafguard':       ['Personal Prod', 'Gross Leads', 'Number of Sales', 'Gross Sales'],
   'lumen':           ['Lumen', 'DTV']
 };
@@ -4541,13 +4541,18 @@ var CAMPAIGN_PROD_COLUMNS = {
   'verizon-fios': {
     'Units':     { prod: ['production lw', 'production'], goal: ['production goals', 'production goal', 'goals'] },
     'Wireless':  { prod: ['wireless'], goal: [] }
+  },
+  'rogers': {
+    'Units':     { prod: ['production lw', 'production'], goal: ['production goals', 'production goal', 'goals'] },
+    'Mobility':  { prod: ['mobility'], goal: [] }
   }
 };
 
 // Which products have goals set (these show goal comparison)
 var CAMPAIGN_GOAL_PRODUCTS = {
   'leafguard': ['Gross Sales', 'Gross Leads'],
-  'verizon-fios': ['Units']  // Production Goals is combined (units + wireless) — shown against Units
+  'verizon-fios': ['Units'],  // Production Goals is combined (units + wireless) — shown against Units
+  'rogers': ['Units']         // Production Goals is combined (units + mobility) — shown against Units
 };
 
 // Campaigns with extra headcount columns (Closers, Lead Gen)
