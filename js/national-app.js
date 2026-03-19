@@ -1767,8 +1767,11 @@ const NationalApp = {
     const goalsEl = document.getElementById('health-goals');
     let goalFieldsHtml = '';
     if (productNames.length > 0) {
-      // Per-product goal inputs (empty by default, like headcount fields)
-      for (const pName of productNames) {
+      // LeafGuard: only show Gross Sales + Gross Leads goals (skip Personal Prod + Number of Sales)
+      const goalProducts = this.state.campaign === 'leafguard'
+        ? productNames.filter(p => p === 'Gross Sales' || p === 'Gross Leads')
+        : productNames;
+      for (const pName of goalProducts) {
         goalFieldsHtml += `
           <div class="goal-field">
             <label class="goal-field-label">${this._esc(pName)} Goal</label>
