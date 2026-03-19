@@ -1672,9 +1672,33 @@ const NationalApp = {
 
     // ── Section 1: Headcount Check (inputs start blank for weekly entry) ──
     const headcountEl = document.getElementById('health-headcount');
-    headcountEl.innerHTML = `
-      <div class="coaching-label">Headcount</div>
-      <div class="hc-grid">
+    const isLG = this.state.campaign === 'leafguard';
+    const hcFieldsHtml = isLG ? `
+        <div class="hc-field">
+          <label class="hc-field-label">Active Reps</label>
+          <input type="number" class="hc-input" id="hc-active-${ownerIdx}" value="" min="0" placeholder="—"
+            onchange="NationalApp._updateHeadcount(${ownerIdx}, 'active', this.value)">
+        </div>
+        <div class="hc-field">
+          <label class="hc-field-label">Closers</label>
+          <input type="number" class="hc-input" id="hc-closers-${ownerIdx}" value="" min="0" placeholder="—"
+            onchange="NationalApp._updateHeadcount(${ownerIdx}, 'closers', this.value)">
+        </div>
+        <div class="hc-field hc-field-calc">
+          <label class="hc-field-label">Lead Gen</label>
+          <div class="hc-value" id="hc-dist-${ownerIdx}">—</div>
+          <div class="hc-calc-note">Active − Closers</div>
+        </div>
+        <div class="hc-field">
+          <label class="hc-field-label">Leaders</label>
+          <input type="number" class="hc-input" id="hc-leaders-${ownerIdx}" value="" min="0" placeholder="—"
+            onchange="NationalApp._updateHeadcount(${ownerIdx}, 'leaders', this.value)">
+        </div>
+        <div class="hc-field">
+          <label class="hc-field-label">In Training</label>
+          <input type="number" class="hc-input" id="hc-training-${ownerIdx}" value="" min="0" placeholder="—"
+            onchange="NationalApp._updateHeadcount(${ownerIdx}, 'training', this.value)">
+        </div>` : `
         <div class="hc-field">
           <label class="hc-field-label">Active Reps</label>
           <input type="number" class="hc-input" id="hc-active-${ownerIdx}" value="" min="0" placeholder="—"
@@ -1694,8 +1718,10 @@ const NationalApp = {
           <label class="hc-field-label">In Training</label>
           <input type="number" class="hc-input" id="hc-training-${ownerIdx}" value="" min="0" placeholder="—"
             onchange="NationalApp._updateHeadcount(${ownerIdx}, 'training', this.value)">
-        </div>
-      </div>
+        </div>`;
+    headcountEl.innerHTML = `
+      <div class="coaching-label">Headcount</div>
+      <div class="hc-grid">${hcFieldsHtml}</div>
       <div class="hc-submit-row">
         <button class="hc-submit-btn" id="hc-submit-${ownerIdx}"
           onclick="NationalApp._submitHeadcount(${ownerIdx})">Submit Headcount</button>
@@ -1881,7 +1907,7 @@ const NationalApp = {
     const baseY = PAD_T + plotH;
 
     // Store chart state for scroll-driven re-renders
-    this._hcData = { hist, ownerIdx, n, slotW, barW, barOff, barAreaW, barAreaVisibleW, plotH, PAD_T, PAD_R, BAR_R, GAP, MIN_LABEL_H, svgH, baseY, YAXIS_W, VISIBLE, shortDate };
+    this._hcData = { hist, ownerIdx, n, slotW, barW, barOff, barAreaW, barAreaVisibleW, plotH, PAD_T, PAD_R, BAR_R, GAP, MIN_LABEL_H, svgH, baseY, YAXIS_W, VISIBLE, shortDate, isLeafGuard };
 
     // Compute initial yMax from visible bars (multiples of 10)
     const visibleMax = this._getHcVisibleMax(0);
@@ -1965,8 +1991,9 @@ const NationalApp = {
             </div>
             <div class="hc-chart-legend">
               <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-leaders"></span>Leaders</span>
-              <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-dist"></span>Distributors</span>
+              <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-dist"></span>${isLeafGuard ? 'Lead Gen' : 'Distributors'}</span>
               <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-training"></span>Training</span>
+              ${isLeafGuard ? '<span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch" style="background:#f59e0b"></span>Closers</span>' : ''}
             </div>
           </div>
           <div class="flip-card-back">
@@ -2057,53 +2084,89 @@ const NationalApp = {
       return `<text x="${cx}" y="${ty}" text-anchor="middle" fill="${color}" font-size="11" font-weight="700" font-family="Inter,sans-serif">${val}</text>`;
     };
 
+    const isLG = this._hcData.isLeafGuard;
+
     d.hist.forEach((r, i) => {
       const origIdx = d.n - 1 - i;
       const active = r.active || 0;
       const leaders = r.leaders || 0;
       const training = r.training || 0;
-      const dist = Math.max(active - leaders, 0);
-      const leaderH = leaders * yScale;
-      const distH = dist * yScale;
-      const solidH = active * yScale;
-      const trainH = training * yScale;
       const x = i * d.slotW + d.barOff;
       const cx = x + d.barW / 2;
-      const solidTop = d.baseY - solidH;
-      const trainTop = solidTop - trainH;
 
-      const topmost = trainH > 0 ? 'training' : (distH > 0 ? 'dist' : 'leader');
+      if (isLG) {
+        // LeafGuard: Closers (orange, bottom) + Lead Gen (teal, middle) + Training (dashed)
+        const closers = r.closers || 0;
+        const leadGen = Math.max(active - closers, 0);
+        const closerH = closers * yScale;
+        const lgH = leadGen * yScale;
+        const solidH = active * yScale;
+        const trainH = training * yScale;
+        const solidTop = d.baseY - solidH;
+        const trainTop = solidTop - trainH;
+        const topmost = trainH > 0 ? 'training' : (lgH > 0 ? 'lg' : 'closer');
 
-      // Leaders (bottom — blue)
-      if (leaderH > 0) {
-        if (topmost === 'leader') {
-          svg += `<path d="${roundTop(x, d.baseY - leaderH, d.barW, leaderH, d.BAR_R)}" fill="#5b9cf6" opacity="0.9"/>`;
-        } else {
-          svg += `<rect x="${x}" y="${d.baseY - leaderH}" width="${d.barW}" height="${leaderH}" fill="#5b9cf6" opacity="0.9"/>`;
+        // Closers (bottom — orange)
+        if (closerH > 0) {
+          if (topmost === 'closer') {
+            svg += `<path d="${roundTop(x, d.baseY - closerH, d.barW, closerH, d.BAR_R)}" fill="#f59e0b" opacity="0.9"/>`;
+          } else {
+            svg += `<rect x="${x}" y="${d.baseY - closerH}" width="${d.barW}" height="${closerH}" fill="#f59e0b" opacity="0.9"/>`;
+          }
+          svg += segLabel(cx, d.baseY - closerH, closerH, closers, '#fff');
         }
-        svg += segLabel(cx, d.baseY - leaderH, leaderH, leaders, '#fff');
-      }
-
-      // Distributors (middle — teal)
-      if (distH > 0) {
-        if (topmost === 'dist') {
-          svg += `<path d="${roundTop(x, solidTop, d.barW, distH, d.BAR_R)}" fill="#0ea5a0" opacity="0.85"/>`;
-        } else {
-          svg += `<rect x="${x}" y="${solidTop}" width="${d.barW}" height="${distH}" fill="#0ea5a0" opacity="0.85"/>`;
+        // Lead Gen (middle — teal)
+        if (lgH > 0) {
+          if (topmost === 'lg') {
+            svg += `<path d="${roundTop(x, solidTop, d.barW, lgH, d.BAR_R)}" fill="#0ea5a0" opacity="0.85"/>`;
+          } else {
+            svg += `<rect x="${x}" y="${solidTop}" width="${d.barW}" height="${lgH}" fill="#0ea5a0" opacity="0.85"/>`;
+          }
+          svg += segLabel(cx, solidTop, lgH, leadGen, '#fff');
         }
-        svg += segLabel(cx, solidTop, distH, dist, '#fff');
-      }
+        // Training extension (dashed purple)
+        if (trainH > 0) {
+          svg += `<path d="${roundTop(x + 0.5, trainTop + 0.5, d.barW - 1, trainH - 1, d.BAR_R)}" fill="rgba(139,92,246,0.08)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 2"/>`;
+          svg += segLabel(cx, trainTop, trainH, training, '#7c3aed');
+        }
+        const totalH = solidH + trainH;
+        const topY = trainH > 0 ? trainTop : solidTop;
+        svg += `<rect x="${x}" y="${Math.min(topY, d.baseY - 1)}" width="${d.barW}" height="${Math.max(totalH, 4)}" fill="transparent" style="cursor:pointer" onmouseenter="NationalApp._showHcTooltip(event,${origIdx},${d.ownerIdx})" onmouseleave="NationalApp._hideHcTooltip()"/>`;
+      } else {
+        // Standard: Leaders (blue, bottom) + Dist (teal, middle) + Training (dashed)
+        const dist = Math.max(active - leaders, 0);
+        const leaderH = leaders * yScale;
+        const distH = dist * yScale;
+        const solidH = active * yScale;
+        const trainH = training * yScale;
+        const solidTop = d.baseY - solidH;
+        const trainTop = solidTop - trainH;
+        const topmost = trainH > 0 ? 'training' : (distH > 0 ? 'dist' : 'leader');
 
-      // Training extension (dashed purple)
-      if (trainH > 0) {
-        svg += `<path d="${roundTop(x + 0.5, trainTop + 0.5, d.barW - 1, trainH - 1, d.BAR_R)}" fill="rgba(139,92,246,0.08)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 2"/>`;
-        svg += segLabel(cx, trainTop, trainH, training, '#7c3aed');
+        if (leaderH > 0) {
+          if (topmost === 'leader') {
+            svg += `<path d="${roundTop(x, d.baseY - leaderH, d.barW, leaderH, d.BAR_R)}" fill="#5b9cf6" opacity="0.9"/>`;
+          } else {
+            svg += `<rect x="${x}" y="${d.baseY - leaderH}" width="${d.barW}" height="${leaderH}" fill="#5b9cf6" opacity="0.9"/>`;
+          }
+          svg += segLabel(cx, d.baseY - leaderH, leaderH, leaders, '#fff');
+        }
+        if (distH > 0) {
+          if (topmost === 'dist') {
+            svg += `<path d="${roundTop(x, solidTop, d.barW, distH, d.BAR_R)}" fill="#0ea5a0" opacity="0.85"/>`;
+          } else {
+            svg += `<rect x="${x}" y="${solidTop}" width="${d.barW}" height="${distH}" fill="#0ea5a0" opacity="0.85"/>`;
+          }
+          svg += segLabel(cx, solidTop, distH, dist, '#fff');
+        }
+        if (trainH > 0) {
+          svg += `<path d="${roundTop(x + 0.5, trainTop + 0.5, d.barW - 1, trainH - 1, d.BAR_R)}" fill="rgba(139,92,246,0.08)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 2"/>`;
+          svg += segLabel(cx, trainTop, trainH, training, '#7c3aed');
+        }
+        const totalH = solidH + trainH;
+        const topY = trainH > 0 ? trainTop : solidTop;
+        svg += `<rect x="${x}" y="${Math.min(topY, d.baseY - 1)}" width="${d.barW}" height="${Math.max(totalH, 4)}" fill="transparent" style="cursor:pointer" onmouseenter="NationalApp._showHcTooltip(event,${origIdx},${d.ownerIdx})" onmouseleave="NationalApp._hideHcTooltip()"/>`;
       }
-
-      // Hover target
-      const totalH = solidH + trainH;
-      const topY = trainH > 0 ? trainTop : solidTop;
-      svg += `<rect x="${x}" y="${Math.min(topY, d.baseY - 1)}" width="${d.barW}" height="${Math.max(totalH, 4)}" fill="transparent" style="cursor:pointer" onmouseenter="NationalApp._showHcTooltip(event,${origIdx},${d.ownerIdx})" onmouseleave="NationalApp._hideHcTooltip()"/>`;
 
       // X-axis date label
       svg += `<text x="${cx}" y="${d.baseY + 16}" text-anchor="middle" fill="#8a95a5" font-size="10" font-weight="600" font-family="Inter,sans-serif">${d.shortDate(r.date)}</text>`;
