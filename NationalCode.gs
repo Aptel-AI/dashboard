@@ -1031,8 +1031,20 @@ function _parseTabDate(name) {
   if (parts.length >= 2) {
     var month = parseInt(parts[0]);
     var day = parseInt(parts[1]);
-    var year = parts.length >= 3 ? parseInt(parts[2]) : new Date().getFullYear();
-    if (year < 100) year += 2000;
+    var year = parts.length >= 3 ? parseInt(parts[2]) : 0;
+    if (year < 100 && year > 0) year += 2000;
+
+    // No year provided — infer from context
+    if (year === 0) {
+      var now = new Date();
+      var curYear = now.getFullYear();
+      // Try current year first; if that date is more than 1 week in the future,
+      // assume it belongs to the previous year
+      var candidate = new Date(curYear, month - 1, day);
+      var oneWeekAhead = new Date(now.getTime() + 7 * 86400000);
+      year = (candidate.getTime() > oneWeekAhead.getTime()) ? curYear - 1 : curYear;
+    }
+
     if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
       return new Date(year, month - 1, day);
     }
@@ -4501,7 +4513,7 @@ var CAMPAIGN_PRODUCTS = {
   'att-res':         ['Residential'],// single product — will update
   'rogers':          ['Rogers'],    // single product — will update
   'leafguard':       ['Leafguard'],
-  'lumen':           ['Lumen']
+  'lumen':           ['Lumen', 'DTV']
 };
 
 // ── Build consolidated headers dynamically per campaign ──
@@ -4542,11 +4554,6 @@ function getConsolidatedHeaders_(campaignKey) {
   for (var p = 0; p < products.length; p++) {
     headers.push('Prod: ' + products[p]);
     headers.push('Goal: ' + products[p]);
-  }
-  // Also add totals if more than one product
-  if (products.length > 1) {
-    headers.push('Prod: Total');
-    headers.push('Goal: Total');
   }
   return headers.concat(CONSOLIDATED_RECRUITING_HEADERS);
 }
@@ -5130,12 +5137,6 @@ function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignK
       prodTotal += prodVal;
       goalTotal += goalVal;
     }
-    // Add totals if multiple products
-    if (products.length > 1) {
-      row.push(prodTotal);
-      row.push(goalTotal);
-    }
-
     // Recruiting metrics
     for (var ri = 0; ri < 12; ri++) {
       row.push(r[ri]);
@@ -5298,9 +5299,7 @@ function readConsolidatedRecruiting(weekCount, campaignFilter) {
         prodCols.push({ product: products[pi], prodCol: pc, goalCol: gc });
       }
     }
-    // Also look for totals column if multi-product
-    var prodTotalCol = findCol(headers, ['prod: total']);
-    var goalTotalCol = findCol(headers, ['goal: total']);
+    // (Total columns removed — each product tracked individually)
     // Fallback: old single-column format
     var colProdLegacy = findCol(headers, ['production']);
     var colGoalsLegacy = findCol(headers, ['goals']);
@@ -5353,12 +5352,7 @@ function readConsolidatedRecruiting(weekCount, campaignFilter) {
             goals: p.goalCol >= 0 ? num(row[p.goalCol]) : 0
           };
         }
-        if (prodTotalCol >= 0 || goalTotalCol >= 0) {
-          productionData['Total'] = {
-            production: prodTotalCol >= 0 ? num(row[prodTotalCol]) : 0,
-            goals: goalTotalCol >= 0 ? num(row[goalTotalCol]) : 0
-          };
-        }
+        // (No Total row — products tracked individually)
       } else if (colProdLegacy >= 0 || colGoalsLegacy >= 0) {
         // Legacy single-column: try splitting "/" values
         var prodParts = _splitSlashValues(row[colProdLegacy >= 0 ? colProdLegacy : 0]);

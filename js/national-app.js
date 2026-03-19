@@ -973,14 +973,9 @@ const NationalApp = {
               totalProd += pv.production || 0;
               totalGoal += pv.goals || 0;
             }
-            // Use explicit total if available, otherwise sum
-            if (prod.Total) {
-              entry.tA = prod.Total.production || 0;
-              entry.tG = prod.Total.goals || 0;
-            } else {
-              entry.tA = totalProd;
-              entry.tG = totalGoal;
-            }
+            // Sum across products (no separate Total column)
+            entry.tA = totalProd;
+            entry.tG = totalGoal;
             prodHistory.push(entry);
           } else {
             // Legacy single-value format
@@ -1005,8 +1000,8 @@ const NationalApp = {
           totalP += lp[pName].production || 0;
           totalG += lp[pName].goals || 0;
         }
-        currentProd.totalActual = lp.Total ? lp.Total.production : totalP;
-        currentProd.totalGoal = lp.Total ? lp.Total.goals : totalG;
+        currentProd.totalActual = totalP;
+        currentProd.totalGoal = totalG;
       } else if (typeof lp === 'number') {
         currentProd.totalActual = lp;
         currentProd.totalGoal = (typeof latestHealth.goals === 'number') ? latestHealth.goals : 0;
@@ -2369,8 +2364,12 @@ const NationalApp = {
               <div class="hc-chart-tooltip" id="prod-chart-tt"></div>
             </div>
             <div class="hc-chart-legend">
-              <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-prod-actual"></span>Actual</span>
-              <span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-prod-goal"></span>Goal</span>
+              ${tableProductNames.length > 1
+                ? tableProductNames.map((pName, pi) =>
+                    `<span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch" style="background:${this._PROD_COLORS[pi % this._PROD_COLORS.length]}"></span>${this._esc(pName)}</span>`
+                  ).join('') + '<span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch" style="background:none;border-top:2px dashed #888;height:0;width:10px;border-radius:0"></span>Goal</span>'
+                : '<span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-prod-actual"></span>Actual</span><span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-prod-goal"></span>Goal</span>'
+              }
             </div>
           </div>
           <div class="flip-card-back">
@@ -2406,8 +2405,17 @@ const NationalApp = {
     let maxVal = 1;
     for (let i = firstVisible; i <= lastVisible; i++) {
       const r = d.hist[i];
-      const barTop = Math.max(r.tA || 0, r.tG || 0);
-      if (barTop > maxVal) maxVal = barTop;
+      // Check per-product values for multi-product campaigns
+      if (r.products && Object.keys(r.products).length > 1) {
+        for (const pName in r.products) {
+          const pv = r.products[pName];
+          const v = Math.max(pv.actual || 0, pv.goal || 0);
+          if (v > maxVal) maxVal = v;
+        }
+      } else {
+        const barTop = Math.max(r.tA || 0, r.tG || 0);
+        if (barTop > maxVal) maxVal = barTop;
+      }
     }
     return maxVal;
   },
@@ -2439,6 +2447,9 @@ const NationalApp = {
     return svg;
   },
 
+  // Product color palette for grouped bars
+  _PROD_COLORS: ['#3b82f6', '#06b6d4', '#8b5cf6', '#f59e0b', '#ec4899'],
+
   _buildProdBarsSvg(yMax) {
     const d = this._prodData;
     if (!d) return '';
@@ -2464,39 +2475,87 @@ const NationalApp = {
       return `<text x="${cx}" y="${ty}" text-anchor="middle" fill="${color}" font-size="11" font-weight="700" font-family="Inter,sans-serif">${val}</text>`;
     };
 
+    // Detect if multi-product — use first entry with products
+    let productNames = [];
+    for (const r of d.hist) {
+      if (r.products && Object.keys(r.products).length > 1) {
+        productNames = Object.keys(r.products);
+        break;
+      }
+    }
+    const isMulti = productNames.length > 1;
+
     d.hist.forEach((r, i) => {
       const origIdx = d.n - 1 - i;
-      const actual = r.tA || 0;
-      const goal = r.tG || 0;
-      const x = i * d.slotW + d.barOff;
-      const cx = x + d.barW / 2;
-      const actualH = actual * yScale;
-      const goalH = goal * yScale;
-      const actualTop = d.baseY - actualH;
+      const slotX = i * d.slotW + d.barOff;
+      const slotCX = slotX + d.barW / 2;
 
-      // Determine color based on goal attainment
-      const pct = goal > 0 ? (actual / goal) : 0;
-      const barColor = pct >= 1 ? '#22c55e' : pct >= 0.8 ? '#f0b429' : pct >= 0.6 ? '#f97316' : '#e53535';
+      if (isMulti) {
+        // ── Grouped bars: one sub-bar per product, touching ──
+        const subW = d.barW / productNames.length;
+        productNames.forEach((pName, pi) => {
+          const pv = (r.products && r.products[pName]) || { actual: 0, goal: 0 };
+          const actual = pv.actual || 0;
+          const goal = pv.goal || 0;
+          const bx = slotX + pi * subW;
+          const bcx = bx + subW / 2;
+          const actualH = actual * yScale;
+          const goalH = goal * yScale;
+          const actualTop = d.baseY - actualH;
+          const baseColor = this._PROD_COLORS[pi % this._PROD_COLORS.length];
 
-      // Actual bar (solid, color-coded)
-      if (actualH > 0) {
-        svg += `<path d="${roundTop(x, actualTop, d.barW, actualH, d.BAR_R)}" fill="${barColor}" opacity="0.85"/>`;
-        svg += segLabel(cx, actualTop, actualH, actual, '#fff');
+          // Determine opacity based on goal attainment
+          const pct = goal > 0 ? (actual / goal) : 0;
+          const barColor = pct >= 1 ? '#22c55e' : pct >= 0.8 ? '#f0b429' : pct >= 0.6 ? '#f97316' : '#e53535';
+
+          // Only round top corners on the outer edges of the group
+          const rLeft = pi === 0 ? d.BAR_R : 0;
+          const rRight = pi === productNames.length - 1 ? d.BAR_R : 0;
+
+          if (actualH > 0) {
+            // Use product color with opacity to differentiate
+            svg += `<path d="${roundTop(bx, actualTop, subW, actualH, Math.min(rLeft, rRight) || 2)}" fill="${baseColor}" opacity="0.85"/>`;
+            svg += segLabel(bcx, actualTop, actualH, actual, '#fff');
+          }
+
+          // Goal marker line
+          if (goal > 0) {
+            const goalY = d.baseY - goalH;
+            svg += `<line x1="${bx}" y1="${goalY}" x2="${bx + subW}" y2="${goalY}" stroke="${baseColor}" stroke-width="2" stroke-dasharray="3 2" opacity="0.5"/>`;
+          }
+
+          // Hover target per sub-bar
+          const topY = Math.min(actualH > 0 ? actualTop : d.baseY, goal > 0 ? d.baseY - goalH : d.baseY);
+          const totalH = d.baseY - topY;
+          svg += `<rect x="${bx}" y="${Math.min(topY, d.baseY - 1)}" width="${subW}" height="${Math.max(totalH, 4)}" fill="transparent" style="cursor:pointer" onmouseenter="NationalApp._showProdTooltip(event,${origIdx},${d.ownerIdx},'${pName}')" onmouseleave="NationalApp._hideProdTooltip()"/>`;
+        });
+      } else {
+        // ── Single-product: original behavior ──
+        const actual = r.tA || 0;
+        const goal = r.tG || 0;
+        const actualH = actual * yScale;
+        const goalH = goal * yScale;
+        const actualTop = d.baseY - actualH;
+        const pct = goal > 0 ? (actual / goal) : 0;
+        const barColor = pct >= 1 ? '#22c55e' : pct >= 0.8 ? '#f0b429' : pct >= 0.6 ? '#f97316' : '#e53535';
+
+        if (actualH > 0) {
+          svg += `<path d="${roundTop(slotX, actualTop, d.barW, actualH, d.BAR_R)}" fill="${barColor}" opacity="0.85"/>`;
+          svg += segLabel(slotCX, actualTop, actualH, actual, '#fff');
+        }
+
+        if (goal > 0) {
+          const goalY = d.baseY - goalH;
+          svg += `<line x1="${slotX - 2}" y1="${goalY}" x2="${slotX + d.barW + 2}" y2="${goalY}" stroke="#6366f1" stroke-width="2" stroke-dasharray="4 2" opacity="0.7"/>`;
+        }
+
+        const topY = Math.min(actualH > 0 ? actualTop : d.baseY, goal > 0 ? d.baseY - goalH : d.baseY);
+        const totalH = d.baseY - topY;
+        svg += `<rect x="${slotX}" y="${Math.min(topY, d.baseY - 1)}" width="${d.barW}" height="${Math.max(totalH, 4)}" fill="transparent" style="cursor:pointer" onmouseenter="NationalApp._showProdTooltip(event,${origIdx},${d.ownerIdx})" onmouseleave="NationalApp._hideProdTooltip()"/>`;
       }
-
-      // Goal marker line (dashed horizontal line at goal level)
-      if (goal > 0) {
-        const goalY = d.baseY - goalH;
-        svg += `<line x1="${x - 2}" y1="${goalY}" x2="${x + d.barW + 2}" y2="${goalY}" stroke="#6366f1" stroke-width="2" stroke-dasharray="4 2" opacity="0.7"/>`;
-      }
-
-      // Hover target
-      const topY = Math.min(actualTop, goal > 0 ? d.baseY - goalH : actualTop);
-      const totalH = d.baseY - topY;
-      svg += `<rect x="${x}" y="${Math.min(topY, d.baseY - 1)}" width="${d.barW}" height="${Math.max(totalH, 4)}" fill="transparent" style="cursor:pointer" onmouseenter="NationalApp._showProdTooltip(event,${origIdx},${d.ownerIdx})" onmouseleave="NationalApp._hideProdTooltip()"/>`;
 
       // X-axis date label
-      svg += `<text x="${cx}" y="${d.baseY + 16}" text-anchor="middle" fill="#8a95a5" font-size="10" font-weight="600" font-family="Inter,sans-serif">${d.shortDate(r.date)}</text>`;
+      svg += `<text x="${slotCX}" y="${d.baseY + 16}" text-anchor="middle" fill="#8a95a5" font-size="10" font-weight="600" font-family="Inter,sans-serif">${d.shortDate(r.date)}</text>`;
     });
 
     return svg;
@@ -2588,20 +2647,37 @@ const NationalApp = {
   },
 
   // ── Production chart tooltip helpers ──
-  _showProdTooltip(event, origIdx, ownerIdx) {
+  _showProdTooltip(event, origIdx, ownerIdx, productName) {
     const owner = this.state.owners[ownerIdx];
     if (!owner) return;
     const r = owner.productionHistory[origIdx];
     if (!r) return;
-    const pct = r.tG > 0 ? Math.round((r.tA / r.tG) * 100) : 0;
     const tt = document.getElementById('prod-chart-tt');
     if (!tt) return;
 
-    tt.innerHTML = `
-      <div style="font-weight:700;margin-bottom:4px">${this._esc(r.date)}</div>
-      <div><span class="tt-swatch" style="background:#22c55e"></span>Actual: <strong>${r.tA}</strong></div>
-      <div><span class="tt-swatch" style="background:#6366f1;border-radius:0;height:2px;width:10px;border-top:2px dashed #6366f1;background:none"></span>Goal: <strong>${r.tG}</strong></div>
-      <div style="border-top:1px solid rgba(255,255,255,0.2);margin:4px 0;padding-top:4px">${pct}% of goal</div>`;
+    if (productName && r.products && r.products[productName]) {
+      // Multi-product tooltip — show specific product
+      const pv = r.products[productName];
+      const actual = pv.actual || 0;
+      const goal = pv.goal || 0;
+      const pct = goal > 0 ? Math.round((actual / goal) * 100) : 0;
+      const pi = Object.keys(r.products).indexOf(productName);
+      const color = this._PROD_COLORS[pi % this._PROD_COLORS.length];
+      tt.innerHTML = `
+        <div style="font-weight:700;margin-bottom:4px">${this._esc(r.date)}</div>
+        <div style="font-weight:600;color:${color};margin-bottom:2px">${this._esc(productName)}</div>
+        <div>Actual: <strong>${actual}</strong></div>
+        <div>Goal: <strong>${goal}</strong></div>
+        <div style="border-top:1px solid rgba(255,255,255,0.2);margin:4px 0;padding-top:4px">${pct}% of goal</div>`;
+    } else {
+      // Single-product tooltip
+      const pct = r.tG > 0 ? Math.round((r.tA / r.tG) * 100) : 0;
+      tt.innerHTML = `
+        <div style="font-weight:700;margin-bottom:4px">${this._esc(r.date)}</div>
+        <div><span class="tt-swatch" style="background:#22c55e"></span>Actual: <strong>${r.tA}</strong></div>
+        <div><span class="tt-swatch" style="background:#6366f1;border-radius:0;height:2px;width:10px;border-top:2px dashed #6366f1;background:none"></span>Goal: <strong>${r.tG}</strong></div>
+        <div style="border-top:1px solid rgba(255,255,255,0.2);margin:4px 0;padding-top:4px">${pct}% of goal</div>`;
+    }
 
     tt.classList.add('visible');
     const outer = tt.closest('.prod-chart-outer');
