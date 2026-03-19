@@ -1744,8 +1744,8 @@ const NationalApp = {
       // Card 2: Gross Leads (main) + Number of Sales (sub)
       const gl = productEntries['Gross Leads'] || { actual: 0, goal: 0 };
       const ns = productEntries['Number of Sales'] || { actual: 0, goal: 0 };
-      prodCardsHtml = this._prodCardCombined('Gross Sales', gs.actual, gs.goal, 'Personal Prod', pp.actual)
-                    + this._prodCardCombined('Gross Leads', gl.actual, gl.goal, 'Number of Sales', ns.actual);
+      prodCardsHtml = this._prodCardCombined('Gross Sales', gs.actual, gs.goal, 'Personal Prod', pp.actual, true)
+                    + this._prodCardCombined('Gross Leads', gl.actual, gl.goal, 'Number of Sales', ns.actual, false);
     } else if (productNames.length > 0) {
       // Show per-product cards only (no total)
       for (const pName of productNames) {
@@ -2398,10 +2398,10 @@ const NationalApp = {
     // Store chart state for scroll-driven re-renders
     this._prodData = { hist, ownerIdx, n, slotW, barW, barOff, barAreaW, barAreaVisibleW, plotH, PAD_T, PAD_R, BAR_R, GAP, MIN_LABEL_H, svgH, baseY, YAXIS_W, VISIBLE, shortDate };
 
-    // Compute initial yMax from visible bars (multiples of 25 or 50)
+    // Compute initial yMax from visible bars with dynamic step
     const visibleMax = this._getProdVisibleMax(0);
-    const prodStep = visibleMax > 100 ? 50 : 25;
-    const yMax = Math.ceil(visibleMax / prodStep) * prodStep || 25;
+    const prodStep = this._prodStepForMax(visibleMax);
+    const yMax = Math.ceil(visibleMax / prodStep) * prodStep || prodStep;
     this._prodCurrentYMax = yMax;
 
     const yAxisSvg = this._buildProdYAxisSvg(yMax);
@@ -2486,11 +2486,13 @@ const NationalApp = {
               <div class="hc-chart-tooltip" id="prod-chart-tt"></div>
             </div>
             <div class="hc-chart-legend">
-              ${tableProductNames.length > 1
+              ${tableProductNames.length > 1 && this.state.campaign !== 'leafguard'
                 ? tableProductNames.map((pName, pi) =>
                     `<span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch" style="background:${this._PROD_COLORS[pi % this._PROD_COLORS.length]}"></span>${this._esc(pName)}</span>`
                   ).join('') + '<span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch" style="background:none;border-top:2px dashed #888;height:0;width:10px;border-radius:0"></span>Goal</span>'
-                : '<span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-prod-actual"></span>Actual</span><span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-prod-goal"></span>Goal</span>'
+                : this.state.campaign === 'leafguard'
+                  ? '<span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-prod-actual"></span>Gross Sales</span><span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-prod-goal"></span>Goal</span>'
+                  : '<span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-prod-actual"></span>Actual</span><span class="hc-chart-legend-item"><span class="hc-chart-legend-swatch swatch-prod-goal"></span>Goal</span>'
               }
             </div>
           </div>
@@ -2524,15 +2526,22 @@ const NationalApp = {
     if (!d) return 5;
     const firstVisible = Math.max(0, Math.floor(scrollLeft / d.slotW) - 1);
     const lastVisible = Math.min(d.n - 1, Math.ceil((scrollLeft + d.barAreaVisibleW) / d.slotW));
+    const isLeafGuard = this.state.campaign === 'leafguard';
     let maxVal = 1;
     for (let i = firstVisible; i <= lastVisible; i++) {
       const r = d.hist[i];
-      // Check per-product values for multi-product campaigns
       if (r.products && Object.keys(r.products).length > 1) {
-        for (const pName in r.products) {
-          const pv = r.products[pName];
-          const v = Math.max(pv.actual || 0, pv.goal || 0);
+        if (isLeafGuard) {
+          // LeafGuard chart: only Gross Sales
+          const gs = r.products['Gross Sales'] || { actual: 0, goal: 0 };
+          const v = Math.max(gs.actual || 0, gs.goal || 0);
           if (v > maxVal) maxVal = v;
+        } else {
+          for (const pName in r.products) {
+            const pv = r.products[pName];
+            const v = Math.max(pv.actual || 0, pv.goal || 0);
+            if (v > maxVal) maxVal = v;
+          }
         }
       } else {
         const barTop = Math.max(r.tA || 0, r.tG || 0);
@@ -2542,12 +2551,24 @@ const NationalApp = {
     return maxVal;
   },
 
+  // Dynamic step size based on value magnitude
+  _prodStepForMax(maxVal) {
+    if (maxVal <= 50) return 10;
+    if (maxVal <= 200) return 25;
+    if (maxVal <= 500) return 50;
+    if (maxVal <= 2000) return 250;
+    if (maxVal <= 10000) return 1000;
+    if (maxVal <= 50000) return 5000;
+    if (maxVal <= 200000) return 25000;
+    return 50000;
+  },
+
   _onProdScroll() {
     const scrollEl = document.getElementById('prod-chart-scroll');
     if (!scrollEl || !this._prodData) return;
     const visibleMax = this._getProdVisibleMax(scrollEl.scrollLeft);
-    const prodStep = visibleMax > 100 ? 50 : 25;
-    const yMax = Math.ceil(visibleMax / prodStep) * prodStep || 25;
+    const prodStep = this._prodStepForMax(visibleMax);
+    const yMax = Math.ceil(visibleMax / prodStep) * prodStep || prodStep;
     if (yMax === this._prodCurrentYMax) return;
     this._prodCurrentYMax = yMax;
     const yAxisEl = document.getElementById('prod-yaxis-svg');
@@ -2560,11 +2581,12 @@ const NationalApp = {
     const d = this._prodData;
     if (!d) return '';
     const yScale = d.plotH / yMax;
-    const step = yMax > 100 ? 50 : 25;
+    const step = this._prodStepForMax(yMax);
+    const formatTick = (v) => v >= 1000 ? (v / 1000) + 'k' : String(v);
     let svg = '';
     for (let val = 0; val <= yMax; val += step) {
       const y = d.baseY - val * yScale;
-      svg += `<text x="${d.YAXIS_W - 6}" y="${y + 3.5}" text-anchor="end" fill="#b0b8c4" font-size="10" font-family="Inter,sans-serif">${val}</text>`;
+      svg += `<text x="${d.YAXIS_W - 6}" y="${y + 3.5}" text-anchor="end" fill="#b0b8c4" font-size="10" font-family="Inter,sans-serif">${formatTick(val)}</text>`;
     }
     return svg;
   },
@@ -2576,7 +2598,7 @@ const NationalApp = {
     const d = this._prodData;
     if (!d) return '';
     const yScale = d.plotH / yMax;
-    const step = yMax > 100 ? 50 : 25;
+    const step = this._prodStepForMax(yMax);
     let svg = '';
 
     // Gridlines
@@ -2605,14 +2627,38 @@ const NationalApp = {
         break;
       }
     }
-    const isMulti = productNames.length > 1;
+    const isLeafGuard = this.state?.campaign === 'leafguard';
+    const isMulti = productNames.length > 1 && !isLeafGuard;
+    const formatLabel = (v) => v >= 1000 ? (v / 1000) + 'k' : String(v);
 
     d.hist.forEach((r, i) => {
       const origIdx = d.n - 1 - i;
       const slotX = i * d.slotW + d.barOff;
       const slotCX = slotX + d.barW / 2;
 
-      if (isMulti) {
+      if (isLeafGuard && r.products) {
+        // LeafGuard: single Gross Sales bar
+        const gs = r.products['Gross Sales'] || { actual: 0, goal: 0 };
+        const actual = gs.actual || 0;
+        const goal = gs.goal || 0;
+        const actualH = actual * yScale;
+        const goalH = goal * yScale;
+        const actualTop = d.baseY - actualH;
+        const pct = goal > 0 ? (actual / goal) : 0;
+        const barColor = pct >= 1 ? '#22c55e' : pct >= 0.8 ? '#f0b429' : pct >= 0.6 ? '#f97316' : '#e53535';
+
+        if (actualH > 0) {
+          svg += `<path d="${roundTop(slotX, actualTop, d.barW, actualH, d.BAR_R)}" fill="${barColor}" opacity="0.85"/>`;
+          svg += segLabel(slotCX, actualTop, actualH, formatLabel(actual), '#fff');
+        }
+        if (goal > 0) {
+          const goalY = d.baseY - goalH;
+          svg += `<line x1="${slotX - 2}" y1="${goalY}" x2="${slotX + d.barW + 2}" y2="${goalY}" stroke="#6366f1" stroke-width="2" stroke-dasharray="4 2" opacity="0.7"/>`;
+        }
+        const topY = Math.min(actualH > 0 ? actualTop : d.baseY, goal > 0 ? d.baseY - goalH : d.baseY);
+        const totalH = d.baseY - topY;
+        svg += `<rect x="${slotX}" y="${Math.min(topY, d.baseY - 1)}" width="${d.barW}" height="${Math.max(totalH, 4)}" fill="transparent" style="cursor:pointer" onmouseenter="NationalApp._showProdTooltip(event,${origIdx},${d.ownerIdx},'Gross Sales')" onmouseleave="NationalApp._hideProdTooltip()"/>`;
+      } else if (isMulti) {
         // ── Grouped bars: one sub-bar per product, touching ──
         const subW = d.barW / productNames.length;
         productNames.forEach((pName, pi) => {
@@ -2896,26 +2942,28 @@ const NationalApp = {
   // ── Production card (colored card, big actual / small goal) ──
   _prodCard(label, actual, goal) {
     const pct = goal ? Math.round((actual / goal) * 100) : 0;
+    const goalLine = goal ? `<div class="prod-card-goal">goal ${Number(goal).toLocaleString()}</div>` : '';
     return `
       <div class="prod-card ${this._pctClass(pct)}">
         <div class="prod-card-label">${label}</div>
-        <div class="prod-card-actual">${actual}</div>
-        <div class="prod-card-goal">goal ${goal}</div>
+        <div class="prod-card-actual">${Number(actual).toLocaleString()}</div>
+        ${goalLine}
       </div>`;
   },
 
   // ── Combined production card (main metric + sub metric underneath) ──
-  _prodCardCombined(mainLabel, mainActual, mainGoal, subLabel, subActual) {
+  _prodCardCombined(mainLabel, mainActual, mainGoal, subLabel, subActual, isCurrency) {
     const pct = mainGoal ? Math.round((mainActual / mainGoal) * 100) : 0;
-    const goalLine = mainGoal ? `<div class="prod-card-goal">goal ${mainGoal.toLocaleString()}</div>` : '';
+    const fmt = (v) => isCurrency ? '$' + Number(v).toLocaleString() : Number(v).toLocaleString();
+    const goalLine = mainGoal ? `<div class="prod-card-goal">goal ${fmt(mainGoal)}</div>` : '';
     return `
       <div class="prod-card ${this._pctClass(pct)}">
         <div class="prod-card-label">${mainLabel}</div>
-        <div class="prod-card-actual">${mainActual.toLocaleString()}</div>
+        <div class="prod-card-actual">${fmt(mainActual)}</div>
         ${goalLine}
         <div class="prod-card-sub">
           <span class="prod-card-sub-label">${subLabel}</span>
-          <span class="prod-card-sub-value">${subActual.toLocaleString()}</span>
+          <span class="prod-card-sub-value">${isCurrency ? '$' + Number(subActual).toLocaleString() : Number(subActual).toLocaleString()}</span>
         </div>
       </div>`;
   },
