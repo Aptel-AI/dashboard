@@ -2235,8 +2235,8 @@ const NationalApp = {
     if (!rawHist.length) { trendEl.style.display = 'none'; return; }
     trendEl.style.display = '';
 
-    // Reverse so newest week is on the LEFT, skip all-zero weeks
-    const hist = [...rawHist].filter(r => (r.tA || 0) > 0 || (r.tG || 0) > 0).reverse();
+    // Reverse so newest week is on the LEFT, skip weeks with no actual production
+    const hist = [...rawHist].filter(r => (r.tA || 0) > 0).reverse();
     const n = hist.length;
     if (!n) { trendEl.style.display = 'none'; return; }
 
@@ -2295,7 +2295,7 @@ const NationalApp = {
     }
     const hasProducts = tableProductNames.length > 0;
 
-    const tableRows = hist.filter(r => (r.tA || 0) > 0 || (r.tG || 0) > 0).map((r, i, arr) => {
+    const tableRows = hist.filter(r => (r.tA || 0) > 0).map((r, i, arr) => {
       const origIdx = hist.indexOf(r);
       const realOrigIdx = n - 1 - origIdx;
       const prev = i < arr.length - 1 ? arr[i + 1] : null;
