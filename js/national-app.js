@@ -1705,13 +1705,10 @@ const NationalApp = {
     const productEntries = prod.products || {};
     const productNames = Object.keys(productEntries);
     if (productNames.length > 0) {
-      // Show per-product cards + total if multiple products
+      // Show per-product cards only (no total)
       for (const pName of productNames) {
         const pData = productEntries[pName];
         prodCardsHtml += this._prodCard(pName, pData.actual, pData.goal);
-      }
-      if (productNames.length > 1) {
-        prodCardsHtml += this._prodCard('Total', prod.totalActual, prod.totalGoal);
       }
     } else {
       // Fallback: single total card
