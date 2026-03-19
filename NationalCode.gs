@@ -4512,7 +4512,7 @@ var CAMPAIGN_PRODUCTS = {
   'att-nds':         ['NDS'],       // single product — will update
   'att-res':         ['Residential'],// single product — will update
   'rogers':          ['Rogers'],    // single product — will update
-  'leafguard':       ['Leafguard'],
+  'leafguard':       ['Personal Prod', 'Gross Leads', 'Number of Sales', 'Gross Sales'],
   'lumen':           ['Lumen', 'DTV']
 };
 
@@ -4528,6 +4528,22 @@ var CONSOLIDATED_BASE_HEADERS = [
   'Dist',            // 4
   'Training'         // 5
 ];
+
+// Campaigns where each product has its own column in the source tab (not "/" separated)
+// Maps product name → array of possible column header matches
+var CAMPAIGN_PROD_COLUMNS = {
+  'leafguard': {
+    'Personal Prod':    ['personal prod', 'personal production'],
+    'Gross Leads':      ['gross leads'],
+    'Number of Sales':  ['number of sales', '# of sales'],
+    'Gross Sales':      ['gross sales']
+  }
+};
+
+// Which product has goals set (only this one shows goal comparison)
+var CAMPAIGN_GOAL_PRODUCT = {
+  'leafguard': 'Gross Sales'
+};
 
 // Campaigns with extra headcount columns (Closers, Lead Gen)
 var CAMPAIGN_EXTRA_HC = {
@@ -4763,7 +4779,7 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
 
       // Extract health rows (Section 1): [{date, active, leaders, dist, training, production, goals}]
       // Pass displayData so slash-separated values like "90/6" are read as text
-      var healthRows = extractHealthRows_(data, sections.section1Start, sections.section1End, displayData);
+      var healthRows = extractHealthRows_(data, sections.section1Start, sections.section1End, displayData, campaignKey);
 
       // Extract recruiting rows from Section 1 (horizontal — inline with health, same row per week)
       var recruitingRows = extractHorizontalRecruitingRows_(data, sections.section1Start, sections.section1End);
@@ -4811,7 +4827,7 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
  * Extract health (Section 1) data as flat rows.
  * Returns: [{ date: Date, active, leaders, dist, training, production, goals }]
  */
-function extractHealthRows_(data, start, end, displayData) {
+function extractHealthRows_(data, start, end, displayData, campaignKey) {
   if (start < 0 || end < start) return [];
 
   // Find the actual header row — skip empty rows at the start
@@ -4834,25 +4850,53 @@ function extractHealthRows_(data, start, end, displayData) {
     goals: findCol(headers, ['production goals', 'production goal', 'goals'])
   };
 
+  // Per-product column detection (LeafGuard: separate columns per product)
+  var perProdCols = null;
+  var prodColConfig = campaignKey && CAMPAIGN_PROD_COLUMNS[campaignKey];
+  if (prodColConfig) {
+    perProdCols = {};
+    var prodNames = Object.keys(prodColConfig);
+    for (var pp = 0; pp < prodNames.length; pp++) {
+      perProdCols[prodNames[pp]] = findCol(headers, prodColConfig[prodNames[pp]]);
+    }
+  }
+
+  var goalProduct = campaignKey && CAMPAIGN_GOAL_PRODUCT[campaignKey];
+
   var result = [];
   for (var i = headerIdx + 1; i <= end; i++) {
     var row = data[i];
     var dateVal = row[colMap.dates];
     if (!dateVal) continue;
-    // Parse date
     var d = (dateVal instanceof Date) ? dateVal : _parseTabDate(String(dateVal));
     if (!d) continue;
 
-    // For production and goals: use DISPLAY values (strings as shown in the sheet)
-    // because Google Sheets may auto-parse "90/6" as a Date object.
-    // Display values preserve the original text like "90/6", "110/12/10".
     var prodRaw, goalsRaw;
-    if (displayData && displayData[i]) {
-      prodRaw = (colMap.production >= 0) ? displayData[i][colMap.production] : '';
-      goalsRaw = (colMap.goals >= 0) ? displayData[i][colMap.goals] : '';
+    if (perProdCols) {
+      // Per-product columns: build "/" separated string for compatibility with mergeHealthRecruiting_
+      var prodVals = [], goalVals = [];
+      var products = CAMPAIGN_PRODUCTS[campaignKey] || [];
+      for (var pp = 0; pp < products.length; pp++) {
+        var col = perProdCols[products[pp]];
+        prodVals.push(col >= 0 ? num(row[col]) : 0);
+        // Only the goal product gets goal values; others get 0
+        if (products[pp] === goalProduct && colMap.goals >= 0) {
+          goalVals.push(displayData && displayData[i] ? displayData[i][colMap.goals] : num(row[colMap.goals]));
+        } else {
+          goalVals.push(0);
+        }
+      }
+      prodRaw = prodVals.join('/');
+      goalsRaw = goalVals.join('/');
     } else {
-      prodRaw = (colMap.production >= 0) ? row[colMap.production] : '';
-      goalsRaw = (colMap.goals >= 0) ? row[colMap.goals] : '';
+      // Standard: single production/goals column (may be "/" separated)
+      if (displayData && displayData[i]) {
+        prodRaw = (colMap.production >= 0) ? displayData[i][colMap.production] : '';
+        goalsRaw = (colMap.goals >= 0) ? displayData[i][colMap.goals] : '';
+      } else {
+        prodRaw = (colMap.production >= 0) ? row[colMap.production] : '';
+        goalsRaw = (colMap.goals >= 0) ? row[colMap.goals] : '';
+      }
     }
 
     result.push({
