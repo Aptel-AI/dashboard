@@ -4728,6 +4728,8 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
       }
     }
 
+    Logger.log('consolidateCampaign_ TAB MATCH: "' + ownerName + '" → ' + (tab ? '"' + tab.getName() + '"' : 'NONE') + (targetTabName ? ' (saved: ' + targetTabName + ')' : ''));
+
     if (!tab) {
       Logger.log('consolidateCampaign_ NO TAB for: "' + ownerName + '" in ' + campaignKey);
       // No tab found — still include owner with a minimal placeholder row
@@ -5193,9 +5195,14 @@ function _fuzzyFindTab_(ownerName, allTabNames, tabByName) {
 
     var score = 0;
 
-    // Strategy 1: Contains match
-    if (tabLower.indexOf(ownerLower) >= 0 || ownerLower.indexOf(tabLower) >= 0) {
-      score = 90;
+    // Strategy 1: Contains match — longer overlap scores higher
+    if (tabLower.indexOf(ownerLower) >= 0) {
+      // Tab contains full owner name — perfect
+      score = 95;
+    } else if (ownerLower.indexOf(tabLower) >= 0) {
+      // Owner name contains tab name — score by coverage (longer tab name = better match)
+      // "Christian E" (11 chars) scores higher than "Christian" (9 chars) for "Christian Esposito"
+      score = 50 + Math.round(tabLower.length / ownerLower.length * 40);
     }
 
     // Strategy 2: First name + last initial, or last name match
@@ -5673,11 +5680,45 @@ function TEST_lumen_refresh() {
   Logger.log('Result: ' + JSON.stringify(result));
 }
 
-// Debug: show column mapping + sample data from Angel's tab
+// Debug: check which tab Christian Esposito matches to
+function TEST_christian_match() {
+  var ss = SpreadsheetApp.openById('1P4DYlcV1hgNkaAapk3tWD7ytcRXw4K1n7R6EMKPCoSA');
+  var allSheets = ss.getSheets();
+  var allTabNames = allSheets.map(function(s) { return s.getName(); });
+  var tabByName = {};
+  allSheets.forEach(function(s) { tabByName[s.getName().toLowerCase()] = s; });
+  Logger.log('All tabs: ' + allTabNames.join(', '));
+
+  var ownerName = 'Christian Esposito';
+  // Exact match
+  var tab = tabByName[ownerName.toLowerCase()] || null;
+  Logger.log('Exact match: ' + (tab ? tab.getName() : 'NONE'));
+
+  // Fuzzy match
+  if (!tab) {
+    tab = _fuzzyFindTab_(ownerName, allTabNames, tabByName);
+    Logger.log('Fuzzy match: ' + (tab ? tab.getName() : 'NONE'));
+  }
+
+  if (tab) {
+    Logger.log('=== Reading from tab: ' + tab.getName() + ' ===');
+    var data = tab.getDataRange().getValues();
+    var sections = findSections(data);
+    Logger.log('Sections: ' + JSON.stringify(sections));
+    var healthRows = extractHealthRows_(data, sections.section1Start, sections.section1End, tab.getDataRange().getDisplayValues());
+    Logger.log('Health rows: ' + healthRows.length);
+    for (var i = Math.max(0, healthRows.length - 3); i < healthRows.length; i++) {
+      var h = healthRows[i];
+      Logger.log('Health[' + i + '] active=' + h.active + ' leaders=' + h.leaders + ' dist=' + h.dist + ' training=' + h.training);
+    }
+  }
+}
+
+// Debug: show column mapping + sample data from Christian E's tab
 function TEST_angel_columns() {
   var ss = SpreadsheetApp.openById('1P4DYlcV1hgNkaAapk3tWD7ytcRXw4K1n7R6EMKPCoSA');
-  var tab = ss.getSheetByName('Angel');
-  if (!tab) { Logger.log('No Angel tab'); return; }
+  var tab = ss.getSheetByName('Christian E');
+  if (!tab) { Logger.log('No Christian E tab'); return; }
   var data = tab.getDataRange().getValues();
   var sections = findSections(data);
   Logger.log('Sections: ' + JSON.stringify(sections));
