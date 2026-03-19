@@ -15,8 +15,8 @@ var OD_CAMPAIGNS = {
   'att-nds':         { label: 'AT&T NDS/Verizon',   sheetId: '1kcUWR3EKgP-9wDct4vDyuQJ7IuS0cbcetY97dmVTY64' },
   'att-res':         { label: 'AT&T Residential',   sheetId: '1HvWJYox3JXvxmza63YBWAqKPtUGPFuaV-s-BOfbWGKM' },
   'rogers':          { label: 'Rogers',             sheetId: '1o1MPKrAzzeaU2JWMODkR9M3uY5rOhIKo-Q64armeTvE' },
-  'leafguard':       { label: 'Leafguard',          sheetId: '' },
-  'lumen':           { label: 'Lumen',              sheetId: '' }
+  'leafguard':       { label: 'Leafguard',          sheetId: '10Fy5XFWCuBmDwvpl4PG4FJT4krwX2ZqN12ARvQLpSuM', ownerSource: 'tabs', excludeTabs: ['Blank Copy'] },
+  'lumen':           { label: 'Lumen',              sheetId: '1P4DYlcV1hgNkaAapk3tWD7ytcRXw4K1n7R6EMKPCoSA', sourceTab: 'Campaign', sectionHeader: 'LUMEN' }
 };
 var OD_NLR_FOLDER = '1hARjh3UH48CWhbYrYBJxFVwgynxapCjG';
 
@@ -3848,9 +3848,91 @@ function odReadTab(tabName) {
 // ═══════════════════════════════════════════════════════
 
 /**
+ * Extract owner names from a campaign spreadsheet.
+ * Supports 3 strategies based on campaign config:
+ *   1. Default: Column A from first tab (skip header + footer-like rows)
+ *   2. ownerSource='tabs': Tab names ARE owner names (minus excludeTabs)
+ *   3. sectionHeader: Find names under a section header in a specific tab
+ * @param {Object} cfg - Campaign config from OD_CAMPAIGNS
+ * @param {Spreadsheet} ss - Already-opened spreadsheet
+ * @return {string[]} Array of owner names
+ */
+function getOwnerNamesForCampaign_(cfg, ss) {
+  var sheets = ss.getSheets();
+  if (!sheets.length) return [];
+
+  // ── Strategy 2: Tab names as owners (LeafGuard) ──
+  if (cfg.ownerSource === 'tabs') {
+    var exclude = (cfg.excludeTabs || []).map(function(t) { return t.toLowerCase(); });
+    var owners = [];
+    for (var s = 0; s < sheets.length; s++) {
+      var tName = sheets[s].getName().trim();
+      if (!tName || tName.charAt(0) === '_') continue;
+      if (exclude.indexOf(tName.toLowerCase()) >= 0) continue;
+      if (SKIP_TABS_.indexOf(tName.toLowerCase()) >= 0) continue;
+      owners.push(tName);
+    }
+    return owners;
+  }
+
+  // ── Strategy 3: Section header in a specific tab (Lumen) ──
+  if (cfg.sectionHeader) {
+    var tab = null;
+    if (cfg.sourceTab) {
+      tab = ss.getSheetByName(cfg.sourceTab);
+    }
+    if (!tab) tab = sheets[0]; // fallback to first tab
+
+    var data = tab.getDataRange().getValues();
+    var headerLower = cfg.sectionHeader.toLowerCase();
+    var owners = [];
+    var inSection = false;
+
+    for (var i = 0; i < data.length; i++) {
+      var val = String(data[i][0] || '').trim();
+      var valLower = val.toLowerCase();
+
+      // Found our section header — start collecting from next row
+      if (valLower === headerLower) {
+        inSection = true;
+        continue;
+      }
+
+      if (!inSection) continue;
+
+      // Stop at empty row, another all-caps section header, or footer-like row
+      if (!val) break;
+      if (val === val.toUpperCase() && val.length > 2 && !/\d/.test(val)) break; // another section header (all caps, no digits)
+      if (valLower.indexOf('total') >= 0 || valLower.indexOf('template') >= 0 ||
+          valLower.indexOf('summary') >= 0 || valLower.indexOf('***') >= 0 ||
+          valLower.indexOf('average') >= 0) break;
+
+      owners.push(val);
+    }
+    return owners;
+  }
+
+  // ── Strategy 1 (Default): Column A from first tab ──
+  var firstTab = sheets[0];
+  var data = firstTab.getDataRange().getValues();
+  var owners = [];
+  for (var i = 1; i < data.length; i++) {
+    var val = String(data[i][0] || '').trim();
+    if (!val) continue;
+    var valLower = val.toLowerCase();
+    if (valLower.indexOf('total') >= 0 || valLower.indexOf('template') >= 0 ||
+        valLower.indexOf('campaign') >= 0 || valLower.indexOf('summary') >= 0 ||
+        valLower.indexOf('sum') >= 0 || valLower.indexOf('***') >= 0 ||
+        valLower.indexOf('header') >= 0 || valLower.indexOf('average') >= 0) continue;
+    owners.push(val);
+  }
+  return owners;
+}
+
+/**
  * action=odCampaignOwners
- * For each campaign in OD_CAMPAIGNS, open the sheet, read Column A
- * after header, ignore the last row. Return owners list per campaign.
+ * For each campaign in OD_CAMPAIGNS, open the sheet and extract owners
+ * using the appropriate strategy. Return owners list per campaign.
  */
 function odGetCampaignOwners() {
   var campaigns = {};
@@ -3861,23 +3943,9 @@ function odGetCampaignOwners() {
     if (!cfg.sheetId) continue;
     try {
       var ss = SpreadsheetApp.openById(cfg.sheetId);
-      var sheets = ss.getSheets();
-      if (!sheets.length) continue;
-      var firstTab = sheets[0];
-      var data = firstTab.getDataRange().getValues();
-      // Skip header row, totals/sum/footer rows
-      var owners = [];
-      for (var i = 1; i < data.length; i++) {
-        var val = String(data[i][0] || '').trim();
-        if (!val) continue;
-        var valLower = val.toLowerCase();
-        if (valLower.indexOf('total') >= 0 || valLower.indexOf('template') >= 0 ||
-            valLower.indexOf('campaign') >= 0 || valLower.indexOf('summary') >= 0 ||
-            valLower.indexOf('sum') >= 0 || valLower.indexOf('***') >= 0 ||
-            valLower.indexOf('header') >= 0 || valLower.indexOf('average') >= 0) continue;
-        owners.push(val);
-      }
+      var owners = getOwnerNamesForCampaign_(cfg, ss);
       // Also collect all tab names (for campaign tab mapping dropdown)
+      var sheets = ss.getSheets();
       var tabNames = [];
       for (var s = 0; s < sheets.length; s++) {
         var tName = sheets[s].getName().trim();
@@ -4531,22 +4599,8 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
   var srcSS = SpreadsheetApp.openById(campaign.sheetId);
   var allTabs = srcSS.getSheets();
 
-  // Get owner names from first tab column A (same method as odGetCampaignOwners)
-  // Skip header row, totals rows, and any row containing "totals", "template", "campaign"
-  var ownerNames = [];
-  if (allTabs.length > 0) {
-    var firstTabData = allTabs[0].getDataRange().getValues();
-    for (var i = 1; i < firstTabData.length; i++) {
-      var v = String(firstTabData[i][0] || '').trim();
-      if (!v) continue;
-      var vLower = v.toLowerCase();
-      if (vLower.indexOf('total') >= 0 || vLower.indexOf('template') >= 0 ||
-          vLower.indexOf('campaign') >= 0 || vLower.indexOf('summary') >= 0 ||
-          vLower.indexOf('sum') >= 0 || vLower.indexOf('***') >= 0 ||
-          vLower.indexOf('header') >= 0 || vLower.indexOf('average') >= 0) continue;
-      ownerNames.push(v);
-    }
-  }
+  // Get owner names using the shared extraction helper
+  var ownerNames = getOwnerNamesForCampaign_(campaign, srcSS);
 
   // ── Load saved tab mappings from _Campaign_Tab_Map ──
   var savedTabMap = {}; // lowercase ownerName → tabName
