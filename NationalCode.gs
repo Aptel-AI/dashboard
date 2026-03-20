@@ -2538,6 +2538,13 @@ function readOwnerNlrData(ownerName, campaignFilter) {
         }
       }
 
+      // Override CPA/CPNS — these are ratios, not sums
+      var wkSpend = summary.totalSpend || 0;
+      var wkApplies = summary.applies || 0;
+      var wkNS = summary.newStarts || 0;
+      summary.cpa = wkApplies > 0 ? Math.round(wkSpend / wkApplies * 100) / 100 : 0;
+      summary.cpns = wkNS > 0 ? Math.round(wkSpend / wkNS * 100) / 100 : 0;
+
       // Include individual ad rows for the Ad Breakdown table
       var lastAccount = '';
       for (var ai = 0; ai < wk.rows.length; ai++) {
