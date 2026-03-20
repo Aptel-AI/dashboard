@@ -2384,13 +2384,20 @@ function readOwnerNlrData(ownerName, campaignFilter) {
         }
       }
 
-      // Data row
-      if (currentWeek && colHeaders && cell0 !== '') {
-        var rowObj = {};
-        for (var c = 0; c < colHeaders.length; c++) {
-          if (colHeaders[c]) rowObj[colHeaders[c]] = data[i][c];
+      // Data row — check for any meaningful data, not just col A (merged cells leave it blank)
+      if (currentWeek && colHeaders) {
+        var hasData = false;
+        for (var dc = 0; dc < Math.min(colHeaders.length, 10); dc++) {
+          var dv = data[i][dc];
+          if (dv !== null && dv !== undefined && String(dv).trim() !== '') { hasData = true; break; }
         }
-        currentWeek.rows.push(rowObj);
+        if (hasData) {
+          var rowObj = {};
+          for (var c = 0; c < colHeaders.length; c++) {
+            if (colHeaders[c]) rowObj[colHeaders[c]] = data[i][c];
+          }
+          currentWeek.rows.push(rowObj);
+        }
       }
     }
     if (currentWeek && currentWeek.rows.length > 0) weeks.push(currentWeek);
@@ -2439,15 +2446,25 @@ function readOwnerNlrData(ownerName, campaignFilter) {
       }
 
       // Include individual ad rows for the Ad Breakdown table
+      var lastAccount = '';
       for (var ai = 0; ai < wk.rows.length; ai++) {
         var r = wk.rows[ai];
         var adSpend = num(r['total spend']);
         var adApplies = num(r['applies']);
         var adNS = num(r['new starts']);
+        var adTitle = String(r['ad title'] || '').trim();
+
+        // Skip rows with no title and no spend (separator/empty rows)
+        if (!adTitle && adSpend === 0 && adApplies === 0) continue;
+
+        // Carry forward account name from merged cells
+        var account = String(r['indeed account'] || '').trim();
+        if (account) { lastAccount = account; } else { account = lastAccount; }
+
         summary.ads.push({
-          account:   String(r['indeed account'] || '').trim(),
-          adTitle:   String(r['ad title'] || '').trim(),
-          location:  String(r['current location'] || '').trim(),
+          account:   account,
+          adTitle:   adTitle,
+          location:  String(r['current location'] || r['location'] || '').trim(),
           spend:     adSpend,
           applies:   adApplies,
           seconds:   num(r['2nds']),
