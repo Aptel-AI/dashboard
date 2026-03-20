@@ -810,6 +810,16 @@ input, select, textarea { font-family: inherit; }
 .planning-drop-zone.drag-over {
   background: #e0f7fa;
 }
+/* Insertion indicator line shown during drag */
+.planning-insert-indicator {
+  height: 3px;
+  background: #0099cc;
+  border-radius: 2px;
+  margin: 2px 0;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
 .planning-drop-zone:empty::after {
   content: 'Drop here';
   display: flex;

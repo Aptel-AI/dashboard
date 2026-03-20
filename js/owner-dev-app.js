@@ -2210,7 +2210,7 @@ const OwnerDev = {
     }
 
     const reorderBtn = day !== undefined
-      ? `<button class="planning-card-reorder" onclick="event.stopPropagation();OwnerDev._openReorderModal('${campaignKey}',${day})" title="Reorder owners">&#x2195;</button>`
+      ? `<button class="planning-card-reorder" onclick="event.stopPropagation();OwnerDev._openReorderModal('${campaignKey}',${day})" title="Reorder owners">&#x1F465;</button>`
       : '';
 
     return `
@@ -2227,7 +2227,7 @@ const OwnerDev = {
   _setupPlanningDnD() {
     let draggedKey = null;
 
-    // Cards
+    // Cards — dragstart/dragend
     document.querySelectorAll('#view-planning .planning-card').forEach(card => {
       card.addEventListener('dragstart', e => {
         draggedKey = card.dataset.campaign;
@@ -2238,15 +2238,28 @@ const OwnerDev = {
       card.addEventListener('dragend', () => {
         card.classList.remove('dragging');
         draggedKey = null;
+        // Clean up all insertion indicators
+        document.querySelectorAll('.planning-insert-indicator').forEach(el => el.remove());
+        document.querySelectorAll('.planning-drop-zone').forEach(z => z.classList.remove('drag-over'));
       });
     });
 
-    // Drop zones (day columns)
+    // Drop zones — track insertion position via indicator line
     document.querySelectorAll('.planning-drop-zone').forEach(zone => {
-      zone.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
-      zone.addEventListener('dragenter', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+      zone.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        this._updateInsertIndicator(zone, e.clientY, draggedKey);
+      });
+      zone.addEventListener('dragenter', e => {
+        e.preventDefault();
+        zone.classList.add('drag-over');
+      });
       zone.addEventListener('dragleave', e => {
-        if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over');
+        if (!zone.contains(e.relatedTarget)) {
+          zone.classList.remove('drag-over');
+          this._removeInsertIndicator(zone);
+        }
       });
       zone.addEventListener('drop', e => {
         e.preventDefault();
@@ -2254,7 +2267,9 @@ const OwnerDev = {
         const key = e.dataTransfer.getData('text/plain') || draggedKey;
         if (!key) return;
         const day = parseInt(zone.dataset.day);
-        this._moveCampaignToDay(key, day);
+        const insertIdx = this._getInsertIndex(zone, e.clientY, key);
+        this._removeInsertIndicator(zone);
+        this._moveCampaignToDay(key, day, insertIdx);
       });
     });
 
@@ -2276,19 +2291,80 @@ const OwnerDev = {
     }
   },
 
-  _moveCampaignToDay(campaignKey, day) {
+  /** Get the insert index based on cursor Y within a drop zone */
+  _getInsertIndex(zone, clientY, draggedKey) {
+    const cards = [...zone.querySelectorAll('.planning-card')].filter(
+      c => c.dataset.campaign !== draggedKey
+    );
+    for (let i = 0; i < cards.length; i++) {
+      const rect = cards[i].getBoundingClientRect();
+      if (clientY < rect.top + rect.height / 2) return i;
+    }
+    return cards.length;
+  },
+
+  /** Show/move a thin indicator line at the insertion point */
+  _updateInsertIndicator(zone, clientY, draggedKey) {
+    let indicator = zone.querySelector('.planning-insert-indicator');
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.className = 'planning-insert-indicator';
+      zone.appendChild(indicator);
+    }
+
+    const cards = [...zone.querySelectorAll('.planning-card')].filter(
+      c => c.dataset.campaign !== draggedKey
+    );
+
+    if (cards.length === 0) {
+      indicator.style.display = 'none';
+      return;
+    }
+
+    indicator.style.display = '';
+    const idx = this._getInsertIndex(zone, clientY, draggedKey);
+    if (idx < cards.length) {
+      zone.insertBefore(indicator, cards[idx]);
+    } else {
+      // After last card
+      const lastCard = cards[cards.length - 1];
+      if (lastCard.nextSibling) {
+        zone.insertBefore(indicator, lastCard.nextSibling);
+      } else {
+        zone.appendChild(indicator);
+      }
+    }
+  },
+
+  _removeInsertIndicator(zone) {
+    zone.querySelectorAll('.planning-insert-indicator').forEach(el => el.remove());
+  },
+
+  _moveCampaignToDay(campaignKey, day, insertIdx) {
+    // Preserve existing ownerOrder if moving within/between days
+    const existing = this.state.planningData.find(p => p.campaignKey === campaignKey);
+    const ownerOrder = existing ? (existing.ownerOrder || []) : [];
+
     // Remove from current position
     this.state.planningData = this.state.planningData.filter(p => p.campaignKey !== campaignKey);
-    // Find the current max sortOrder for this day
-    const dayItems = this.state.planningData.filter(p => p.day === day);
-    const maxSort = dayItems.length > 0 ? Math.max(...dayItems.map(p => p.sortOrder)) + 1 : 0;
-    // Add to new day
-    this.state.planningData.push({
-      day,
-      sortOrder: maxSort,
-      campaignKey,
-      ownerOrder: []
-    });
+
+    // Get ordered list of campaigns already in this day
+    const dayItems = this.state.planningData
+      .filter(p => p.day === day)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    // Insert at the right position
+    const idx = (insertIdx !== undefined) ? insertIdx : dayItems.length;
+    dayItems.splice(idx, 0, { day, sortOrder: 0, campaignKey, ownerOrder });
+
+    // Recalculate sort orders
+    dayItems.forEach((item, i) => { item.sortOrder = i; });
+
+    // Replace this day's entries in planningData
+    this.state.planningData = [
+      ...this.state.planningData.filter(p => p.day !== day),
+      ...dayItems
+    ];
     this.state._planningDirty = true;
     this._renderPlanningGrid();
   },
