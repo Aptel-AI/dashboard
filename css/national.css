@@ -530,14 +530,14 @@ input, select, textarea { font-family: inherit; }
   background: var(--gray-100);
   color: var(--gray-500);
 }
-.owner-rank-badge.rank-gold   { background: #fbbf24; color: #78350f; }
-.owner-rank-badge.rank-silver { background: #94a3b8; color: #0f172a; }
-.owner-rank-badge.rank-bronze { background: #f97316; color: #fff; }
+.owner-rank-badge.rank-gold   { background: #facc15; color: #713f12; }
+.owner-rank-badge.rank-silver { background: #a8a29e; color: #1c1917; }
+.owner-rank-badge.rank-bronze { background: #b45309; color: #fff; }
 
 /* Tinted cards for top 3 */
-.owner-card.rank-gold   { background: #fefce8; border-color: #fbbf24; }
-.owner-card.rank-silver { background: #f1f5f9; border-color: #94a3b8; }
-.owner-card.rank-bronze { background: #fff7ed; border-color: #f97316; }
+.owner-card.rank-gold   { background: #fefce8; border-color: #eab308; }
+.owner-card.rank-silver { background: #f5f5f4; border-color: #a8a29e; }
+.owner-card.rank-bronze { background: #fef3e2; border-color: #b45309; }
 
 /* Status badge (used on owner cards and in status legend) */
 .status-badge {
