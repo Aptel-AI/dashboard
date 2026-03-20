@@ -824,16 +824,18 @@ input, select, textarea { font-family: inherit; }
 /* Campaign cards (in grid and pool) */
 .planning-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 12px 10px;
   background: #fff;
   border: 1px solid #dce5ed;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: grab;
   user-select: none;
   transition: box-shadow 0.15s, opacity 0.15s;
   position: relative;
+  text-align: center;
 }
 .planning-card:hover {
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -843,35 +845,33 @@ input, select, textarea { font-family: inherit; }
   border-style: dashed;
 }
 .planning-card-logo {
-  width: 24px;
-  height: 24px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
-  flex-shrink: 0;
 }
 .planning-card-logo-placeholder {
-  width: 24px;
-  height: 24px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  flex-shrink: 0;
+  font-size: 28px;
 }
 .planning-card-info {
-  flex: 1;
   min-width: 0;
+  width: 100%;
 }
 .planning-card-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #0d2035;
+  font-size: 11px;
+  font-weight: 500;
+  color: #708090;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .planning-card-owners {
   font-size: 10px;
-  color: #708090;
+  color: #b0bec5;
 }
 .planning-card-reorder {
   padding: 2px 6px;
