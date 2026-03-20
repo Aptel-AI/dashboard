@@ -630,7 +630,8 @@ const NationalApp = {
   // Aliases handle cases where Tableau uses a different name than the campaign sheet
   _D2D_RANK_ALIASES: {
     'wayne rude': 'flloyd (wayne) rude',
-    'tre mitchell': 'lamar (tre) mitchell iii'
+    'tre mitchell': 'lamar (tre) mitchell iii',
+    'john richard young': 'jr (john richard) young'
   },
 
   _enrichOwnersWithD2DRanking(ranking) {
