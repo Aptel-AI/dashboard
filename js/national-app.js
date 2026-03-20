@@ -3724,35 +3724,36 @@ const NationalApp = {
     // ── Card 2: Rep Breakdown Table ──
     const repsEl = document.getElementById('sales-reps-table');
     if (s.reps.length) {
+      const _sh = (label, col) => `<th class="num sortable-th" onclick="NationalApp._sortSalesReps('${col}')" style="cursor:pointer;user-select:none;">${label} <span style="font-size:10px;opacity:0.5;">&#x25B2;&#x25BC;</span></th>`;
       const repHeaders = isNDS
-        ? `<th style="width:30px"></th><th>Rep Name</th>
-           <th class="num">New/Ports</th>
-           <th class="num">Orders</th>
-           <th class="num">Cancel %</th>
-           <th class="num">Extra %</th>
-           <th class="num">Next Up %</th>
-           <th class="num">ABP %</th>
-           <th class="num">BYOD %</th>
-           <th class="num">New %</th>
-           <th class="num">Insurance %</th>
-           <th class="num">Credit %</th>
-           <th class="num">Away %</th>
-           <th class="num">Before 3 %</th>
-           <th class="num">After 7:30 %</th>`
-        : `<th style="width:30px"></th><th>Rep Name</th>
-           <th class="num">Volume</th>
-           <th class="num">Orders</th>
-           <th class="num">Sales/Rep</th>
-           <th class="num">Internet</th>
-           <th class="num">VOIP</th>
-           <th class="num">Wireless</th>
-           <th class="num">AIR/AWB</th>
-           <th class="num">Early %</th>
-           <th class="num">Late %</th>
-           <th class="num">ABP %</th>
-           <th class="num">CRU %</th>
-           <th class="num">New Wrls %</th>
-           <th class="num">BYOD %</th>`;
+        ? `<th style="width:30px"></th><th class="sortable-th" onclick="NationalApp._sortSalesReps('name')" style="cursor:pointer;user-select:none;">Rep Name <span style="font-size:10px;opacity:0.5;">&#x25B2;&#x25BC;</span></th>
+           ${_sh('New/Ports','newPorts')}
+           ${_sh('Orders','orderCount')}
+           ${_sh('Cancel %','cancelFraudPct')}
+           ${_sh('Extra %','extraPremiumPct')}
+           ${_sh('Next Up %','nextUpPct')}
+           ${_sh('ABP %','abpPct')}
+           ${_sh('BYOD %','byodPct')}
+           ${_sh('New %','newOfNewPortsPct')}
+           ${_sh('Insurance %','insurancePct')}
+           ${_sh('Credit %','highMedCreditPct')}
+           ${_sh('Away %','awayFromDoorsPct')}
+           ${_sh('Before 3 %','before3pmPct')}
+           ${_sh('After 7:30 %','after730pmPct')}`
+        : `<th style="width:30px"></th><th class="sortable-th" onclick="NationalApp._sortSalesReps('name')" style="cursor:pointer;user-select:none;">Rep Name <span style="font-size:10px;opacity:0.5;">&#x25B2;&#x25BC;</span></th>
+           ${_sh('Volume','totalVolume')}
+           ${_sh('Orders','orderCount')}
+           ${_sh('Sales/Rep','salesPerRep')}
+           ${_sh('Internet','internet')}
+           ${_sh('VOIP','voip')}
+           ${_sh('Wireless','wireless')}
+           ${_sh('AIR/AWB','airAwb')}
+           ${_sh('Early %','earlyPct')}
+           ${_sh('Late %','latePct')}
+           ${_sh('ABP %','abpPct')}
+           ${_sh('CRU %','cruPct')}
+           ${_sh('New Wrls %','newWrlsPct')}
+           ${_sh('BYOD %','byodPct')}`;
 
       const repRows = isNDS
         ? s.reps.map((rep, ri) => `
@@ -3813,6 +3814,32 @@ const NationalApp = {
           </div>
         </div>`;
     }
+  },
+
+  // ── Sort sales reps table by column ──
+  _salesSortCol: null,
+  _salesSortAsc: true,
+
+  _sortSalesReps(col) {
+    const owner = this.state.selectedOwner;
+    if (!owner || !owner.sales || !owner.sales.reps) return;
+
+    // Toggle direction if same column, otherwise default descending (except name = ascending)
+    if (this._salesSortCol === col) {
+      this._salesSortAsc = !this._salesSortAsc;
+    } else {
+      this._salesSortCol = col;
+      this._salesSortAsc = col === 'name';
+    }
+
+    const dir = this._salesSortAsc ? 1 : -1;
+    owner.sales.reps.sort((a, b) => {
+      const va = a[col], vb = b[col];
+      if (col === 'name') return dir * String(va || '').localeCompare(String(vb || ''));
+      return dir * ((va || 0) - (vb || 0));
+    });
+
+    this.renderSalesTab(owner);
   },
 
   // ── Toggle rep row highlight (checkbox in sales table) ──
