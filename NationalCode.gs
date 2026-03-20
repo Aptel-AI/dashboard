@@ -122,6 +122,12 @@ function doGet(e) {
       return jsonResp(readNDSOwnerSales(ownerParam));
     }
 
+    // ── AT&T Res per-owner sales data (Campaign Tracker Section 3) ──
+    if (action === 'resOwnerSales') {
+      var ownerParam = e.parameter.owner || '';
+      return jsonResp(readResOwnerSales(ownerParam));
+    }
+
     // ── List cost files in Drive folder (names + IDs only) ──
     if (action === 'listCostFiles') {
       return jsonResp(listCostFiles());
@@ -4140,6 +4146,121 @@ function readNDSOwnerSales(ownerName) {
       totalVolume:      cols.newPorts >= 0 ? num(row[cols.newPorts]) : 0,
       salesPerRep:      0,
       repCount:         0
+    };
+
+    if (repName.toLowerCase() === 'total') {
+      summary = entry;
+    } else {
+      reps.push(entry);
+    }
+  }
+
+  if (summary) summary.repCount = reps.length;
+
+  return { summary: summary, reps: reps, tab: tab.getName() };
+}
+
+// ── AT&T Residential per-owner sales (Campaign Tracker Section 3) ──
+function readResOwnerSales(ownerName) {
+  if (!ownerName) return { error: 'No owner specified' };
+  if (!SHEETS.CAMPAIGN_TRACKER) return { error: 'Campaign Tracker sheet not configured' };
+
+  var ss;
+  try {
+    ss = SpreadsheetApp.openById(SHEETS.CAMPAIGN_TRACKER);
+  } catch (err) {
+    return { error: 'Cannot open Campaign Tracker: ' + err.message };
+  }
+
+  // Find owner tab — exact then fuzzy
+  var ownerLower = ownerName.toLowerCase().trim();
+  var allSheets = ss.getSheets();
+  var tab = null;
+
+  for (var i = 0; i < allSheets.length; i++) {
+    if (allSheets[i].getName().toLowerCase().trim() === ownerLower) {
+      tab = allSheets[i];
+      break;
+    }
+  }
+
+  if (!tab) {
+    var allTabNames = allSheets.map(function(s) { return s.getName(); });
+    var tabByName = {};
+    allSheets.forEach(function(s) { tabByName[s.getName().toLowerCase().trim()] = s; });
+    tab = _fuzzyFindTab_(ownerName, allTabNames, tabByName);
+  }
+
+  if (!tab) return { error: 'No tab found for: ' + ownerName };
+
+  var lastRow = tab.getLastRow();
+  var lastCol = Math.min(tab.getLastColumn(), 20);
+  if (lastRow < 5 || lastCol < 3) return { error: 'Tab too small: ' + tab.getName() };
+
+  var data = tab.getRange(1, 1, lastRow, lastCol).getValues();
+
+  // Find "Rep Name" or "Name" header row (sales section — search from row 20 down)
+  var headersRow = -1;
+  for (var i = Math.max(0, data.length - 40); i < data.length; i++) {
+    var cellA = String(data[i][0] || '').trim().toLowerCase();
+    if (cellA === 'rep name' || cellA === 'name') {
+      headersRow = i;
+      break;
+    }
+  }
+  if (headersRow < 0) return { error: 'No "Rep Name" header found in: ' + tab.getName() };
+
+  var hdrs = data[headersRow].map(function(h) { return String(h || '').trim().toLowerCase(); });
+
+  var colIdx = function(patterns) {
+    for (var p = 0; p < patterns.length; p++) {
+      for (var c = 0; c < hdrs.length; c++) {
+        if (hdrs[c].indexOf(patterns[p]) >= 0) return c;
+      }
+    }
+    return -1;
+  };
+
+  var cols = {
+    rep:             0,
+    newInternet:     colIdx(['new internet count', 'new internet']),
+    upgradeInternet: colIdx(['upgrade internet count', 'upgrade internet']),
+    videoSales:      colIdx(['video sales', 'video']),
+    salesAll:        colIdx(['sales (all)', 'sales all', 'total sales']),
+    abpMix:          colIdx(['abp mix', 'abp']),
+    gigMix:          colIdx(['1gig', 'gig+ mix', 'gig mix']),
+    techInstall:     colIdx(['tech install']),
+    wirelessSales:   colIdx(['wireless']),
+    voiceSales:      colIdx(['voice'])
+  };
+
+  var summary = null;
+  var reps = [];
+
+  for (var i = headersRow + 1; i < data.length; i++) {
+    var row = data[i];
+    var repName = String(row[cols.rep] || '').trim();
+    if (!repName) break;
+
+    var newInt = cols.newInternet >= 0 ? num(row[cols.newInternet]) : 0;
+    var upgInt = cols.upgradeInternet >= 0 ? num(row[cols.upgradeInternet]) : 0;
+    var video  = cols.videoSales >= 0 ? num(row[cols.videoSales]) : 0;
+    var wireless = cols.wirelessSales >= 0 ? num(row[cols.wirelessSales]) : 0;
+    var voice  = cols.voiceSales >= 0 ? num(row[cols.voiceSales]) : 0;
+    var total  = cols.salesAll >= 0 ? num(row[cols.salesAll]) : (newInt + upgInt + video + wireless + voice);
+
+    var entry = {
+      name:            repName,
+      rep:             repName,
+      newInternet:     newInt,
+      upgradeInternet: upgInt,
+      videoSales:      video,
+      wirelessSales:   wireless,
+      voiceSales:      voice,
+      totalVolume:     total,
+      abpMix:          cols.abpMix >= 0 ? numDec(row[cols.abpMix]) : 0,
+      gigMix:          cols.gigMix >= 0 ? numDec(row[cols.gigMix]) : 0,
+      techInstall:     cols.techInstall >= 0 ? numDec(row[cols.techInstall]) : 0
     };
 
     if (repName.toLowerCase() === 'total') {

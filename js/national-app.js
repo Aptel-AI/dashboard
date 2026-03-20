@@ -522,6 +522,33 @@ const NationalApp = {
     return result;
   },
 
+  // ── Fetch AT&T Res sales data for a single owner on demand ──
+  async _fetchResOwnerSales(owner) {
+    owner._resSalesFetching = true;
+    try {
+      const url = NATIONAL_CONFIG.appsScriptUrl +
+        '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
+        '&action=resOwnerSales' +
+        '&owner=' + encodeURIComponent(owner.name) +
+        '&_t=' + Date.now();
+      const resp = await this._fetchWithTimeout(fetch(url), 30000);
+      const result = await resp.json();
+      if (!result.error && (result.summary || result.reps)) {
+        owner.sales = { summary: result.summary, reps: result.reps || [] };
+        owner._resSalesFetched = true;
+        console.log('[NationalApp] Res sales loaded for', owner.name, ':', result.reps?.length, 'reps, tab:', result.tab);
+        if (this.state.selectedOwner === owner && this.state.currentTab === 'sales') {
+          this.renderSalesTab(owner);
+        }
+      } else {
+        console.warn('[NationalApp] Res sales empty for', owner.name, ':', result.error || 'no data');
+      }
+    } catch (err) {
+      console.warn('[NationalApp] Res sales fetch failed for', owner.name, ':', err.message);
+    }
+    owner._resSalesFetching = false;
+  },
+
   // ── Fetch NDS sales data for a single owner on demand ──
   async _fetchNDSOwnerSales(owner) {
     owner._ndsSalesFetching = true;
@@ -1897,10 +1924,14 @@ const NationalApp = {
       this._fetchOwnerNlrData(owner);
     }
 
-    // Lazy-load NDS sales data for this owner (non-blocking)
+    // Lazy-load sales data for this owner (non-blocking)
     const isNDS = this.state.campaign && this.state.campaign.indexOf('nds') >= 0;
+    const isRes = this.state.campaign === 'att-res';
     if (isNDS && !owner._ndsSalesFetched) {
       this._fetchNDSOwnerSales(owner);
+    }
+    if (isRes && !owner._resSalesFetched) {
+      this._fetchResOwnerSales(owner);
     }
   },
 
