@@ -531,7 +531,7 @@ input, select, textarea { font-family: inherit; }
   color: var(--gray-500);
 }
 .owner-rank-badge.rank-gold   { background: #fef3c7; color: #92400e; }
-.owner-rank-badge.rank-silver { background: #e2e8f0; color: #334155; }
+.owner-rank-badge.rank-silver { background: #c0cfdf; color: #1e293b; }
 .owner-rank-badge.rank-bronze { background: #fed7aa; color: #9a3412; }
 
 /* Status badge (used on owner cards and in status legend) */
