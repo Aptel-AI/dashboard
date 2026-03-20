@@ -868,8 +868,8 @@ input, select, textarea { font-family: inherit; }
   height: 28px;
 }
 .planning-pool-cards .planning-card-logo-dual .planning-card-logo {
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 16px;
 }
 
 .planning-card-info {
@@ -892,19 +892,19 @@ input, select, textarea { font-family: inherit; }
 /* Pool cards — compact horizontal pill style */
 .planning-pool-cards .planning-card {
   flex-direction: row;
-  padding: 6px 12px;
-  gap: 8px;
+  padding: 8px 14px;
+  gap: 10px;
   border-radius: 20px;
   text-align: left;
 }
 .planning-pool-cards .planning-card-logo {
-  width: 22px;
-  height: 22px;
+  width: 36px;
+  height: 20px;
 }
 .planning-pool-cards .planning-card-logo-placeholder {
-  width: 22px;
-  height: 22px;
-  font-size: 14px;
+  width: 36px;
+  height: 20px;
+  font-size: 16px;
 }
 .planning-pool-cards .planning-card-label {
   font-size: 12px;
