@@ -650,14 +650,32 @@ const NationalApp = {
       // Exact match (includes aliases)
       let entry = rankLower[ownerLc];
 
-      // Starts-with
+      // Starts-with (full string)
       if (!entry) {
         for (const lc in rankLower) {
           if (lc.startsWith(ownerLc) || ownerLc.startsWith(lc)) { entry = rankLower[lc]; break; }
         }
       }
 
-      // Contains
+      // Last name exact + first name prefix (handles Jess↔Jessica, Mike↔Michael, etc.)
+      if (!entry) {
+        const ownerParts = ownerLc.split(/\s+/);
+        if (ownerParts.length >= 2) {
+          const ownerFirst = ownerParts[0];
+          const ownerLast = ownerParts[ownerParts.length - 1];
+          for (const lc in rankLower) {
+            const parts = lc.split(/\s+/);
+            if (parts.length < 2) continue;
+            const rFirst = parts[0];
+            const rLast = parts[parts.length - 1];
+            if (rLast === ownerLast && (rFirst.startsWith(ownerFirst) || ownerFirst.startsWith(rFirst))) {
+              entry = rankLower[lc]; break;
+            }
+          }
+        }
+      }
+
+      // Contains (full string)
       if (!entry) {
         for (const lc in rankLower) {
           if (lc.indexOf(ownerLc) >= 0 || ownerLc.indexOf(lc) >= 0) { entry = rankLower[lc]; break; }
