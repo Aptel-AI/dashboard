@@ -1227,18 +1227,47 @@ const NationalApp = {
       showLegend: true
     };
 
-    // KPI totals
-    const firstBookedIdx = 2;
-    const newStartsIdx = 9;
-    const startRetIdx = 11;
-
+    // KPI totals — enriched with breakdowns for campaign overview cards
     const crRows = this.state.campaignRecruiting.rows;
+    const _t = (idx) => crRows[idx] ? crRows[idx].total : 0;
+
+    // Aggregate headcount breakdown across all owners
+    const hcBreakdown = this.state.owners.reduce((acc, o) => {
+      acc.leaders += o.headcount.leaders || 0;
+      acc.closers += o.headcount.closers || 0;
+      acc.leadGen += o.headcount.leadGen || 0;
+      acc.training += o.headcount.training || 0;
+      return acc;
+    }, { leaders: 0, closers: 0, leadGen: 0, training: 0 });
+
+    // Aggregate production breakdown across all owners
+    const prodBreakdown = {};
+    this.state.owners.forEach(o => {
+      if (!o.production || !o.production.products) return;
+      for (const [pName, pData] of Object.entries(o.production.products)) {
+        if (!prodBreakdown[pName]) prodBreakdown[pName] = 0;
+        prodBreakdown[pName] += pData.actual || 0;
+      }
+    });
+
     this.state.campaignTotals = {
       headcount: totals.headcount,
-      firstBooked: crRows[firstBookedIdx] ? crRows[firstBookedIdx].total : 0,
-      newStarts: crRows[newStartsIdx] ? crRows[newStartsIdx].total : 0,
-      retention: crRows[startRetIdx] ? crRows[startRetIdx].total + '%' : '—',
-      production: totals.production
+      hcBreakdown,
+      // 1st Rounds
+      firstBooked: _t(2),
+      firstShowed: _t(3),
+      firstRetention: _t(4),
+      // 2nd Rounds
+      secondBooked: _t(6),
+      secondShowed: _t(7),
+      secondRetention: _t(8),
+      // New Starts
+      newStartsBooked: _t(9),
+      newStartsShowed: _t(10),
+      newStartRetention: _t(11),
+      // Production
+      production: totals.production,
+      prodBreakdown
     };
   },
 
@@ -1710,12 +1739,56 @@ const NationalApp = {
     document.getElementById('campaign-title').textContent = (cfg?.label || 'Campaign') + ' Campaign';
     document.getElementById('overview-date').textContent = 'Week of ' + this._formatCurrentWeek();
 
-    // KPI cards
-    document.getElementById('kpi-headcount').textContent = t.headcount || '—';
-    document.getElementById('kpi-1st-booked').textContent = t.firstBooked || '—';
-    document.getElementById('kpi-starts').textContent = t.newStarts || '—';
-    document.getElementById('kpi-retention').textContent = t.retention || '—';
-    document.getElementById('kpi-production').textContent = t.production || '—';
+    const hc = t.hcBreakdown || {};
+    const pb = t.prodBreakdown || {};
+
+    // Build production breakdown items (skip zero values, sort desc)
+    const prodItems = Object.entries(pb)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, val]) => `<div class="kpi-breakdown-item"><span class="kpi-bd-label">${this._esc(name)}</span><span class="kpi-bd-value">${val.toLocaleString()}</span></div>`)
+      .join('');
+
+    // Build headcount breakdown items
+    const hcItems = [
+      hc.leaders ? ['Leaders', hc.leaders] : null,
+      hc.closers ? ['Closers', hc.closers] : null,
+      hc.leadGen ? ['Lead Gen', hc.leadGen] : null,
+      hc.training ? ['Training', hc.training] : null
+    ].filter(Boolean)
+      .map(([label, val]) => `<div class="kpi-breakdown-item"><span class="kpi-bd-label">${label}</span><span class="kpi-bd-value">${val.toLocaleString()}</span></div>`)
+      .join('');
+
+    const container = document.getElementById('campaign-kpis');
+    container.innerHTML = `
+      <div class="kpi-card">
+        <div class="kpi-label">Active Headcount</div>
+        <div class="kpi-value">${t.headcount?.toLocaleString() || '—'}</div>
+        <div class="kpi-breakdown">${hcItems || '<div class="kpi-bd-empty">No breakdown</div>'}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">1st Rounds</div>
+        <div class="kpi-value">${(t.firstShowed || 0).toLocaleString()}<span class="kpi-sub"> showed</span></div>
+        <div class="kpi-context">out of ${(t.firstBooked || 0).toLocaleString()} booked</div>
+        <div class="kpi-retention">${t.firstRetention || 0}% retention</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">2nd Rounds</div>
+        <div class="kpi-value">${(t.secondShowed || 0).toLocaleString()}<span class="kpi-sub"> showed</span></div>
+        <div class="kpi-context">out of ${(t.secondBooked || 0).toLocaleString()} booked</div>
+        <div class="kpi-retention">${t.secondRetention || 0}% retention</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">New Starts</div>
+        <div class="kpi-value">${(t.newStartsShowed || 0).toLocaleString()}<span class="kpi-sub"> showed</span></div>
+        <div class="kpi-context">out of ${(t.newStartsBooked || 0).toLocaleString()} booked</div>
+        <div class="kpi-retention">${t.newStartRetention || 0}% retention</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Production</div>
+        <div class="kpi-value">${t.production?.toLocaleString() || '—'}</div>
+        <div class="kpi-breakdown">${prodItems || '<div class="kpi-bd-empty">No breakdown</div>'}</div>
+      </div>`;
   },
 
   // ══════════════════════════════════════════════════
