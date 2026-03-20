@@ -4779,7 +4779,7 @@ var CAMPAIGN_PRODUCTS = {
   'frontier':        ['Frontier', 'Cell', 'TV'],
   'verizon-fios':    ['Units', 'Wireless'],
   'att-nds':         ['Units'],
-  'att-res':         ['Residential'],// single product — will update
+  'att-res':         ['Internet', 'Wireless', 'DTV'],
   'rogers':          ['Units', 'Mobility'],
   'leafguard':       ['Personal Prod', 'Gross Leads', 'Number of Sales', 'Gross Sales'],
   'lumen':           ['Lumen', 'DTV']
@@ -4814,6 +4814,11 @@ var CAMPAIGN_PROD_COLUMNS = {
   'rogers': {
     'Units':     { prod: ['production lw', 'production'], goal: [] },
     'Mobility':  { prod: ['mobility', 'mobilty'], goal: [] }
+  },
+  'att-res': {
+    'Internet':  { prod: ['internet'], goal: [] },
+    'Wireless':  { prod: ['wireless'], goal: [] },
+    'DTV':       { prod: ['dtv'], goal: [] }
   }
 };
 
@@ -5166,20 +5171,43 @@ function extractHealthRows_(data, start, end, displayData, campaignKey) {
       }
       var sharedGoalParts = _splitSlashValues(sharedGoalRaw);
 
+      // First pass: read production values + detect which have dedicated goal columns
+      var hasGoalCol = [];
       for (var pp = 0; pp < products.length; pp++) {
         var ppc = perProdCols[products[pp]] || { prodCol: -1, goalCol: -1 };
         prodVals.push(ppc.prodCol >= 0 ? num(row[ppc.prodCol]) : 0);
-        // Goal assignment: per-product goal column first, then shared "/" column by index
+        hasGoalCol.push(ppc.goalCol >= 0);
+      }
+
+      // Smart goal mapping: if fewer goal parts than products,
+      // map goals left-to-right to products that have data (skipping empty ones).
+      // This handles cases like Internet+DTV with no Wireless: "40/20" → Internet=40, DTV=20.
+      var activeIndices = []; // product indices that have actual data
+      for (var ai = 0; ai < prodVals.length; ai++) {
+        if (!hasGoalCol[ai] && prodVals[ai] > 0) activeIndices.push(ai);
+      }
+      // If no products have data, fall back to all non-goal-col products
+      if (!activeIndices.length) {
+        for (var ai2 = 0; ai2 < products.length; ai2++) {
+          if (!hasGoalCol[ai2]) activeIndices.push(ai2);
+        }
+      }
+
+      // Second pass: assign goals
+      var sharedGoalIdx = 0;
+      for (var pp = 0; pp < products.length; pp++) {
+        var ppc = perProdCols[products[pp]] || { prodCol: -1, goalCol: -1 };
         if (ppc.goalCol >= 0) {
           // Per-product goal column (e.g., LeafGuard Gross Leads Goal)
           var goalCellRaw = displayData && displayData[i] ? String(displayData[i][ppc.goalCol]) : String(row[ppc.goalCol] || '');
           goalVals.push(num(goalCellRaw));
-        } else if (pp < sharedGoalParts.length) {
-          // Shared "/" separated goal column — assign by product index
-          goalVals.push(sharedGoalParts[pp]);
-        } else if (sharedGoalParts.length === 1) {
-          // Single goal value — assign to first product only
-          goalVals.push(pp === 0 ? sharedGoalParts[0] : 0);
+        } else if (activeIndices.indexOf(pp) >= 0 && sharedGoalIdx < sharedGoalParts.length) {
+          // Shared "/" goal mapped to this active product
+          goalVals.push(sharedGoalParts[sharedGoalIdx++]);
+        } else if (sharedGoalParts.length === 1 && pp === activeIndices[0]) {
+          // Single goal value — assign to first active product
+          goalVals.push(sharedGoalParts[0]);
+          sharedGoalIdx++;
         } else {
           goalVals.push(0);
         }
