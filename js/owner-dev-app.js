@@ -2202,7 +2202,7 @@ const OwnerDev = {
 
     let logoHtml;
     if (Array.isArray(logos)) {
-      logoHtml = logos.map(l => `<img src="${l}" class="planning-card-logo">`).join('');
+      logoHtml = `<span class="planning-card-logo-dual">${logos.map(l => `<img src="${l}" class="planning-card-logo">`).join('')}</span>`;
     } else if (logos) {
       logoHtml = `<img src="${logos}" class="planning-card-logo">`;
     } else {

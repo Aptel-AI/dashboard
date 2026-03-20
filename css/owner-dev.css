@@ -744,26 +744,26 @@ input, select, textarea { font-family: inherit; }
 
 /* Unassigned pool */
 .planning-pool {
-  background: #f0f4f8;
-  border: 2px dashed #c8d6e0;
+  background: #f7f9fb;
+  border: 1.5px dashed #c8d6e0;
   border-radius: 10px;
-  padding: 14px 16px;
-  margin-bottom: 20px;
-  min-height: 60px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  min-height: 42px;
 }
 .planning-pool-label {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: #708090;
-  margin-bottom: 10px;
+  color: #a0adb8;
+  margin-bottom: 8px;
 }
 .planning-pool-cards {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  min-height: 44px;
+  gap: 8px;
+  min-height: 34px;
 }
 .planning-pool.drag-over {
   background: #e0f7fa;
@@ -821,13 +821,13 @@ input, select, textarea { font-family: inherit; }
   font-weight: 500;
 }
 
-/* Campaign cards (in grid and pool) */
+/* Campaign cards — default (inside day columns): stacked, logo-prominent */
 .planning-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 12px 10px;
+  gap: 4px;
+  padding: 10px 8px;
   background: #fff;
   border: 1px solid #dce5ed;
   border-radius: 10px;
@@ -845,18 +845,33 @@ input, select, textarea { font-family: inherit; }
   border-style: dashed;
 }
 .planning-card-logo {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
 }
 .planning-card-logo-placeholder {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  font-size: 24px;
 }
+/* Dual logos side-by-side (e.g. AT&T NDS/Verizon) */
+.planning-card-logo-dual {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.planning-card-logo-dual .planning-card-logo {
+  width: 28px;
+  height: 28px;
+}
+.planning-pool-cards .planning-card-logo-dual .planning-card-logo {
+  width: 18px;
+  height: 18px;
+}
+
 .planning-card-info {
   min-width: 0;
   width: 100%;
@@ -872,6 +887,32 @@ input, select, textarea { font-family: inherit; }
 .planning-card-owners {
   font-size: 10px;
   color: #b0bec5;
+}
+
+/* Pool cards — compact horizontal pill style */
+.planning-pool-cards .planning-card {
+  flex-direction: row;
+  padding: 6px 12px;
+  gap: 8px;
+  border-radius: 20px;
+  text-align: left;
+}
+.planning-pool-cards .planning-card-logo {
+  width: 22px;
+  height: 22px;
+}
+.planning-pool-cards .planning-card-logo-placeholder {
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+}
+.planning-pool-cards .planning-card-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0d2035;
+}
+.planning-pool-cards .planning-card-owners {
+  display: none;
 }
 .planning-card-reorder {
   padding: 2px 6px;
