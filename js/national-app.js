@@ -359,10 +359,9 @@ const NationalApp = {
       return { owners: cd.owners || [], weeks: cd.weeks || [], label: cd.label || '', products: cd.products || ['Total'] };
     }
 
-    const weeks = NATIONAL_CONFIG.campaigns[campaignKey]?.weeksToPull || 6;
     const url = NATIONAL_CONFIG.appsScriptUrl +
       '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
-      '&action=recruiting&weeks=' + weeks +
+      '&action=recruiting&weeks=0' +
       '&_t=' + Date.now();
     const resp = await fetch(url);
     const result = await resp.json();

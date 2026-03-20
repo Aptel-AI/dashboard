@@ -5339,7 +5339,7 @@ function extractHorizontalRecruitingRows_(data, start, end) {
   var colCalls = findCol(headers, ['calls received', 'applies received', 'applies']);
   var colSentToList = findCol(headers, ['sent to call list', 'sent to list', 'no list']);
   var col1stBooked = findCol(headers, ['1st rounds booked', '1st booked', 'first booked', 'booked from call']);
-  var col1stShowed = findCol(headers, ['1st rounds showed', '1st showed', 'first showed']);
+  var col1stShowed = findCol(headers, ['1st rounds showed', '1st showed', 'first showed', 'rounds showed']);
   var colConversion = findCol(headers, ['conversion', 'turned to 2nd', '% of call']);
 
   // Find 2nd round columns (must contain "2nd")
@@ -5601,12 +5601,12 @@ function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignK
     var goalParts = _splitSlashValues(h.goalsRaw);
 
     // Build the row: base columns first
-    // Use Monday-snapped date so all owners share the same week date in consolidated tab
-    var snapKey = keys2[i]; // already "MM/DD/YYYY" Monday format from _normalizeDateKey_
+    // Use Sunday-snapped date so all owners share the same week date in consolidated tab
+    var snapKey = keys2[i]; // already "MM/DD/YYYY" Sunday format from _normalizeDateKey_
     var snapParts = snapKey.split('/');
-    var mondayDate = new Date(Number(snapParts[2]), Number(snapParts[0]) - 1, Number(snapParts[1]));
+    var sundayDate = new Date(Number(snapParts[2]), Number(snapParts[0]) - 1, Number(snapParts[1]), 12, 0, 0);
     var row = [
-      mondayDate,          // 0: Week (Monday of ISO week)
+      sundayDate,          // 0: Week (Sunday of week)
       ownerName,           // 1: Owner
       h.active || 0,       // 2: Active HC
       h.leaders || 0,      // 3: Leaders
@@ -5726,11 +5726,11 @@ function _fuzzyFindTab_(ownerName, allTabNames, tabByName) {
 function _normalizeDateKey_(d) {
   if (!d) return '';
   if (!(d instanceof Date)) d = new Date(d);
-  // Snap to Monday of the same ISO week so Sat/Sun/Mon all land in the same bucket
+  // Snap to Sunday of the same week (source spreadsheets use Sunday dates)
   var day = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-  var offset = day === 0 ? -6 : 1 - day; // Sun→prev Mon, Sat→prev Mon, Mon→0
-  var mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset);
-  return ('0' + (mon.getMonth() + 1)).slice(-2) + '/' + ('0' + mon.getDate()).slice(-2) + '/' + mon.getFullYear();
+  var offset = -day; // Sun→0, Mon→-1, Tue→-2, ... Sat→-6
+  var sun = new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset, 12, 0, 0);
+  return ('0' + (sun.getMonth() + 1)).slice(-2) + '/' + ('0' + sun.getDate()).slice(-2) + '/' + sun.getFullYear();
 }
 
 /**
@@ -5898,9 +5898,8 @@ function readConsolidatedRecruiting(weekCount, campaignFilter) {
       var db = b.date ? b.date.getTime() : 0;
       return db - da;
     });
-    if (weekCount > 0 && weekEntries.length > weekCount) {
-      weekEntries = weekEntries.slice(0, weekCount);
-    }
+    // No week limit — send all history so WoW health/production cards have full data.
+    // The frontend recruiting table handles its own 4-week column display independently.
 
     campaigns[key] = {
       label: campaign.label,
@@ -6293,5 +6292,37 @@ function TEST_rogers_pipeline() {
       parts.push(headers[c] + '=' + row[c]);
     }
     Logger.log('Row[' + i + '] ' + parts.join(', '));
+  }
+}
+
+// Debug: list all tab names in Frontier source sheet, then inspect Alante's tab
+function TEST_frontier_alante() {
+  var ss = SpreadsheetApp.openById('1WWpLQTCyvPmJbx3jjowFszwOF_JUnjS6tzu-eAASwk0');
+  var allTabs = ss.getSheets().map(function(s) { return s.getName(); });
+  Logger.log('All tabs (' + allTabs.length + '): ' + allTabs.join(', '));
+
+  // Find Alante's tab (fuzzy)
+  var tab = null;
+  for (var i = 0; i < allTabs.length; i++) {
+    if (allTabs[i].toLowerCase().indexOf('alante') >= 0) {
+      tab = ss.getSheetByName(allTabs[i]);
+      Logger.log('Found Alante tab: "' + allTabs[i] + '"');
+      break;
+    }
+  }
+  if (!tab) { Logger.log('No tab containing "alante" found'); return; }
+
+  var data = tab.getDataRange().getValues();
+  Logger.log('Total rows: ' + data.length);
+  var sections = findSections(data);
+  Logger.log('Sections: ' + JSON.stringify(sections));
+  // Log ALL health section rows with first 8 columns
+  for (var r = 0; r <= Math.min(sections.section1End, data.length - 1); r++) {
+    var cols = [];
+    for (var c = 0; c < Math.min(8, data[r].length); c++) {
+      var v = data[r][c];
+      cols.push('[' + c + ']' + (v instanceof Date ? 'DATE:' + v.toISOString().slice(0,10) : v));
+    }
+    Logger.log('Row ' + r + ': ' + cols.join(' | '));
   }
 }
