@@ -1426,8 +1426,10 @@ const NationalApp = {
       acc.closers += o.headcount.closers || 0;
       acc.leadGen += o.headcount.leadGen || 0;
       acc.training += o.headcount.training || 0;
+      acc.active += o.headcount.active || 0;
       return acc;
-    }, { leaders: 0, closers: 0, leadGen: 0, training: 0 });
+    }, { leaders: 0, closers: 0, leadGen: 0, training: 0, active: 0 });
+    hcBreakdown.dist = Math.max(hcBreakdown.active - hcBreakdown.leaders, 0);
 
     // Aggregate production breakdown across all owners
     const prodBreakdown = {};
@@ -2034,16 +2036,16 @@ const NationalApp = {
     const hc = t.hcBreakdown || {};
     const pb = t.prodBreakdown || {};
 
-    // Build production breakdown items (skip zero values, sort desc)
-    const prodItems = Object.entries(pb)
-      .filter(([, v]) => v > 0)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, val]) => `<div class="kpi-breakdown-item"><span class="kpi-bd-label">${this._esc(name)}</span><span class="kpi-bd-value">${val.toLocaleString()}</span></div>`)
-      .join('');
+    // Build production breakdown items (skip if only one product, skip zero values, sort desc)
+    const prodEntries = Object.entries(pb).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    const prodItems = prodEntries.length > 1
+      ? prodEntries.map(([name, val]) => `<div class="kpi-breakdown-item"><span class="kpi-bd-label">${this._esc(name)}</span><span class="kpi-bd-value">${val.toLocaleString()}</span></div>`).join('')
+      : '';
 
     // Build headcount breakdown items
     const hcItems = [
       hc.leaders ? ['Leaders', hc.leaders] : null,
+      hc.dist ? ['Distributors', hc.dist] : null,
       hc.closers ? ['Closers', hc.closers] : null,
       hc.leadGen ? ['Lead Gen', hc.leadGen] : null,
       hc.training ? ['Training', hc.training] : null
