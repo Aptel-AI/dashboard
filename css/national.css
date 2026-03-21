@@ -1173,7 +1173,7 @@ input, select, textarea { font-family: inherit; }
 .data-table tbody td.bold { font-weight: 700; }
 .data-table tbody tr:hover { background: var(--gray-50); }
 .data-table tbody tr:last-child td { border-bottom: none; }
-.rep-highlight-cb { width: 16px; height: 16px; cursor: pointer; accent-color: var(--sc-cyan, #00c8ff); }
+.rep-highlight-cb { width: 16px; height: 16px; cursor: pointer; accent-color: #708090; }
 
 /* Week-over-week horizontal scroll */
 .wow-cards {
