@@ -722,7 +722,7 @@ input, select, textarea { font-family: inherit; }
   overflow: hidden;
   vertical-align: top;
   position: relative;
-  top: -4px;
+  top: -10px;
 }
 .tab-logo-badge img {
   height: 100%;
