@@ -216,6 +216,11 @@ function doGet(e) {
       return jsonResp(odGetPlanning());
     }
 
+    // ── OD: Get flagged reps (unresolved only) ──
+    if (action === 'odGetFlaggedReps') {
+      return jsonResp(odGetFlaggedReps());
+    }
+
     if (owner) {
       return jsonResp(loadOwnerDetail(campaign, owner));
     } else {
@@ -307,6 +312,12 @@ function doPost(e) {
         break;
       case 'odSavePlanning':
         result = odSavePlanning(body);
+        break;
+      case 'odFlagRep':
+        result = odFlagRep(body);
+        break;
+      case 'odUnflagRep':
+        result = odUnflagRep(body);
         break;
       default:
         result = { error: 'unknown action: ' + body.action };
@@ -6531,6 +6542,101 @@ function odGetCampaignTabMap() {
   }
 
   return { success: true, mappings: mappings, campaignTabs: campaignTabs };
+}
+
+// ═══════════════════════════════════════════════════════
+// FLAGGED REPS — Coach → Planning one-on-one requests
+// ═══════════════════════════════════════════════════════
+
+var OD_FLAGGED_HEADERS_ = ['repName', 'ownerName', 'campaign', 'flaggedBy', 'flaggedAt', 'resolved'];
+
+/**
+ * action: odGetFlaggedReps (doGet)
+ * Returns unresolved flagged reps.
+ */
+function odGetFlaggedReps() {
+  var sheet = odGetOrCreateTab('_OD_FlaggedReps', OD_FLAGGED_HEADERS_);
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { success: true, reps: [] };
+
+  var headers = data[0].map(function(h) { return String(h).trim(); });
+  var colMap = {};
+  for (var c = 0; c < headers.length; c++) colMap[headers[c]] = c;
+
+  var reps = [];
+  for (var i = 1; i < data.length; i++) {
+    var resolved = String(data[i][colMap['resolved']] || '').trim();
+    if (resolved) continue; // skip resolved
+
+    reps.push({
+      repName: String(data[i][colMap['repName']] || '').trim(),
+      ownerName: String(data[i][colMap['ownerName']] || '').trim(),
+      campaign: String(data[i][colMap['campaign']] || '').trim(),
+      flaggedBy: String(data[i][colMap['flaggedBy']] || '').trim(),
+      flaggedAt: String(data[i][colMap['flaggedAt']] || '').trim()
+    });
+  }
+  return { success: true, reps: reps };
+}
+
+/**
+ * action: odFlagRep (doPost)
+ * body: { repName, ownerName, campaign, flaggedBy }
+ */
+function odFlagRep(body) {
+  var repName = String(body.repName || '').trim();
+  var ownerName = String(body.ownerName || '').trim();
+  var campaign = String(body.campaign || '').trim();
+  var flaggedBy = String(body.flaggedBy || '').trim();
+  if (!repName || !ownerName || !campaign) {
+    return { success: false, message: 'repName, ownerName, and campaign are required' };
+  }
+
+  var sheet = odGetOrCreateTab('_OD_FlaggedReps', OD_FLAGGED_HEADERS_);
+
+  // Check if already flagged (unresolved)
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    var rn = String(data[i][0] || '').trim().toLowerCase();
+    var on = String(data[i][1] || '').trim().toLowerCase();
+    var camp = String(data[i][2] || '').trim().toLowerCase();
+    var resolved = String(data[i][5] || '').trim();
+    if (rn === repName.toLowerCase() && on === ownerName.toLowerCase() && camp === campaign.toLowerCase() && !resolved) {
+      return { success: true, message: 'Already flagged' };
+    }
+  }
+
+  sheet.appendRow([repName, ownerName, campaign, flaggedBy, new Date().toISOString(), '']);
+  return { success: true };
+}
+
+/**
+ * action: odUnflagRep (doPost)
+ * body: { repName, ownerName, campaign }
+ * Sets resolved = now on the matching unresolved row.
+ */
+function odUnflagRep(body) {
+  var repName = String(body.repName || '').trim().toLowerCase();
+  var ownerName = String(body.ownerName || '').trim().toLowerCase();
+  var campaign = String(body.campaign || '').trim().toLowerCase();
+  if (!repName || !ownerName || !campaign) {
+    return { success: false, message: 'repName, ownerName, and campaign are required' };
+  }
+
+  var sheet = odGetOrCreateTab('_OD_FlaggedReps', OD_FLAGGED_HEADERS_);
+  var data = sheet.getDataRange().getValues();
+
+  for (var i = 1; i < data.length; i++) {
+    var rn = String(data[i][0] || '').trim().toLowerCase();
+    var on = String(data[i][1] || '').trim().toLowerCase();
+    var camp = String(data[i][2] || '').trim().toLowerCase();
+    var resolved = String(data[i][5] || '').trim();
+    if (rn === repName && on === ownerName && camp === campaign && !resolved) {
+      sheet.getRange(i + 1, 6).setValue(new Date().toISOString()); // col 6 = resolved
+      return { success: true };
+    }
+  }
+  return { success: false, message: 'Flagged rep not found' };
 }
 
 /**

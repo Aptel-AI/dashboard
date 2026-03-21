@@ -31,7 +31,8 @@ const OwnerDev = {
     // Planning tab state
     planningData: [],       // [{ day, sortOrder, campaignKey, ownerOrder }, ...]
     planningLoaded: false,  // whether planning data has been fetched
-    _planningDirty: false   // whether unsaved changes exist
+    _planningDirty: false,  // whether unsaved changes exist
+    flaggedReps: []         // [{ repName, ownerName, campaign, flaggedBy, flaggedAt }]
   },
 
   // ══════════════════════════════════════════════════════
@@ -2132,9 +2133,15 @@ const OwnerDev = {
     if (!this.state.planningLoaded) {
       this._showPlanningLoading(true);
       try {
-        const res = await this._api('odGetPlanning');
-        if (res.success && res.planning) {
-          this.state.planningData = res.planning;
+        const [planRes, flagRes] = await Promise.allSettled([
+          this._api('odGetPlanning'),
+          this._api('odGetFlaggedReps')
+        ]);
+        if (planRes.status === 'fulfilled' && planRes.value.success) {
+          this.state.planningData = planRes.value.planning;
+        }
+        if (flagRes.status === 'fulfilled' && flagRes.value.success) {
+          this.state.flaggedReps = flagRes.value.reps || [];
         }
       } catch (err) {
         console.warn('[OwnerDev] Failed to load planning:', err.message);
@@ -2143,6 +2150,7 @@ const OwnerDev = {
       this._showPlanningLoading(false);
     }
     this._renderPlanningGrid();
+    this._renderFlaggedReps();
   },
 
   _showPlanningLoading(show) {
@@ -2513,6 +2521,91 @@ const OwnerDev = {
       console.error('[OwnerDev] savePlanning error:', err);
       this._toast('Failed to save schedule', 'error');
       if (status) status.textContent = 'Error';
+    }
+  },
+
+  // ══════════════════════════════════════════════════════
+  // FLAGGED REPS (one-on-one requests from Coach)
+  // ══════════════════════════════════════════════════════
+
+  _renderFlaggedReps() {
+    const container = document.getElementById('planning-flagged');
+    const list = document.getElementById('flagged-reps-list');
+    const countBadge = document.getElementById('flagged-count');
+    if (!container || !list) return;
+
+    const reps = this.state.flaggedReps || [];
+    if (!reps.length) {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = '';
+    if (countBadge) countBadge.textContent = reps.length;
+
+    const campaignLabels = {};
+    if (typeof NATIONAL_CONFIG !== 'undefined' && NATIONAL_CONFIG.campaigns) {
+      for (const [k, v] of Object.entries(NATIONAL_CONFIG.campaigns)) {
+        campaignLabels[k] = v.label || k;
+      }
+    }
+
+    list.innerHTML = reps.map((rep, idx) => {
+      const campLabel = campaignLabels[rep.campaign] || rep.campaign;
+      const dateStr = rep.flaggedAt ? new Date(rep.flaggedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      return `
+        <div class="flagged-rep-card">
+          <div class="flagged-rep-info">
+            <div class="flagged-rep-name">${this._esc(rep.repName)}</div>
+            <div class="flagged-rep-meta">
+              <span class="flagged-rep-owner">${this._esc(rep.ownerName)}</span>
+              <span class="flagged-rep-campaign">${this._esc(campLabel)}</span>
+              ${dateStr ? `<span class="flagged-rep-date">${dateStr}</span>` : ''}
+            </div>
+          </div>
+          <button class="flagged-rep-done" onclick="OwnerDev._resolveFlaggedRep(${idx})" title="Mark as scheduled">Done</button>
+        </div>`;
+    }).join('');
+
+    // Update nav badge
+    this._updateFlaggedBadge();
+  },
+
+  _updateFlaggedBadge() {
+    const count = (this.state.flaggedReps || []).length;
+    const badge = document.getElementById('planning-notif-badge');
+    if (badge) {
+      badge.textContent = count;
+      badge.style.display = count > 0 ? '' : 'none';
+    }
+  },
+
+  async _resolveFlaggedRep(idx) {
+    const rep = this.state.flaggedReps[idx];
+    if (!rep) return;
+
+    try {
+      await this._post('odUnflagRep', {
+        repName: rep.repName,
+        ownerName: rep.ownerName,
+        campaign: rep.campaign
+      });
+      this.state.flaggedReps.splice(idx, 1);
+      this._renderFlaggedReps();
+      this._toast('Marked as scheduled');
+
+      // Update NationalApp's cached flagged reps too
+      if (typeof NationalApp !== 'undefined') {
+        NationalApp._flaggedReps = (NationalApp._flaggedReps || []).filter(f =>
+          !(f.repName.toLowerCase() === rep.repName.toLowerCase() &&
+            f.ownerName.toLowerCase() === rep.ownerName.toLowerCase() &&
+            f.campaign.toLowerCase() === rep.campaign.toLowerCase())
+        );
+        NationalApp._updateFlaggedBadge();
+      }
+    } catch (err) {
+      console.error('[OwnerDev] Resolve flagged rep error:', err);
+      this._toast('Failed to resolve', 'error');
     }
   }
 };

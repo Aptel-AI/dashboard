@@ -105,6 +105,8 @@ const NationalApp = {
     if (!this._planningSchedule) {
       this._loadPlanningFromCache();
     }
+    // Fetch flagged reps (non-blocking, populates badge)
+    this._fetchFlaggedReps();
 
     if (campaign) {
       // Direct campaign selection — wait for both planning + campaign data
@@ -4089,6 +4091,8 @@ const NationalApp = {
     const s = owner.sales;
     const sm = s.summary;
     const isNDS = this.state.campaign && (this.state.campaign.indexOf('nds') >= 0 || this.state.campaign.indexOf('NDS') >= 0);
+    // Store reps for checkbox flag/unflag reference
+    this._currentSalesReps = s.reps || [];
 
     // ── Card 1: Owner Summary ──
     const summaryEl = document.getElementById('sales-summary');
@@ -4214,10 +4218,14 @@ const NationalApp = {
 
       const _stickyTd0 = 'position:sticky;left:0;z-index:1;background:inherit;';
       const _stickyTd1 = 'position:sticky;left:30px;z-index:1;background:inherit;';
+      const _ownerName = owner.name;
+      const _campaign = this.state.campaign;
       const repRows = isNDS
-        ? s.reps.map((rep, ri) => `
+        ? s.reps.map((rep, ri) => {
+            const _flagged = this._isRepFlagged(rep.name, _ownerName, _campaign);
+            return `
             <tr id="sales-rep-row-${ri}" style="background:var(--black,#f0f4f8);">
-              <td style="${_stickyTd0}"><input type="checkbox" class="rep-highlight-cb" onchange="NationalApp._toggleRepHighlight(${ri}, this.checked)"></td>
+              <td style="${_stickyTd0}"><input type="checkbox" class="rep-highlight-cb" ${_flagged ? 'checked' : ''} onchange="NationalApp._toggleRepHighlight(${ri}, this.checked)"></td>
               <td class="bold" style="${_stickyTd1}">${this._esc(rep.name)}</td>
               <td class="num">${rep.newPorts || rep.totalVolume}</td>
               <td class="num">${rep.orderCount}</td>
@@ -4232,10 +4240,12 @@ const NationalApp = {
               <td class="num">${this._pct(rep.awayFromDoorsPct)}</td>
               <td class="num">${this._pct(rep.before3pmPct)}</td>
               <td class="num">${this._pct(rep.after730pmPct)}</td>
-            </tr>`).join('')
-        : s.reps.map((rep, ri) => `
+            </tr>`}).join('')
+        : s.reps.map((rep, ri) => {
+            const _flagged = this._isRepFlagged(rep.name, _ownerName, _campaign);
+            return `
             <tr id="sales-rep-row-${ri}" style="background:var(--black,#f0f4f8);">
-              <td style="${_stickyTd0}"><input type="checkbox" class="rep-highlight-cb" onchange="NationalApp._toggleRepHighlight(${ri}, this.checked)"></td>
+              <td style="${_stickyTd0}"><input type="checkbox" class="rep-highlight-cb" ${_flagged ? 'checked' : ''} onchange="NationalApp._toggleRepHighlight(${ri}, this.checked)"></td>
               <td class="bold" style="${_stickyTd1}">${this._esc(rep.name)}</td>
               <td class="num">${rep.totalVolume}</td>
               <td class="num">${rep.orderCount}</td>
@@ -4250,7 +4260,7 @@ const NationalApp = {
               <td class="num">${this._pct(rep.cruPct)}</td>
               <td class="num">${this._pct(rep.newWrlsPct)}</td>
               <td class="num">${this._pct(rep.byodPct)}</td>
-            </tr>`).join('');
+            </tr>`}).join('');
 
       repsEl.innerHTML = `
         <div class="coaching-section">
@@ -4301,16 +4311,96 @@ const NationalApp = {
     this.renderSalesTab(owner);
   },
 
-  // ── Toggle rep row highlight (checkbox in sales table) ──
+  // ── Flag/unflag rep for one-on-one (checkbox in sales table) ──
   _toggleRepHighlight(rowIdx, checked) {
-    const row = document.getElementById('sales-rep-row-' + rowIdx);
-    if (!row) return;
+    const owner = this.state.selectedOwner;
+    const reps = this._currentSalesReps || [];
+    const rep = reps[rowIdx];
+    if (!rep || !owner) return;
+
+    const repName = rep.name;
+    const ownerName = owner.name;
+    const campaign = this.state.campaign;
+
     if (checked) {
-      row.style.background = 'rgba(0, 200, 255, 0.12)';
-      row.style.fontWeight = '600';
+      // Flag the rep
+      this._postFlag('odFlagRep', { repName, ownerName, campaign, flaggedBy: this.state.session?.email || '' });
+      if (!this._flaggedReps) this._flaggedReps = [];
+      this._flaggedReps.push({ repName, ownerName, campaign });
     } else {
-      row.style.background = '';
-      row.style.fontWeight = '';
+      // Unflag the rep
+      this._postFlag('odUnflagRep', { repName, ownerName, campaign });
+      if (this._flaggedReps) {
+        this._flaggedReps = this._flaggedReps.filter(f =>
+          !(f.repName.toLowerCase() === repName.toLowerCase() &&
+            f.ownerName.toLowerCase() === ownerName.toLowerCase() &&
+            f.campaign.toLowerCase() === campaign.toLowerCase())
+        );
+      }
+    }
+    // Update badge count
+    this._updateFlaggedBadge();
+  },
+
+  async _postFlag(action, data) {
+    try {
+      const apiUrl = NATIONAL_CONFIG.appsScriptUrl || (typeof OD_CONFIG !== 'undefined' ? OD_CONFIG.appsScriptUrl : '');
+      const apiKey = NATIONAL_CONFIG.apiKey || (typeof OD_CONFIG !== 'undefined' ? OD_CONFIG.apiKey : '');
+      await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action, key: apiKey, ...data })
+      });
+    } catch (err) {
+      console.warn('[NationalApp] Flag POST error:', err.message);
+    }
+  },
+
+  _FLAGGED_CACHE_KEY: 'od_flagged_reps_cache',
+
+  async _fetchFlaggedReps() {
+    // Load from cache first
+    try {
+      const raw = localStorage.getItem(this._FLAGGED_CACHE_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (cached.reps) this._flaggedReps = cached.reps;
+      }
+    } catch { /* ignore */ }
+
+    // Fetch fresh
+    try {
+      const apiUrl = NATIONAL_CONFIG.appsScriptUrl || (typeof OD_CONFIG !== 'undefined' ? OD_CONFIG.appsScriptUrl : '');
+      const apiKey = NATIONAL_CONFIG.apiKey || (typeof OD_CONFIG !== 'undefined' ? OD_CONFIG.apiKey : '');
+      const url = new URL(apiUrl);
+      url.searchParams.set('key', apiKey);
+      url.searchParams.set('action', 'odGetFlaggedReps');
+      const res = await fetch(url.toString()).then(r => r.json());
+      if (res.success && res.reps) {
+        this._flaggedReps = res.reps;
+        localStorage.setItem(this._FLAGGED_CACHE_KEY, JSON.stringify({ reps: res.reps, _ts: Date.now() }));
+      }
+    } catch (err) {
+      console.warn('[NationalApp] Fetch flagged reps error:', err.message);
+    }
+    this._updateFlaggedBadge();
+  },
+
+  _isRepFlagged(repName, ownerName, campaign) {
+    if (!this._flaggedReps) return false;
+    return this._flaggedReps.some(f =>
+      f.repName.toLowerCase() === repName.toLowerCase() &&
+      f.ownerName.toLowerCase() === ownerName.toLowerCase() &&
+      f.campaign.toLowerCase() === campaign.toLowerCase()
+    );
+  },
+
+  _updateFlaggedBadge() {
+    const count = (this._flaggedReps || []).length;
+    const badge = document.getElementById('planning-notif-badge');
+    if (badge) {
+      badge.textContent = count;
+      badge.style.display = count > 0 ? '' : 'none';
     }
   },
 

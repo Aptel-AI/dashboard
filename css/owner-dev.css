@@ -810,6 +810,112 @@ input, select, textarea { font-family: inherit; }
 .planning-drop-zone.drag-over {
   background: #e0f7fa;
 }
+/* Notification badge (nav tab) */
+.nav-tab {
+  position: relative;
+}
+.notif-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: #e53535;
+  border-radius: 8px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* Flagged reps section */
+.planning-flagged {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #dce5ed;
+}
+.planning-flagged-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.planning-flagged-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0d2035;
+}
+.flagged-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: #e53535;
+  border-radius: 10px;
+}
+.flagged-reps-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.flagged-rep-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #dce5ed;
+  border-radius: 10px;
+  min-width: 220px;
+}
+.flagged-rep-info {
+  flex: 1;
+  min-width: 0;
+}
+.flagged-rep-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0d2035;
+}
+.flagged-rep-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #708090;
+}
+.flagged-rep-campaign {
+  padding: 1px 6px;
+  background: rgba(0,153,204,0.1);
+  color: #0099cc;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 10px;
+}
+.flagged-rep-done {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 6px;
+  background: #22c55e;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.flagged-rep-done:hover {
+  background: #16a34a;
+}
+
 /* Planning loading state */
 .planning-loading {
   grid-column: 1 / -1;
