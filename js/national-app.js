@@ -4065,10 +4065,15 @@ const NationalApp = {
         svg += `<text x="${cx}" y="${baseY - shH / 2 + 4}" text-anchor="middle" fill="#fff" font-size="9" font-weight="700" font-family="Inter,sans-serif"${_shadow}>${sh}</text>`;
       }
 
-      // Retention % above bar
+      // Retention % pill above bar
       if (pct !== null) {
         const topY = Math.min(baseY - bkH, baseY - shH);
-        svg += `<text x="${cx}" y="${topY - 5}" text-anchor="middle" fill="${barColor}" font-size="8" font-weight="800" font-family="Inter,sans-serif">${pct}%</text>`;
+        const pillY = topY - 14;
+        const pillW = pct >= 100 ? 30 : 26;
+        const pillFill = _isLight(barColor) ? barColor : barColor;
+        const pillText = _isLight(barColor) ? '#000' : '#fff';
+        svg += `<rect x="${cx - pillW/2}" y="${pillY}" width="${pillW}" height="12" rx="6" fill="${pillFill}" opacity="0.9"/>`;
+        svg += `<text x="${cx}" y="${pillY + 9}" text-anchor="middle" fill="${pillText}" font-size="7.5" font-weight="800" font-family="Inter,sans-serif">${pct}%</text>`;
       }
 
       // Week label below
