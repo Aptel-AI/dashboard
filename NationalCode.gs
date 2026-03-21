@@ -2817,7 +2817,8 @@ function saveGoalsRow_(ownerName, campaignLabel, campaignKey, goals) {
     var campaignHeaders2 = getConsolidatedHeaders_(campaignKey);
     var newRow = [];
     for (var h2 = 0; h2 < campaignHeaders2.length; h2++) newRow.push(0);
-    newRow[colWeek] = nextMonday;
+    // Write as formatted string to avoid timezone/time issues in Sheets
+    newRow[colWeek] = formatDate(nextMonday);
     newRow[colOwner] = ownerName;
     sheet.appendRow(newRow);
     targetRow = sheet.getLastRow();
