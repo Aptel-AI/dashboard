@@ -5481,7 +5481,9 @@ const NationalApp = {
     h += `<tr class="rt-gauge-header"><td colspan="2">2ND ROUNDS REQUIRED</td></tr>`;
     tiers.forEach(t => {
       const val = leaders * t.mult;
-      h += `<tr><td>${this._esc(t.label)}</td><td class="rt-gauge-val" style="background:${t.color}">${val}</td></tr>`;
+      const isLight = t.color === '#ffeb3b' || t.color === '#f9a825' || t.color === '#84cc16';
+      const shadow = isLight ? '0 1px 3px rgba(0,0,0,0.55), 0 0 8px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.45), 0 0 6px rgba(0,0,0,0.2)';
+      h += `<tr><td>${this._esc(t.label)}</td><td class="rt-gauge-val" style="background:${t.color};color:#fff;text-shadow:${shadow}">${val}</td></tr>`;
     });
     h += `</tbody></table>`;
     return h;
