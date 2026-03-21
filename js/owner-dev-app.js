@@ -2130,6 +2130,7 @@ const OwnerDev = {
 
   async _initPlanning() {
     if (!this.state.planningLoaded) {
+      this._showPlanningLoading(true);
       try {
         const res = await this._api('odGetPlanning');
         if (res.success && res.planning) {
@@ -2139,8 +2140,20 @@ const OwnerDev = {
         console.warn('[OwnerDev] Failed to load planning:', err.message);
       }
       this.state.planningLoaded = true;
+      this._showPlanningLoading(false);
     }
     this._renderPlanningGrid();
+  },
+
+  _showPlanningLoading(show) {
+    const grid = document.getElementById('planning-grid');
+    const pool = document.getElementById('planning-pool');
+    if (show) {
+      if (grid) grid.innerHTML = '<div class="planning-loading"><div class="loading-spinner"></div></div>';
+      if (pool) pool.style.display = 'none';
+    } else {
+      if (pool) pool.style.display = '';
+    }
   },
 
   _renderPlanningGrid() {

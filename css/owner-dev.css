@@ -810,6 +810,15 @@ input, select, textarea { font-family: inherit; }
 .planning-drop-zone.drag-over {
   background: #e0f7fa;
 }
+/* Planning loading state */
+.planning-loading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+}
+
 /* Insertion indicator line shown during drag */
 .planning-insert-indicator {
   height: 3px;
