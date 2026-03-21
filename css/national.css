@@ -716,16 +716,17 @@ input, select, textarea { font-family: inherit; }
   align-items: center;
   justify-content: center;
   margin-left: 6px;
-  padding: 2px 8px;
+  padding: 3px 6px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.06);
   vertical-align: middle;
 }
+#tab-badge-recruiting { background: #111; }
+#tab-badge-audit { background: linear-gradient(135deg, #c23a5a, #7b3590, #1a2744); }
 .tab-logo-badge img {
   height: 14px;
   width: auto;
   object-fit: contain;
-  opacity: 0.85;
+  filter: brightness(10);
 }
 
 /* Tab Content */
