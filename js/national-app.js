@@ -4070,10 +4070,9 @@ const NationalApp = {
         const topY = Math.min(baseY - bkH, baseY - shH);
         const pillY = topY - 14;
         const pillW = pct >= 100 ? 30 : 26;
-        const pillFill = _isLight(barColor) ? barColor : barColor;
-        const pillText = _isLight(barColor) ? '#000' : '#fff';
-        svg += `<rect x="${cx - pillW/2}" y="${pillY}" width="${pillW}" height="12" rx="6" fill="${pillFill}" opacity="0.9"/>`;
-        svg += `<text x="${cx}" y="${pillY + 9}" text-anchor="middle" fill="${pillText}" font-size="7.5" font-weight="800" font-family="Inter,sans-serif">${pct}%</text>`;
+        const pillShadow = _isLight(barColor) ? ' filter="url(#txtShadow)"' : '';
+        svg += `<rect x="${cx - pillW/2}" y="${pillY}" width="${pillW}" height="12" rx="6" fill="${barColor}" opacity="0.9"/>`;
+        svg += `<text x="${cx}" y="${pillY + 9}" text-anchor="middle" fill="#fff" font-size="7.5" font-weight="800" font-family="Inter,sans-serif"${pillShadow}>${pct}%</text>`;
       }
 
       // Week label below
