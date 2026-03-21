@@ -5949,13 +5949,19 @@ function readConsolidatedRecruiting(weekCount, campaignFilter) {
       var owner = String(row[colOwner] || '').trim();
       if (!dateVal || !owner) continue;
 
-      var dateKey = formatDate(dateVal);
+      // All campaigns except LeafGuard count weeks offset by -7 days in the source sheet.
+      // Shift display date forward by 7 days so e.g. 3/8 shows as 3/15.
+      var displayDate = (dateVal instanceof Date) ? new Date(dateVal.getTime()) : _parseTabDate(String(dateVal));
+      if (key !== 'leafguard' && displayDate) {
+        displayDate = new Date(displayDate.getTime() + 7 * 86400000);
+      }
+      var dateKey = formatDate(displayDate || dateVal);
       ownerSet[owner] = true;
 
       if (!weekMap[dateKey]) {
         weekMap[dateKey] = {
           tabName: dateKey,
-          date: (dateVal instanceof Date) ? dateVal : _parseTabDate(String(dateVal)),
+          date: displayDate || ((dateVal instanceof Date) ? dateVal : _parseTabDate(String(dateVal))),
           data: {}
         };
       }
