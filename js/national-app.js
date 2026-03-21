@@ -2250,53 +2250,57 @@ const NationalApp = {
     const goals = owner.nextGoals;
     const ownerIdx = this.state.owners.indexOf(owner);
 
-    // ── Section 1: Headcount Check (inputs start blank for weekly entry) ──
+    // ── Section 1: Headcount Check (pre-fill with current values so coaches can update all week) ──
     const headcountEl = document.getElementById('health-headcount');
     const isLG = this.state.campaign === 'leafguard';
+    const _hcVal = (field) => hc[field] ? hc[field] : '';
+    const _hcDist = isLG
+      ? (hc.active && hc.closers ? Math.max(hc.active - hc.closers, 0) : '—')
+      : (hc.active && hc.leaders ? Math.max(hc.active - hc.leaders, 0) : '—');
     const hcFieldsHtml = isLG ? `
         <div class="hc-field">
           <label class="hc-field-label">Active Reps</label>
-          <input type="number" class="hc-input" id="hc-active-${ownerIdx}" value="" min="0" placeholder="—"
+          <input type="number" class="hc-input" id="hc-active-${ownerIdx}" value="${_hcVal('active')}" min="0" placeholder="—"
             onchange="NationalApp._updateHeadcount(${ownerIdx}, 'active', this.value)">
         </div>
         <div class="hc-field">
           <label class="hc-field-label">Closers</label>
-          <input type="number" class="hc-input" id="hc-closers-${ownerIdx}" value="" min="0" placeholder="—"
+          <input type="number" class="hc-input" id="hc-closers-${ownerIdx}" value="${_hcVal('closers')}" min="0" placeholder="—"
             onchange="NationalApp._updateHeadcount(${ownerIdx}, 'closers', this.value)">
         </div>
         <div class="hc-field hc-field-calc">
           <label class="hc-field-label">Lead Gen</label>
-          <div class="hc-value" id="hc-dist-${ownerIdx}">—</div>
+          <div class="hc-value" id="hc-dist-${ownerIdx}">${_hcDist}</div>
           <div class="hc-calc-note">Active − Closers</div>
         </div>
         <div class="hc-field">
           <label class="hc-field-label">Leaders</label>
-          <input type="number" class="hc-input" id="hc-leaders-${ownerIdx}" value="" min="0" placeholder="—"
+          <input type="number" class="hc-input" id="hc-leaders-${ownerIdx}" value="${_hcVal('leaders')}" min="0" placeholder="—"
             onchange="NationalApp._updateHeadcount(${ownerIdx}, 'leaders', this.value)">
         </div>
         <div class="hc-field">
           <label class="hc-field-label">In Training</label>
-          <input type="number" class="hc-input" id="hc-training-${ownerIdx}" value="" min="0" placeholder="—"
+          <input type="number" class="hc-input" id="hc-training-${ownerIdx}" value="${_hcVal('training')}" min="0" placeholder="—"
             onchange="NationalApp._updateHeadcount(${ownerIdx}, 'training', this.value)">
         </div>` : `
         <div class="hc-field">
           <label class="hc-field-label">Active Reps</label>
-          <input type="number" class="hc-input" id="hc-active-${ownerIdx}" value="" min="0" placeholder="—"
+          <input type="number" class="hc-input" id="hc-active-${ownerIdx}" value="${_hcVal('active')}" min="0" placeholder="—"
             onchange="NationalApp._updateHeadcount(${ownerIdx}, 'active', this.value)">
         </div>
         <div class="hc-field">
           <label class="hc-field-label">Leaders</label>
-          <input type="number" class="hc-input" id="hc-leaders-${ownerIdx}" value="" min="0" placeholder="—"
+          <input type="number" class="hc-input" id="hc-leaders-${ownerIdx}" value="${_hcVal('leaders')}" min="0" placeholder="—"
             onchange="NationalApp._updateHeadcount(${ownerIdx}, 'leaders', this.value)">
         </div>
         <div class="hc-field hc-field-calc">
           <label class="hc-field-label">Distributors</label>
-          <div class="hc-value" id="hc-dist-${ownerIdx}">—</div>
+          <div class="hc-value" id="hc-dist-${ownerIdx}">${_hcDist}</div>
           <div class="hc-calc-note">Active − Leaders</div>
         </div>
         <div class="hc-field">
           <label class="hc-field-label">In Training</label>
-          <input type="number" class="hc-input" id="hc-training-${ownerIdx}" value="" min="0" placeholder="—"
+          <input type="number" class="hc-input" id="hc-training-${ownerIdx}" value="${_hcVal('training')}" min="0" placeholder="—"
             onchange="NationalApp._updateHeadcount(${ownerIdx}, 'training', this.value)">
         </div>`;
     headcountEl.innerHTML = `
@@ -2304,7 +2308,7 @@ const NationalApp = {
       <div class="hc-grid">${hcFieldsHtml}</div>
       <div class="hc-submit-row">
         <button class="hc-submit-btn" id="hc-submit-${ownerIdx}"
-          onclick="NationalApp._submitHeadcount(${ownerIdx})">Submit Headcount</button>
+          onclick="NationalApp._submitHeadcount(${ownerIdx})">Update Headcount</button>
         <span class="hc-submit-note" id="hc-submit-note-${ownerIdx}"></span>
       </div>`;
 
@@ -2418,7 +2422,7 @@ const NationalApp = {
     if (distEl) distEl.textContent = (activeEl?.value && leadersEl?.value) ? dist : '—';
   },
 
-  // ── Submit headcount — logs a new dated row ──
+  // ── Submit headcount — updates the most recent row (no duplicates) ──
   _submitHeadcount(ownerIdx) {
     const owner = this.state.owners[ownerIdx];
     if (!owner) return;
@@ -2427,6 +2431,7 @@ const NationalApp = {
     const active = parseInt(document.getElementById('hc-active-' + ownerIdx)?.value) || 0;
     const leaders = parseInt(document.getElementById('hc-leaders-' + ownerIdx)?.value) || 0;
     const training = parseInt(document.getElementById('hc-training-' + ownerIdx)?.value) || 0;
+    const closers = parseInt(document.getElementById('hc-closers-' + ownerIdx)?.value) || 0;
 
     if (!active && !leaders && !training) return; // Don't submit empty
 
@@ -2434,15 +2439,17 @@ const NationalApp = {
     owner.headcount.active = active;
     owner.headcount.leaders = leaders;
     owner.headcount.training = training;
+    if (closers) owner.headcount.closers = closers;
 
-    const now = new Date();
-    const dateStr = (now.getMonth() + 1) + '/' + now.getDate();
-
-    // Push new entry
-    owner.headcountHistory.push({
-      date: dateStr,
-      active, leaders, training
-    });
+    // Update the latest history entry in-place (don't push a new one)
+    const hist = owner.headcountHistory || [];
+    if (hist.length > 0) {
+      const latest = hist[hist.length - 1];
+      latest.active = active;
+      latest.leaders = leaders;
+      latest.training = training;
+      if (closers) latest.closers = closers;
+    }
 
     // Re-render the trend table
     this._renderHeadcountTrend(owner, ownerIdx);
@@ -2461,7 +2468,9 @@ const NationalApp = {
     // Show confirmation
     const note = document.getElementById('hc-submit-note-' + ownerIdx);
     if (note) {
-      note.textContent = 'Submitted ' + dateStr;
+      const now = new Date();
+      const dateStr = (now.getMonth() + 1) + '/' + now.getDate();
+      note.textContent = 'Updated ' + dateStr;
       note.classList.add('show');
       setTimeout(() => note.classList.remove('show'), 3000);
     }
