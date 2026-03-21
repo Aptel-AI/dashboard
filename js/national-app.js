@@ -1542,6 +1542,68 @@ const NationalApp = {
     if (refreshAll) refreshAll.style.display = isSA ? '' : 'none';
     const refreshStatus = document.getElementById('landing-refresh-status');
     if (refreshStatus) refreshStatus.style.display = isSA ? '' : 'none';
+
+    // Prefetch today's scheduled campaigns in background
+    this._prefetchTodaysCampaigns();
+  },
+
+  /**
+   * Prefetch full campaign data for today's scheduled campaigns.
+   * Runs in background so clicking into a campaign is near-instant.
+   */
+  async _prefetchTodaysCampaigns() {
+    const sched = this._planningSchedule || [];
+    if (!sched.length) return;
+
+    const todayIdx = (new Date().getDay() + 6) % 7;
+    const tomorrowIdx = (todayIdx + 1) % 7;
+    // Prefetch today first, then tomorrow
+    const todayCampaigns = sched
+      .filter(p => p.day === todayIdx || p.day === tomorrowIdx)
+      .sort((a, b) => {
+        // Today before tomorrow
+        const aPriority = a.day === todayIdx ? 0 : 1;
+        const bPriority = b.day === todayIdx ? 0 : 1;
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        return a.sortOrder - b.sortOrder;
+      });
+
+    if (!todayCampaigns.length) return;
+
+    for (const entry of todayCampaigns) {
+      const key = entry.campaignKey;
+      // Skip if already cached and fresh
+      if (this._readCoachCampaignCache(key)) {
+        console.log('[NationalApp] Prefetch skip (cached):', key);
+        continue;
+      }
+      // Skip if already prefetching
+      if (this._prefetching && this._prefetching[key]) continue;
+      if (!this._prefetching) this._prefetching = {};
+      this._prefetching[key] = true;
+
+      console.log('[NationalApp] Prefetching campaign data:', key);
+      try {
+        // Save current state, load campaign, cache it, restore state
+        const savedOwners = this.state.owners;
+        const savedTotals = this.state.campaignTotals;
+        const savedCampaign = this.state.campaign;
+
+        this.state.campaign = key;
+        await this.loadCampaignData(key);
+        this._writeCoachCampaignCache(key);
+
+        // Restore previous state
+        this.state.owners = savedOwners;
+        this.state.campaignTotals = savedTotals;
+        this.state.campaign = savedCampaign;
+
+        console.log('[NationalApp] Prefetched + cached:', key);
+      } catch (err) {
+        console.warn('[NationalApp] Prefetch failed for', key, ':', err.message);
+      }
+      this._prefetching[key] = false;
+    }
   },
 
   _COACH_CACHE_MAX_AGE: 15 * 60 * 1000, // 15 min per-campaign cache
