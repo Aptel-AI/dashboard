@@ -1517,9 +1517,6 @@ const NationalApp = {
           <div class="campaign-card-label">${this._esc(label)}</div>
           ${variantHtml}
           ${ownerCount ? `<div class="campaign-card-owners">${ownerCount} owner${ownerCount !== 1 ? 's' : ''}</div>` : ''}
-          ${this._isSuperadmin() ? `<button class="campaign-card-refresh" data-campaign="${key}"
-            onclick="event.stopPropagation(); NationalApp.refreshSingleFromLanding('${key}', this)"
-            title="Refresh ${this._esc(label)} only">&#x21bb;</button>` : ''}
         </div>`;
     }).join('');
 
