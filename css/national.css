@@ -715,12 +715,14 @@ input, select, textarea { font-family: inherit; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: 6px;
-  width: 24px;
-  height: 24px;
+  margin-left: 2px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   overflow: hidden;
-  vertical-align: middle;
+  vertical-align: top;
+  position: relative;
+  top: -4px;
 }
 .tab-logo-badge img {
   height: 100%;
