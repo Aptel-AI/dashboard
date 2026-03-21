@@ -3968,9 +3968,9 @@ const NationalApp = {
 
   _showRcTooltip(event) {
     const el = event.target;
-    const wrap = el.closest('.rc-bar-wrap');
-    if (!wrap) return;
-    const tt = wrap.querySelector('.rc-tooltip');
+    const card = el.closest('.recruit-chart-card');
+    if (!card) return;
+    const tt = card.querySelector('.rc-tooltip');
     if (!tt) return;
     const wk = el.getAttribute('data-wk') || '';
     const bk = el.getAttribute('data-bk') || '0';
@@ -3978,7 +3978,7 @@ const NationalApp = {
     const pct = el.getAttribute('data-pct');
     tt.innerHTML = `<div style="font-weight:700;margin-bottom:2px">${wk}</div><div>Booked: <strong>${bk}</strong></div><div>Showed: <strong>${sh}</strong></div>${pct ? '<div style="border-top:1px solid rgba(255,255,255,0.2);margin-top:3px;padding-top:3px">Retention: <strong>' + pct + '%</strong></div>' : ''}`;
     tt.classList.add('visible');
-    const rect = wrap.getBoundingClientRect();
+    const rect = card.getBoundingClientRect();
     const bar = el.getBoundingClientRect();
     let left = bar.left - rect.left + bar.width / 2 - tt.offsetWidth / 2;
     left = Math.max(4, Math.min(left, rect.width - tt.offsetWidth - 4));
@@ -4118,10 +4118,10 @@ const NationalApp = {
             <div class="rc-card-hero-label">showed</div>
           </div>
         </div>
-        <div class="rc-bar-wrap" style="position:relative">
+        <div class="rc-bar-wrap">
           <svg viewBox="0 0 ${vbW} ${svgH}" width="${svgWidthPct}" preserveAspectRatio="xMinYMid meet" style="display:block">${svg}</svg>
-          <div class="hc-chart-tooltip rc-tooltip"></div>
         </div>
+        <div class="hc-chart-tooltip rc-tooltip"></div>
         ${legend}
       </div>`;
   },

@@ -1366,6 +1366,7 @@ input, select, textarea { font-family: inherit; }
   gap: 12px;
 }
 .recruit-chart-card {
+  position: relative;
   background: var(--white, #fff);
   border: 1px solid var(--gray-100, #e5e7eb);
   border-radius: var(--radius, 10px);
