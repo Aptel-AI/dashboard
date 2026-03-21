@@ -716,13 +716,16 @@ input, select, textarea { font-family: inherit; }
   align-items: center;
   justify-content: center;
   margin-left: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  overflow: hidden;
   vertical-align: middle;
 }
 .tab-logo-badge img {
-  height: 20px;
-  width: auto;
-  object-fit: contain;
-  border-radius: 4px;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
 }
 
 /* Tab Content */
