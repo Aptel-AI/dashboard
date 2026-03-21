@@ -983,19 +983,9 @@ const OwnerDev = {
 
     document.getElementById('user-name').textContent = s.name || s.email;
 
+    // Team badge hidden — no longer shown
     const badge = document.getElementById('user-team-badge');
-    const effectiveTeam = this._getEffectiveTeam();
-    const teamCfg = OD_CONFIG.teams[effectiveTeam];
-    if (teamCfg) {
-      badge.style.display = '';
-      badge.style.background = teamCfg.color;
-      badge.textContent = teamCfg.icon + ' ' + teamCfg.label;
-    }
-
-    // If superadmin, show indicator
-    if (this.state.isSuperadmin && this.state.viewAsTeam) {
-      badge.textContent = '👁️ ' + badge.textContent;
-    }
+    if (badge) badge.style.display = 'none';
   },
 
   // ══════════════════════════════════════════════════════
