@@ -1045,11 +1045,20 @@ const OwnerDev = {
     document.getElementById('stat-partial').textContent = partial;
     document.getElementById('stat-unmapped').textContent = unmapped;
 
-    // Update mapping nav badge with total unmapped (across all campaigns, ignoring filter)
-    const allRows = this._getFilteredRows(true); // ignoreFilter=true
+    // Update mapping nav badge with unmapped count for current team
+    const allRows = this._getFilteredRows(true);
+    const team = this._getEffectiveTeam();
     let totalUnmapped = 0;
     for (const row of allRows) {
-      if (this._getRowStatus(row) === 'unmapped') totalUnmapped++;
+      const m = this._findMapping(row.campaign, row.ownerName);
+      if (team === 'cam') {
+        if (!m?.camCompany) totalUnmapped++;
+      } else if (team === 'nlr') {
+        if (!m?.nlrTab) totalUnmapped++;
+      } else {
+        // Maddie / superadmin: unmapped = missing either
+        if (this._getRowStatus(row, m) === 'unmapped') totalUnmapped++;
+      }
     }
     const badge = document.getElementById('mapping-notif-badge');
     if (badge) {
