@@ -1044,6 +1044,18 @@ const OwnerDev = {
     document.getElementById('stat-mapped').textContent = mapped;
     document.getElementById('stat-partial').textContent = partial;
     document.getElementById('stat-unmapped').textContent = unmapped;
+
+    // Update mapping nav badge with total unmapped (across all campaigns, ignoring filter)
+    const allRows = this._getFilteredRows(true); // ignoreFilter=true
+    let totalUnmapped = 0;
+    for (const row of allRows) {
+      if (this._getRowStatus(row) === 'unmapped') totalUnmapped++;
+    }
+    const badge = document.getElementById('mapping-notif-badge');
+    if (badge) {
+      badge.textContent = totalUnmapped;
+      badge.style.display = totalUnmapped > 0 ? '' : 'none';
+    }
   },
 
   // ══════════════════════════════════════════════════════
