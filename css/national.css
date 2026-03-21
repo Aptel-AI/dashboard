@@ -318,16 +318,16 @@ input, select, textarea { font-family: inherit; }
 /* Day pill (top-right corner, from planning schedule) */
 .campaign-card-day-pill {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  padding: 2px 8px;
-  font-size: 10px;
-  font-weight: 700;
+  top: 10px;
+  right: 10px;
+  padding: 2px 7px;
+  font-size: 9px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #0099cc;
-  background: rgba(0, 153, 204, 0.1);
-  border-radius: 6px;
+  color: #a0adb8;
+  background: none;
+  border-radius: 4px;
   z-index: 1;
 }
 
