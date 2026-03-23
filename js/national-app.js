@@ -1436,6 +1436,7 @@ const NationalApp = {
       return {
         name: name,
         tab: name,
+        _campaignKey: campaignKey,
         statusCode: null,
         headcount: {
           active: latestHeadcount.active || 0,
@@ -2618,7 +2619,7 @@ const NationalApp = {
     }
 
     // ── Write to spreadsheet via Apps Script ──
-    const campaignLabel = this._getCampaignLabel();
+    const campaignLabel = this._getCampaignLabel(owner);
     const dist = Math.max(active - leaders, 0);
     const note = document.getElementById('hc-submit-note-' + ownerIdx);
     try {
@@ -3668,7 +3669,7 @@ const NationalApp = {
 
   _saveProdRow(owner, entry) {
     const sheetName = owner._sheetName || owner.tab || owner.name;
-    const campaignLabel = this._getCampaignLabel();
+    const campaignLabel = this._getCampaignLabel(owner);
     const products = entry.products || {};
     const productKeys = Object.keys(products);
 
@@ -3759,7 +3760,7 @@ const NationalApp = {
   async _submitGoals(ownerIdx) {
     const owner = this.state.owners[ownerIdx];
     if (!owner) return;
-    const campaignLabel = this._getCampaignLabel();
+    const campaignLabel = this._getCampaignLabel(owner);
 
     // Collect goal values from all goal inputs in the DOM (not just production.products,
     // since Set Goals shows ALL products including ones not yet sold)
@@ -3980,7 +3981,7 @@ const NationalApp = {
 
     // Fire and forget — save in background
     const sheetName = owner._sheetName || owner.tab || owner.name;
-    const campaignLabel = this._getCampaignLabel();
+    const campaignLabel = this._getCampaignLabel(owner);
     const prodDate = prodHist.length > 0 ? prodHist[prodHist.length - 1].date : this._latestWeekDate;
     fetch(NATIONAL_CONFIG.appsScriptUrl, {
       method: 'POST',
@@ -5850,8 +5851,8 @@ const NationalApp = {
 
   // Get the display label for the current campaign (used as the sheet tab name).
   // Checks multiple sources since config may not be populated on all code paths.
-  _getCampaignLabel() {
-    const key = this.state.campaign;
+  _getCampaignLabel(owner) {
+    const key = this.state.campaign || owner?._campaignKey || this._coachCampaign;
     if (!key) return '';
     // 1. NATIONAL_CONFIG (set by _populateCampaignSelector or loadCampaignData)
     const cfg = NATIONAL_CONFIG.campaigns[key];
