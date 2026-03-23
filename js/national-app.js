@@ -2371,22 +2371,34 @@ const NationalApp = {
     } else if (productNames.length > 0) {
       // Show per-product cards only — hide products with no goal, no current units, and no history
       const prodHist = owner.productionHistory || [];
+      // Determine if production is missing (all zeros) → make cards editable
+      const prodMissing = !prod.totalActual && !prod.totalGoal;
       for (const pName of productNames) {
         const pData = productEntries[pName];
         if (!pData.actual && !pData.goal) {
           // Check if this product has ever had production historically
           const everSold = prodHist.some(w => w.products && w.products[pName] && (w.products[pName].actual > 0));
-          if (!everSold) continue;
+          if (!everSold && !prodMissing) continue;
         }
-        prodCardsHtml += this._prodCard(pName, pData.actual, pData.goal);
+        prodCardsHtml += prodMissing
+          ? this._prodCardEditable(pName, pData.actual, pData.goal, ownerIdx)
+          : this._prodCard(pName, pData.actual, pData.goal);
       }
     } else {
       // Fallback: single total card
-      prodCardsHtml = this._prodCard('Total Units', prod.totalActual, prod.totalGoal);
+      const prodMissing = !prod.totalActual && !prod.totalGoal;
+      prodCardsHtml = prodMissing
+        ? this._prodCardEditable('Total Units', prod.totalActual, prod.totalGoal, ownerIdx)
+        : this._prodCard('Total Units', prod.totalActual, prod.totalGoal);
     }
+    const prodMissing = !prod.totalActual && !prod.totalGoal;
     prodEl.innerHTML = `
-      <div class="coaching-label">Production Review <span class="coaching-sublabel">Last Week</span></div>
-      <div class="prod-cards">${prodCardsHtml}</div>`;
+      <div class="coaching-label">Production Review <span class="coaching-sublabel">Last Week</span>${prodMissing ? ' <span style="color:var(--orange);font-size:12px;font-weight:500;">— No data entered</span>' : ''}</div>
+      <div class="prod-cards">${prodCardsHtml}</div>
+      ${prodMissing ? `<div class="hc-submit-row">
+        <button class="hc-submit-btn" onclick="NationalApp._submitProductionCards(${ownerIdx})">Save Production</button>
+        <span class="hc-submit-note" id="prod-submit-note-${ownerIdx}"></span>
+      </div>` : ''}`;
 
     // ── Production Trend Table ──
     this._renderProductionTrend(owner, ownerIdx);
@@ -3829,6 +3841,114 @@ const NationalApp = {
         <div class="prod-card-actual">${Number(actual).toLocaleString()}</div>
         ${goalLine}
       </div>`;
+  },
+
+  // ── Editable production card (for weeks with missing data) ──
+  _prodCardEditable(label, actual, goal, ownerIdx) {
+    const safeLabel = label.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+    return `
+      <div class="prod-card pct-none" style="border:2px dashed var(--orange);">
+        <div class="prod-card-label">${label}</div>
+        <input type="number" class="hc-input prod-card-edit-input" id="prod-edit-${safeLabel}-${ownerIdx}"
+          value="${actual || ''}" min="0" placeholder="—"
+          style="font-size:28px;font-weight:700;text-align:center;width:80%;margin:4px auto;">
+        <div class="prod-card-goal" style="margin-top:4px;">
+          goal: <input type="number" class="hc-input prod-card-edit-input" id="prod-edit-goal-${safeLabel}-${ownerIdx}"
+            value="${goal || ''}" min="0" placeholder="—"
+            style="font-size:13px;width:60px;text-align:center;display:inline-block;">
+        </div>
+      </div>`;
+  },
+
+  // ── Submit production from editable cards ──
+  async _submitProductionCards(ownerIdx) {
+    const owner = this.state.owners[ownerIdx];
+    if (!owner) return;
+    const prod = owner.production || {};
+    const productEntries = prod.products || {};
+    const productNames = Object.keys(productEntries);
+    const note = document.getElementById('prod-submit-note-' + ownerIdx);
+
+    // Read values from editable card inputs
+    const updates = {};
+    let totalActual = 0, totalGoal = 0;
+    if (productNames.length > 0) {
+      for (const pName of productNames) {
+        const safeLabel = pName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+        const actualVal = parseInt(document.getElementById('prod-edit-' + safeLabel + '-' + ownerIdx)?.value) || 0;
+        const goalVal = parseInt(document.getElementById('prod-edit-goal-' + safeLabel + '-' + ownerIdx)?.value) || 0;
+        updates[pName] = { actual: actualVal, goal: goalVal };
+        totalActual += actualVal;
+        totalGoal += goalVal;
+      }
+    } else {
+      totalActual = parseInt(document.getElementById('prod-edit-total-units-' + ownerIdx)?.value) || 0;
+      totalGoal = parseInt(document.getElementById('prod-edit-goal-total-units-' + ownerIdx)?.value) || 0;
+    }
+
+    if (!totalActual && !totalGoal) return;
+
+    // Update in-memory state
+    prod.totalActual = totalActual;
+    prod.totalGoal = totalGoal;
+    for (const pName in updates) {
+      if (prod.products[pName]) {
+        prod.products[pName].actual = updates[pName].actual;
+        prod.products[pName].goal = updates[pName].goal;
+      }
+    }
+
+    // Also update the newest production history entry
+    const prodHist = owner.productionHistory || [];
+    if (prodHist.length > 0) {
+      const newest = prodHist[prodHist.length - 1];
+      newest.tA = totalActual;
+      newest.tG = totalGoal;
+      for (const pName in updates) {
+        if (!newest.products) newest.products = {};
+        newest.products[pName] = { actual: updates[pName].actual, goal: updates[pName].goal };
+      }
+    }
+
+    // Save to backend
+    try {
+      if (note) { note.textContent = 'Saving...'; note.classList.add('show'); }
+      const sheetName = owner._sheetName || owner.tab || owner.name;
+      // Determine the date for the production row (newest week)
+      const prodDate = prodHist.length > 0 ? prodHist[prodHist.length - 1].date : this._latestWeekDate;
+      const resp = await fetch(NATIONAL_CONFIG.appsScriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          key: NATIONAL_CONFIG.apiKey,
+          action: 'updateProduction',
+          ownerName: sheetName,
+          date: prodDate,
+          products: productNames.length > 0 ? updates : null,
+          internet: totalActual,
+          wireless: 0,
+          dtv: 0,
+          goals: totalGoal ? String(totalGoal) : ''
+        })
+      });
+      const result = await resp.json();
+      if (result.error) throw new Error(result.error);
+      console.log('[Prod Cards] Saved:', sheetName, prodDate, updates);
+      this._invalidateOdCache();
+      if (note) {
+        note.textContent = 'Saved ✓';
+        setTimeout(() => note.classList.remove('show'), 3000);
+      }
+      // Re-render health tab to swap cards from editable to display
+      this.renderHealthTab(owner);
+    } catch (err) {
+      console.error('[Prod Cards] Save failed:', err);
+      if (note) {
+        note.textContent = 'Save failed — ' + err.message;
+        note.style.color = '#e53535';
+        setTimeout(() => { note.classList.remove('show'); note.style.color = ''; }, 5000);
+      }
+    }
   },
 
   // ── Combined production card (main metric + sub metric underneath) ──
