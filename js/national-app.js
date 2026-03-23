@@ -3664,43 +3664,37 @@ const NationalApp = {
     }, 1200);
   },
 
-  async _saveProdRow(owner, entry) {
+  _saveProdRow(owner, entry) {
     const sheetName = owner._sheetName || owner.tab || owner.name;
     const campaignLabel = this._getCampaignLabel();
-    // Build per-product payload for backend
     const products = entry.products || {};
     const productKeys = Object.keys(products);
-    try {
-      const resp = await fetch(NATIONAL_CONFIG.appsScriptUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          key: NATIONAL_CONFIG.apiKey,
-          action: 'updateProduction',
-          ownerName: sheetName,
-          date: entry.date,
-          campaignLabel: campaignLabel,
-          // Send per-product data for campaigns that have it
-          products: productKeys.length > 0 ? products : null,
-          // Legacy fallback params
-          internet: entry.tA || 0,
-          wireless: 0,
-          dtv: 0,
-          goals: entry.tG ? String(entry.tG) : ''
-        })
-      });
-      const result = await resp.json();
+
+    // Update rankings immediately from in-memory state
+    this._invalidateOdCache();
+    this._rankOwnersByProduction();
+    this.renderOwnersList();
+
+    // Fire and forget — save in background
+    fetch(NATIONAL_CONFIG.appsScriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        key: NATIONAL_CONFIG.apiKey,
+        action: 'updateProduction',
+        ownerName: sheetName,
+        date: entry.date,
+        campaignLabel: campaignLabel,
+        products: productKeys.length > 0 ? products : null,
+        internet: entry.tA || 0,
+        wireless: 0,
+        dtv: 0,
+        goals: entry.tG ? String(entry.tG) : ''
+      })
+    }).then(r => r.json()).then(result => {
       if (result.error) console.warn('[Prod Save] Error:', result.error);
-      else {
-        console.log('[Prod Save] Saved', sheetName, entry.date, productKeys.length ? productKeys : 'legacy');
-        this._invalidateOdCache();
-        // Re-rank owners live as production data comes in
-        this._rankOwnersByProduction();
-        this.renderOwnersList();
-      }
-    } catch (err) {
-      console.warn('[Prod Save] Network error:', err.message);
-    }
+      else console.log('[Prod Save] Saved', sheetName, entry.date, productKeys.length ? productKeys : 'legacy');
+    }).catch(err => console.warn('[Prod Save] Network error:', err.message));
   },
 
   // ── Production chart tooltip helpers ──
@@ -3793,38 +3787,24 @@ const NationalApp = {
 
     if (!anyGoal) return;
 
-    const note = document.getElementById('goal-submit-note-' + ownerIdx);
-    const btn = document.querySelector(`#health-goals .hc-submit-btn`);
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    // Fire and forget — save in background so the coach can move on immediately
+    fetch(NATIONAL_CONFIG.appsScriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        key: NATIONAL_CONFIG.apiKey,
+        action: 'saveGoals',
+        ownerName: owner._sheetName || owner.tab || owner.name,
+        campaignLabel: cfg.label,
+        campaignKey: this.state.campaign,
+        goals: goals
+      })
+    }).then(r => r.json()).then(result => {
+      if (result.error) console.warn('[Goals] Error:', result.error);
+      else console.log('[Goals] Saved:', result);
+    }).catch(err => console.warn('[Goals] Network error:', err.message));
 
-    try {
-      const resp = await fetch(NATIONAL_CONFIG.appsScriptUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          key: NATIONAL_CONFIG.apiKey,
-          action: 'saveGoals',
-          ownerName: owner._sheetName || owner.tab || owner.name,
-          campaignLabel: cfg.label,
-          campaignKey: this.state.campaign,
-          goals: goals
-        })
-      });
-      const result = await resp.json();
-      if (result.error) {
-        console.warn('[Goals] Error:', result.error);
-        if (note) { note.textContent = 'Error: ' + result.error; note.classList.add('show'); }
-      } else {
-        console.log('[Goals] Saved:', result);
-        if (note) { note.textContent = 'Goals saved for ' + (result.date || 'next week'); note.classList.add('show'); }
-      }
-    } catch (err) {
-      console.warn('[Goals] Network error:', err.message);
-      if (note) { note.textContent = 'Network error'; note.classList.add('show'); }
-    }
-
-    if (btn) { btn.disabled = false; btn.textContent = 'Submit Goals'; }
-    if (note) setTimeout(() => note.classList.remove('show'), 3000);
+    this._invalidateOdCache();
   },
 
   // ── Notes log: add / delete ──
@@ -3991,51 +3971,36 @@ const NationalApp = {
       }
     }
 
-    // Save to backend
-    try {
-      if (note) { note.textContent = 'Saving...'; note.classList.add('show'); }
-      const sheetName = owner._sheetName || owner.tab || owner.name;
-      const campaignLabel = this._getCampaignLabel();
-      // Determine the date for the production row (newest week)
-      const prodDate = prodHist.length > 0 ? prodHist[prodHist.length - 1].date : this._latestWeekDate;
-      const resp = await fetch(NATIONAL_CONFIG.appsScriptUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          key: NATIONAL_CONFIG.apiKey,
-          action: 'updateProduction',
-          ownerName: sheetName,
-          date: prodDate,
-          campaignLabel: campaignLabel,
-          products: productNames.length > 0 ? updates : null,
-          internet: totalActual,
-          wireless: 0,
-          dtv: 0,
-          goals: totalGoal ? String(totalGoal) : ''
-        })
-      });
-      const result = await resp.json();
-      if (result.error) throw new Error(result.error);
-      console.log('[Prod Cards] Saved:', sheetName, prodDate, updates);
-      this._invalidateOdCache();
-      // Clear the missing-prod flag since we just entered data
-      owner._newestWeekMissingProd = false;
-      if (note) {
-        note.textContent = 'Saved ✓';
-        setTimeout(() => note.classList.remove('show'), 3000);
-      }
-      // Re-rank owners and refresh the list + health tab
-      this._rankOwnersByProduction();
-      this.renderOwnersList();
-      this.renderHealthTab(owner);
-    } catch (err) {
-      console.error('[Prod Cards] Save failed:', err);
-      if (note) {
-        note.textContent = 'Save failed — ' + err.message;
-        note.style.color = '#e53535';
-        setTimeout(() => { note.classList.remove('show'); note.style.color = ''; }, 5000);
-      }
-    }
+    // Update state immediately, then save in background
+    owner._newestWeekMissingProd = false;
+    this._invalidateOdCache();
+    this._rankOwnersByProduction();
+    this.renderOwnersList();
+    this.renderHealthTab(owner);
+
+    // Fire and forget — save in background
+    const sheetName = owner._sheetName || owner.tab || owner.name;
+    const campaignLabel = this._getCampaignLabel();
+    const prodDate = prodHist.length > 0 ? prodHist[prodHist.length - 1].date : this._latestWeekDate;
+    fetch(NATIONAL_CONFIG.appsScriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        key: NATIONAL_CONFIG.apiKey,
+        action: 'updateProduction',
+        ownerName: sheetName,
+        date: prodDate,
+        campaignLabel: campaignLabel,
+        products: productNames.length > 0 ? updates : null,
+        internet: totalActual,
+        wireless: 0,
+        dtv: 0,
+        goals: totalGoal ? String(totalGoal) : ''
+      })
+    }).then(r => r.json()).then(result => {
+      if (result.error) console.warn('[Prod Cards] Error:', result.error);
+      else console.log('[Prod Cards] Saved:', sheetName, prodDate);
+    }).catch(err => console.warn('[Prod Cards] Network error:', err.message));
   },
 
   // ── Combined production card (main metric + sub metric underneath) ──
