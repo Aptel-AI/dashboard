@@ -2845,9 +2845,9 @@ function saveGoalsRow_(ownerName, campaignLabel, campaignKey, goals) {
 
   // If no row exists for next week, create one
   if (targetRow === -1) {
-    var campaignHeaders2 = getConsolidatedHeaders_(campaignKey);
+    var numCols = headers.length; // use actual sheet column count, not template
     var newRow = [];
-    for (var h2 = 0; h2 < campaignHeaders2.length; h2++) newRow.push(0);
+    for (var h2 = 0; h2 < numCols; h2++) newRow.push(0);
     // Write as formatted string to avoid timezone/time issues in Sheets
     newRow[colWeek] = formatDate(nextMonday);
     newRow[colOwner] = ownerName;
