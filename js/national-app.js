@@ -2618,7 +2618,7 @@ const NationalApp = {
     }
 
     // ── Write to spreadsheet via Apps Script ──
-    const campaignLabel = NATIONAL_CONFIG.campaigns[this.state.campaign]?.label || '';
+    const campaignLabel = this._getCampaignLabel();
     const dist = Math.max(active - leaders, 0);
     const note = document.getElementById('hc-submit-note-' + ownerIdx);
     try {
@@ -3786,9 +3786,6 @@ const NationalApp = {
     if (!anyGoal) return;
 
     this._flashBtn(document.querySelector('#health-goals .hc-submit-btn'));
-
-    const ownerName = owner._sheetName || owner.tab || owner.name;
-    console.log('[Goals] Submitting:', { ownerName, campaignLabel, campaignKey: this.state.campaign, goals });
 
     // Fire and forget — save in background so the coach can move on immediately
     fetch(NATIONAL_CONFIG.appsScriptUrl, {
@@ -5855,7 +5852,7 @@ const NationalApp = {
   // Checks multiple sources since config may not be populated on all code paths.
   _getCampaignLabel() {
     const key = this.state.campaign;
-    if (!key) { console.warn('[getCampaignLabel] state.campaign is falsy:', key); return ''; }
+    if (!key) return '';
     // 1. NATIONAL_CONFIG (set by _populateCampaignSelector or loadCampaignData)
     const cfg = NATIONAL_CONFIG.campaigns[key];
     if (cfg?.label) return cfg.label;
@@ -5863,9 +5860,7 @@ const NationalApp = {
     const acd = this._allCampaignsData?.[key];
     if (acd?.label) return acd.label;
     // 3. Title-case the key as last resort (frontier → Frontier)
-    const fallback = key.charAt(0).toUpperCase() + key.slice(1).replace(/-./g, m => ' ' + m[1].toUpperCase());
-    console.log('[getCampaignLabel] Using title-case fallback:', fallback, 'for key:', key);
-    return fallback;
+    return key.charAt(0).toUpperCase() + key.slice(1).replace(/-./g, m => ' ' + m[1].toUpperCase());
   },
 
   // Invalidate ALL caches so next load fetches fresh data from server.
