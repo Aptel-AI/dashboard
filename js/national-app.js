@@ -1391,11 +1391,21 @@ const NationalApp = {
         prodHistory.push({ date: newestWeekDate, tA: 0, tG: 0, products: inheritProducts });
       }
 
-      // Build current production strictly from LAST WEEK (second-to-last prodHistory entry,
-      // since the last entry is always the upcoming week with all zeros for goal-setting).
-      // Rankings are purely a last-week stat — no fallback to older weeks.
+      // Build current production strictly from LAST WEEK only.
+      // The last prodHistory entry is always the upcoming week (all zeros for goal-setting).
+      // We need the entry before that, BUT only if its date is actually within the last ~2 weeks.
+      // If it's from months ago (like Adam Cole's 09/07/2025), it's not "last week" — treat as 0.
       const lastWeekProdIdx = prodHistory.length >= 2 ? prodHistory.length - 2 : prodHistory.length - 1;
-      const lastWeekProdEntry = prodHistory.length > 0 ? prodHistory[lastWeekProdIdx] : null;
+      let lastWeekProdEntry = prodHistory.length > 0 ? prodHistory[lastWeekProdIdx] : null;
+      // Validate the date is recent (within 16 days to allow for slight date offsets)
+      if (lastWeekProdEntry && lastWeekProdEntry.date) {
+        const parts = lastWeekProdEntry.date.split('/');
+        if (parts.length === 3) {
+          const entryDate = new Date(+parts[2], +parts[0] - 1, +parts[1]);
+          const daysSince = (Date.now() - entryDate.getTime()) / (1000 * 60 * 60 * 24);
+          if (daysSince > 16) lastWeekProdEntry = null; // too old, not last week
+        }
+      }
       let currentProd = { totalGoal: 0, totalActual: 0, wirelessGoal: 0, wirelessActual: 0, products: {} };
       if (lastWeekProdEntry && lastWeekProdEntry.products) {
         let totalP = 0, totalG = 0;
@@ -1411,7 +1421,7 @@ const NationalApp = {
         currentProd.totalActual = lastWeekProdEntry.tA || 0;
         currentProd.totalGoal = lastWeekProdEntry.tG || 0;
       }
-      const newestWeekMissingProd = lastWeekProdEntry && lastWeekProdEntry.tA === 0 && lastWeekProdEntry.tG === 0;
+      const newestWeekMissingProd = !lastWeekProdEntry || (lastWeekProdEntry.tA === 0 && lastWeekProdEntry.tG === 0);
       // If currentProd has no products but prodHistory does, inherit product names
       if (!Object.keys(currentProd.products).length && prodHistory.length > 0) {
         const fallbackPH = prodHistory.find(p => p.products && Object.keys(p.products).length > 0);
@@ -1803,7 +1813,7 @@ const NationalApp = {
     }
   },
 
-  _COACH_CACHE_VERSION: 4, // bump to invalidate all caches after code changes
+  _COACH_CACHE_VERSION: 5, // bump to invalidate all caches after code changes
   _COACH_CACHE_MAX_AGE: 15 * 60 * 1000, // 15 min per-campaign cache
 
   async selectCampaign(campaignKey) {
