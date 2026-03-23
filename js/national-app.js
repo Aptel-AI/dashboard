@@ -1814,6 +1814,7 @@ const NationalApp = {
     }
   },
 
+  _COACH_CACHE_VERSION: 2, // bump to invalidate all caches after code changes
   _COACH_CACHE_MAX_AGE: 15 * 60 * 1000, // 15 min per-campaign cache
 
   async selectCampaign(campaignKey) {
@@ -1909,7 +1910,7 @@ const NationalApp = {
       const raw = localStorage.getItem('coach_cache_' + campaignKey);
       if (!raw) return null;
       const data = JSON.parse(raw);
-      if (Date.now() - (data._ts || 0) > this._COACH_CACHE_MAX_AGE) {
+      if (Date.now() - (data._ts || 0) > this._COACH_CACHE_MAX_AGE || (data._v || 0) !== this._COACH_CACHE_VERSION) {
         localStorage.removeItem('coach_cache_' + campaignKey);
         return null;
       }
@@ -1941,6 +1942,7 @@ const NationalApp = {
       }
       localStorage.setItem('coach_cache_' + campaignKey, JSON.stringify({
         _ts: Date.now(),
+        _v: this._COACH_CACHE_VERSION,
         owners: this.state.owners,
         campaignTotals: this.state.campaignTotals
       }));
