@@ -1566,9 +1566,19 @@ const NationalApp = {
   },
 
   // ── Rank owners by most recent week's production (for non-att-res campaigns) ──
+  // If the newest week has no production (fresh week), use the last week with actual data
   _rankOwnersByProduction() {
     const sorted = [...this.state.owners]
-      .map((o, idx) => ({ idx, prod: o.production?.totalActual || 0 }))
+      .map((o, idx) => {
+        let prod = o.production?.totalActual || 0;
+        // If current production is 0 (fresh week), find last week with data from history
+        if (!prod && o.productionHistory?.length) {
+          for (let i = o.productionHistory.length - 1; i >= 0; i--) {
+            if (o.productionHistory[i].tA > 0) { prod = o.productionHistory[i].tA; break; }
+          }
+        }
+        return { idx, prod };
+      })
       .sort((a, b) => b.prod - a.prod);
 
     sorted.forEach((entry, rank) => {
