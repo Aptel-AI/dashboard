@@ -1319,6 +1319,8 @@ const NationalApp = {
             hcHistory.push({ date: allWeeksChron[wi].tabName, active: hcActive, leaders: hcLeaders, training: hcTraining, closers: hcClosers, leadGen: hcLeadGen });
           }
           // Production history — handle both old format (single numbers) and new format (per-product objects)
+          // Always include the most recent week (even if all zeros) so coaches can fill it in
+          const isNewestWeek = (wi === allWeeksChron.length - 1);
           const prod = h.production;
           if (prod && typeof prod === 'object' && !Array.isArray(prod)) {
             // New per-product format: { Frontier: {production, goals}, Cell: {production, goals}, ... }
@@ -1334,13 +1336,13 @@ const NationalApp = {
             // Sum across products (no separate Total column)
             entry.tA = totalProd;
             entry.tG = totalGoal;
-            // Skip weeks where all data is zero
-            if (totalProd > 0 || totalGoal > 0) prodHistory.push(entry);
+            // Include newest week even if zeros (editable), skip older empty weeks
+            if (totalProd > 0 || totalGoal > 0 || isNewestWeek) prodHistory.push(entry);
           } else {
             // Legacy single-value format
             const legA = (typeof prod === 'number') ? prod : 0;
             const legG = (typeof h.goals === 'number') ? h.goals : 0;
-            if (legA > 0 || legG > 0) {
+            if (legA > 0 || legG > 0 || isNewestWeek) {
               prodHistory.push({ date: allWeeksChron[wi].tabName, tA: legA, tG: legG, products: {} });
             }
           }
@@ -3054,11 +3056,11 @@ const NationalApp = {
     if (!rawHist.length) { trendEl.style.display = 'none'; return; }
     trendEl.style.display = '';
 
-    // Reverse so newest week is on the LEFT, skip weeks with no actual production
+    // Reverse so newest week is on the LEFT
+    // Keep zero-production weeks visible so coaches can fill them in during meetings
     // Track original indices for tooltip accuracy
     const hist = rawHist
       .map((r, idx) => ({ ...r, _origIdx: idx }))
-      .filter(r => (r.tA || 0) > 0)
       .reverse();
     const n = hist.length;
     if (!n) { trendEl.style.display = 'none'; return; }
@@ -3118,7 +3120,7 @@ const NationalApp = {
     }
     const hasProducts = tableProductNames.length > 0;
 
-    const tableRows = hist.filter(r => (r.tA || 0) > 0).map((r, i, arr) => {
+    const tableRows = hist.map((r, i, arr) => {
       const realOrigIdx = r._origIdx !== undefined ? r._origIdx : (n - 1 - hist.indexOf(r));
       const prev = i < arr.length - 1 ? arr[i + 1] : null;
       const arrow = this._trendArrow(r.tA, prev?.tA);
@@ -3129,16 +3131,20 @@ const NationalApp = {
       if (hasProducts) {
         for (const pName of tableProductNames) {
           const pData = (r.products || {})[pName] || { actual: 0, goal: 0 };
-          productCells += `<td class="num">${pData.actual || 0}</td><td class="num">${pData.goal || 0}</td>`;
+          const escapedPName = this._esc(pName).replace(/'/g, "\\'");
+          productCells += `<td class="num"><input type="number" class="hc-edit-input" value="${pData.actual || ''}" min="0" placeholder="—"
+            onchange="NationalApp._onProdProductEdit(${ownerIdx},${realOrigIdx},'${escapedPName}','actual',this.value)"></td>
+          <td class="num"><input type="number" class="hc-edit-input" value="${pData.goal || ''}" min="0" placeholder="—"
+            onchange="NationalApp._onProdProductEdit(${ownerIdx},${realOrigIdx},'${escapedPName}','goal',this.value)"></td>`;
         }
       }
 
       return `<tr>
         <td class="bold">${this._esc(r.date)}</td>
         ${productCells}
-        ${!hasProducts ? `<td class="num"><input type="number" class="hc-edit-input" value="${r.tA || 0}" min="0"
+        ${!hasProducts ? `<td class="num"><input type="number" class="hc-edit-input" value="${r.tA || ''}" min="0" placeholder="—"
           onchange="NationalApp._onProdTableEdit(${ownerIdx},${realOrigIdx},'tA',this.value)">${arrow}</td>
-        <td class="num"><input type="number" class="hc-edit-input" value="${r.tG || 0}" min="0"
+        <td class="num"><input type="number" class="hc-edit-input" value="${r.tG || ''}" min="0" placeholder="—"
           onchange="NationalApp._onProdTableEdit(${ownerIdx},${realOrigIdx},'tG',this.value)"></td>` : ''}
         <td class="num"><span class="prod-pct-badge ${pctClass}">${pct}%</span></td>
       </tr>`;
@@ -3520,8 +3526,62 @@ const NationalApp = {
     }, 1200);
   },
 
+  // ── Per-product inline edit handler (for campaigns with product breakdown) ──
+  _onProdProductEdit(ownerIdx, histIdx, productName, field, value) {
+    const owner = this.state.owners[ownerIdx];
+    if (!owner) return;
+    const entry = owner.productionHistory[histIdx];
+    if (!entry) return;
+    if (!entry.products) entry.products = {};
+    if (!entry.products[productName]) entry.products[productName] = { actual: 0, goal: 0 };
+    entry.products[productName][field] = parseInt(value) || 0;
+
+    // Recompute totals from all products
+    let totalProd = 0, totalGoal = 0;
+    for (const pName in entry.products) {
+      totalProd += entry.products[pName].actual || 0;
+      totalGoal += entry.products[pName].goal || 0;
+    }
+    entry.tA = totalProd;
+    entry.tG = totalGoal;
+
+    // If editing the most recent entry, keep current production in sync
+    if (histIdx === owner.productionHistory.length - 1) {
+      owner.production.totalActual = totalProd;
+      owner.production.totalGoal = totalGoal;
+      if (owner.production.products?.[productName]) {
+        owner.production.products[productName].actual = entry.products[productName].actual;
+        owner.production.products[productName].goal = entry.products[productName].goal;
+      }
+    }
+
+    // Update % badge live
+    const row = event?.target?.closest('tr');
+    if (row) {
+      const pctCell = row.querySelector('.prod-pct-badge');
+      if (pctCell) {
+        const pct = totalGoal > 0 ? Math.round((totalProd / totalGoal) * 100) : 0;
+        const pctClass = pct >= 100 ? 'pct-green' : pct >= 80 ? 'pct-yellow' : pct >= 60 ? 'pct-orange' : 'pct-red';
+        pctCell.textContent = pct + '%';
+        pctCell.className = 'prod-pct-badge ' + pctClass;
+      }
+    }
+
+    // Debounced save to spreadsheet
+    const saveKey = `prod_${ownerIdx}_${histIdx}`;
+    if (this._hcSaveTimers?.[saveKey]) clearTimeout(this._hcSaveTimers[saveKey]);
+    if (!this._hcSaveTimers) this._hcSaveTimers = {};
+    this._hcSaveTimers[saveKey] = setTimeout(() => {
+      this._saveProdRow(owner, entry);
+      delete this._hcSaveTimers[saveKey];
+    }, 1200);
+  },
+
   async _saveProdRow(owner, entry) {
     const sheetName = owner._sheetName || owner.tab || owner.name;
+    // Build per-product payload for backend
+    const products = entry.products || {};
+    const productKeys = Object.keys(products);
     try {
       const resp = await fetch(NATIONAL_CONFIG.appsScriptUrl, {
         method: 'POST',
@@ -3531,13 +3591,18 @@ const NationalApp = {
           action: 'updateProduction',
           ownerName: sheetName,
           date: entry.date,
-          productionLW: entry.tA || 0,
-          productionGoals: entry.tG || 0
+          // Send per-product data for campaigns that have it
+          products: productKeys.length > 0 ? products : null,
+          // Legacy fallback params
+          internet: entry.tA || 0,
+          wireless: 0,
+          dtv: 0,
+          goals: entry.tG ? String(entry.tG) : ''
         })
       });
       const result = await resp.json();
       if (result.error) console.warn('[Prod Save] Error:', result.error);
-      else console.log('[Prod Save] Saved', sheetName, entry.date);
+      else console.log('[Prod Save] Saved', sheetName, entry.date, productKeys.length ? productKeys : 'legacy');
     } catch (err) {
       console.warn('[Prod Save] Network error:', err.message);
     }
