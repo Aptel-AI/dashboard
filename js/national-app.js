@@ -3787,6 +3787,9 @@ const NationalApp = {
 
     this._flashBtn(document.querySelector('#health-goals .hc-submit-btn'));
 
+    const ownerName = owner._sheetName || owner.tab || owner.name;
+    console.log('[Goals] Submitting:', { ownerName, campaignLabel, campaignKey: this.state.campaign, goals });
+
     // Fire and forget — save in background so the coach can move on immediately
     fetch(NATIONAL_CONFIG.appsScriptUrl, {
       method: 'POST',
