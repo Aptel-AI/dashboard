@@ -2718,16 +2718,36 @@ function updateHeadcountRow(ownerName, date, active, leaders, dist, training, ca
 
     if (colOwner === undefined) return { error: 'Owner column not found in "' + campaignLabel + '"' };
 
-    // Find the most recent row for this owner (data is sorted date-descending)
+    // Find the row for this owner matching the requested date
+    // If date is provided, match owner+date; otherwise fall back to most recent row
     var targetRow = -1;
     var targetDate = '';
+    var fallbackRow = -1;
+    var fallbackDate = '';
+    var normDate = date ? _normalizeDate(date) : null;
     for (var i = 1; i < data.length; i++) {
       var rowOwner = String(data[i][colOwner] || '').trim();
-      if (rowOwner.toLowerCase() === ownerName.toLowerCase()) {
-        targetRow = i + 1; // 1-based
-        targetDate = data[i][colWeek];
-        break; // first match = most recent (sorted desc)
+      if (rowOwner.toLowerCase() !== ownerName.toLowerCase()) continue;
+      var rowDate = colWeek !== undefined ? data[i][colWeek] : null;
+      // If date requested, try exact match first
+      if (normDate && rowDate) {
+        var rowNorm = _normalizeDate(rowDate);
+        if (rowNorm === normDate) {
+          targetRow = i + 1;
+          targetDate = rowDate;
+          break;
+        }
       }
+      // Track first (most recent) row as fallback
+      if (fallbackRow === -1) {
+        fallbackRow = i + 1;
+        fallbackDate = rowDate;
+      }
+    }
+    // Use fallback if no exact date match
+    if (targetRow === -1 && fallbackRow !== -1) {
+      targetRow = fallbackRow;
+      targetDate = fallbackDate;
     }
 
     if (targetRow === -1) {
