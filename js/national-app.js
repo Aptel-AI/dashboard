@@ -2550,6 +2550,7 @@ const NationalApp = {
       const result = await resp.json();
       if (result.error) throw new Error(result.error);
       console.log('[NationalApp] Headcount saved:', result);
+      this._invalidateOdCache();
       if (note) {
         note.textContent = `Saved ✓ (row ${result.row})`;
         setTimeout(() => note.classList.remove('show'), 3000);
@@ -3602,7 +3603,10 @@ const NationalApp = {
       });
       const result = await resp.json();
       if (result.error) console.warn('[Prod Save] Error:', result.error);
-      else console.log('[Prod Save] Saved', sheetName, entry.date, productKeys.length ? productKeys : 'legacy');
+      else {
+        console.log('[Prod Save] Saved', sheetName, entry.date, productKeys.length ? productKeys : 'legacy');
+        this._invalidateOdCache();
+      }
     } catch (err) {
       console.warn('[Prod Save] Network error:', err.message);
     }
@@ -5660,6 +5664,17 @@ const NationalApp = {
     const d = document.createElement('div');
     d.textContent = s || '';
     return d.innerHTML;
+  },
+
+  // Invalidate OwnerDev localStorage cache so next load fetches fresh data from server.
+  // Called after headcount/production saves so manual edits aren't lost on reload.
+  _invalidateOdCache() {
+    try { localStorage.removeItem('od_data_cache'); } catch {}
+    // Also bust the in-memory campaign cache for the current campaign so a
+    // back-to-landing → re-enter triggers a fresh server fetch
+    if (this._allCampaignsData && this.state.campaign) {
+      delete this._allCampaignsData[this.state.campaign];
+    }
   },
 
   _formatCurrentWeek() {
