@@ -1302,9 +1302,9 @@ const NationalApp = {
           // Production: track the most recent week with actual production data
           // (allWeeksChron is oldest-first, so last match wins = newest with data)
           // Production should show last week's values even when headcount resets on a fresh week
-          const prod = h.production;
-          if (prod && typeof prod === 'object') {
-            const hasProd = Object.keys(prod).some(k => k !== 'Total' && (prod[k]?.production > 0 || prod[k]?.goals > 0));
+          const hProd = h.production;
+          if (hProd && typeof hProd === 'object') {
+            const hasProd = Object.keys(hProd).some(k => k !== 'Total' && (hProd[k]?.production > 0 || hProd[k]?.goals > 0));
             if (hasProd) latestProdHealth = h;
           }
           if ((h.leaders || 0) > 0) lastNonZeroLeaders = h.leaders;
