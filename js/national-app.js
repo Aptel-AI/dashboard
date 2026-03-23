@@ -5855,7 +5855,7 @@ const NationalApp = {
   // Checks multiple sources since config may not be populated on all code paths.
   _getCampaignLabel() {
     const key = this.state.campaign;
-    if (!key) return '';
+    if (!key) { console.warn('[getCampaignLabel] state.campaign is falsy:', key); return ''; }
     // 1. NATIONAL_CONFIG (set by _populateCampaignSelector or loadCampaignData)
     const cfg = NATIONAL_CONFIG.campaigns[key];
     if (cfg?.label) return cfg.label;
@@ -5863,7 +5863,9 @@ const NationalApp = {
     const acd = this._allCampaignsData?.[key];
     if (acd?.label) return acd.label;
     // 3. Title-case the key as last resort (frontier → Frontier)
-    return key.charAt(0).toUpperCase() + key.slice(1).replace(/-./g, m => ' ' + m[1].toUpperCase());
+    const fallback = key.charAt(0).toUpperCase() + key.slice(1).replace(/-./g, m => ' ' + m[1].toUpperCase());
+    console.log('[getCampaignLabel] Using title-case fallback:', fallback, 'for key:', key);
+    return fallback;
   },
 
   // Invalidate ALL caches so next load fetches fresh data from server.
