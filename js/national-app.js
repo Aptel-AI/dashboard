@@ -1289,9 +1289,9 @@ const NationalApp = {
       const hcHistory = [];
       const prodHistory = [];
       // allWeeks is newest-first; allWeeksChron is oldest-first
-      // Check newest week first for headcount — if it has a health object (even all zeros),
+      // Check newest non-future week for headcount — if it has a health object (even all zeros),
       // that's the current headcount state (fresh week = blank inputs, not prefilled)
-      const newestWeek = allWeeks[0];
+      const newestWeek = pastWeeks[0];
       let headcountSetFromNewest = false;
       if (newestWeek) {
         const nwData = (newestWeek.data || {})[name];
@@ -1809,7 +1809,7 @@ const NationalApp = {
     }
   },
 
-  _COACH_CACHE_VERSION: 7, // bump to invalidate all caches after code changes
+  _COACH_CACHE_VERSION: 8, // bump to invalidate all caches after code changes
   _COACH_CACHE_MAX_AGE: 15 * 60 * 1000, // 15 min per-campaign cache
 
   async selectCampaign(campaignKey) {
