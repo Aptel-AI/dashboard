@@ -1391,29 +1391,26 @@ const NationalApp = {
         prodHistory.push({ date: newestWeekDate, tA: 0, tG: 0, products: inheritProducts });
       }
 
-      // Build current production from most recent week with actual production data
-      // (separate from headcount which uses the newest week even if all zeros)
+      // Build current production strictly from LAST WEEK (second-to-last prodHistory entry,
+      // since the last entry is always the upcoming week with all zeros for goal-setting).
+      // Rankings are purely a last-week stat — no fallback to older weeks.
+      const lastWeekProdIdx = prodHistory.length >= 2 ? prodHistory.length - 2 : prodHistory.length - 1;
+      const lastWeekProdEntry = prodHistory.length > 0 ? prodHistory[lastWeekProdIdx] : null;
       let currentProd = { totalGoal: 0, totalActual: 0, wirelessGoal: 0, wirelessActual: 0, products: {} };
-      const lp = latestProdHealth.production;
-      if (lp && typeof lp === 'object' && !Array.isArray(lp)) {
+      if (lastWeekProdEntry && lastWeekProdEntry.products) {
         let totalP = 0, totalG = 0;
-        for (const pName in lp) {
-          if (pName === 'Total') continue;
-          currentProd.products[pName] = { actual: lp[pName].production || 0, goal: lp[pName].goals || 0 };
-          totalP += lp[pName].production || 0;
-          totalG += lp[pName].goals || 0;
+        for (const pName in lastWeekProdEntry.products) {
+          const pe = lastWeekProdEntry.products[pName];
+          currentProd.products[pName] = { actual: pe.actual || 0, goal: pe.goal || 0 };
+          totalP += pe.actual || 0;
+          totalG += pe.goal || 0;
         }
         currentProd.totalActual = totalP;
         currentProd.totalGoal = totalG;
-      } else if (typeof lp === 'number') {
-        currentProd.totalActual = lp;
-        currentProd.totalGoal = (typeof latestProdHealth.goals === 'number') ? latestProdHealth.goals : 0;
+      } else if (lastWeekProdEntry) {
+        currentProd.totalActual = lastWeekProdEntry.tA || 0;
+        currentProd.totalGoal = lastWeekProdEntry.tG || 0;
       }
-      // Check if LAST WEEK's production is missing — the newest prodHistory entry is always
-      // the upcoming week (all zeros by design). The Production Review card shows last week,
-      // so check the second-to-last entry (or the last entry if there's only one).
-      const lastWeekProdIdx = prodHistory.length >= 2 ? prodHistory.length - 2 : prodHistory.length - 1;
-      const lastWeekProdEntry = prodHistory.length > 0 ? prodHistory[lastWeekProdIdx] : null;
       const newestWeekMissingProd = lastWeekProdEntry && lastWeekProdEntry.tA === 0 && lastWeekProdEntry.tG === 0;
       // If currentProd has no products but prodHistory does, inherit product names
       if (!Object.keys(currentProd.products).length && prodHistory.length > 0) {
@@ -1806,7 +1803,7 @@ const NationalApp = {
     }
   },
 
-  _COACH_CACHE_VERSION: 3, // bump to invalidate all caches after code changes
+  _COACH_CACHE_VERSION: 4, // bump to invalidate all caches after code changes
   _COACH_CACHE_MAX_AGE: 15 * 60 * 1000, // 15 min per-campaign cache
 
   async selectCampaign(campaignKey) {
