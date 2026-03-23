@@ -2275,6 +2275,7 @@ const NationalApp = {
     // ── Section 1: Headcount Check (pre-fill with current values so coaches can update all week) ──
     const headcountEl = document.getElementById('health-headcount');
     const isLG = this.state.campaign === 'leafguard';
+    console.log(`[HC-DEBUG] renderHealthTab for ${owner.name}: hc=`, JSON.parse(JSON.stringify(hc)), 'hcHistory=', owner.headcountHistory?.length, 'entries');
     const _hcVal = (field) => hc[field] ? hc[field] : '';
     const _hcDist = isLG
       ? (hc.active && hc.closers ? Math.max(hc.active - hc.closers, 0) : '—')
