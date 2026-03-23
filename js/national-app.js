@@ -684,20 +684,23 @@ const NationalApp = {
         '&_t=' + Date.now();
       const resp = await this._fetchWithTimeout(fetch(url), 30000);
       const result = await resp.json();
+      // Clear fetching flag BEFORE re-render so renderSalesTab doesn't show spinner again
+      owner._resSalesFetching = false;
       if (!result.error && (result.summary || result.reps)) {
         owner.sales = { summary: result.summary, reps: result.reps || [] };
         owner._resSalesFetched = true;
         console.log('[NationalApp] Res sales loaded for', owner.name, ':', result.reps?.length, 'reps, tab:', result.tab);
-        if (this.state.selectedOwner === owner && this.state.currentTab === 'sales') {
-          this.renderSalesTab(owner);
-        }
       } else {
         console.warn('[NationalApp] Res sales empty for', owner.name, ':', result.error || 'no data');
       }
     } catch (err) {
       console.warn('[NationalApp] Res sales fetch failed for', owner.name, ':', err.message);
+      owner._resSalesFetching = false;
     }
-    owner._resSalesFetching = false;
+    // Always re-render if user is still on sales tab (handles both success + error/empty)
+    if (this.state.selectedOwner === owner && this.state.currentTab === 'sales') {
+      this.renderSalesTab(owner);
+    }
   },
 
   // ── Fetch NDS sales data for a single owner on demand ──
@@ -711,21 +714,23 @@ const NationalApp = {
         '&_t=' + Date.now();
       const resp = await this._fetchWithTimeout(fetch(url), 30000);
       const result = await resp.json();
+      // Clear fetching flag BEFORE re-render so renderSalesTab doesn't show spinner again
+      owner._ndsSalesFetching = false;
       if (!result.error && (result.summary || result.reps)) {
         owner.sales = { summary: result.summary, reps: result.reps || [] };
         owner._ndsSalesFetched = true;
         console.log('[NationalApp] NDS sales loaded for', owner.name, ':', result.reps?.length, 'reps, tab:', result.tab);
-        // Re-render sales tab if currently viewing it
-        if (this.state.selectedOwner === owner && this.state.currentTab === 'sales') {
-          this.renderSalesTab(owner);
-        }
       } else {
         console.warn('[NationalApp] NDS sales empty for', owner.name, ':', result.error || 'no data');
       }
     } catch (err) {
       console.warn('[NationalApp] NDS sales fetch failed for', owner.name, ':', err.message);
+      owner._ndsSalesFetching = false;
     }
-    owner._ndsSalesFetching = false;
+    // Always re-render if user is still on sales tab (handles both success + error/empty)
+    if (this.state.selectedOwner === owner && this.state.currentTab === 'sales') {
+      this.renderSalesTab(owner);
+    }
   },
 
   // ── Fetch B2B production/sales data from local _B2B_Production tab ──
