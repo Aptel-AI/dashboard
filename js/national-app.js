@@ -1338,14 +1338,37 @@ const NationalApp = {
             entry.tG = totalGoal;
             // Include newest week even if zeros (editable), skip older empty weeks
             if (totalProd > 0 || totalGoal > 0 || isNewestWeek) prodHistory.push(entry);
+          } else if (isNewestWeek) {
+            // Newest week with no production object at all — add empty entry so it's editable
+            // Inherit product names from previous weeks so the cards know what columns to show
+            const inheritProducts = {};
+            for (let pi = prodHistory.length - 1; pi >= 0; pi--) {
+              const prev = prodHistory[pi];
+              if (prev.products && Object.keys(prev.products).length > 0) {
+                for (const pn of Object.keys(prev.products)) inheritProducts[pn] = { actual: 0, goal: 0 };
+                break;
+              }
+            }
+            prodHistory.push({ date: allWeeksChron[wi].tabName, tA: 0, tG: 0, products: inheritProducts });
           } else {
-            // Legacy single-value format
+            // Legacy single-value format (older weeks)
             const legA = (typeof prod === 'number') ? prod : 0;
             const legG = (typeof h.goals === 'number') ? h.goals : 0;
-            if (legA > 0 || legG > 0 || isNewestWeek) {
+            if (legA > 0 || legG > 0) {
               prodHistory.push({ date: allWeeksChron[wi].tabName, tA: legA, tG: legG, products: {} });
             }
           }
+        } else if (wi === allWeeksChron.length - 1) {
+          // Newest week has no health data at all — add empty production entry so it's editable
+          const inheritProducts = {};
+          for (let pi = prodHistory.length - 1; pi >= 0; pi--) {
+            const prev = prodHistory[pi];
+            if (prev.products && Object.keys(prev.products).length > 0) {
+              for (const pn of Object.keys(prev.products)) inheritProducts[pn] = { actual: 0, goal: 0 };
+              break;
+            }
+          }
+          prodHistory.push({ date: allWeeksChron[wi].tabName, tA: 0, tG: 0, products: inheritProducts });
         }
       }
 
@@ -1366,6 +1389,16 @@ const NationalApp = {
       } else if (typeof lp === 'number') {
         currentProd.totalActual = lp;
         currentProd.totalGoal = (typeof latestProdHealth.goals === 'number') ? latestProdHealth.goals : 0;
+      }
+      // If currentProd has no products but prodHistory does, inherit product names
+      // so editable cards show the right columns for the newest empty week
+      if (!Object.keys(currentProd.products).length && prodHistory.length > 0) {
+        const newestPH = prodHistory[prodHistory.length - 1];
+        if (newestPH.products && Object.keys(newestPH.products).length > 0) {
+          for (const pn of Object.keys(newestPH.products)) {
+            currentProd.products[pn] = { actual: 0, goal: 0 };
+          }
+        }
       }
 
       return {
