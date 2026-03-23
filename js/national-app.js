@@ -1409,6 +1409,9 @@ const NationalApp = {
       // If so, override currentProd to show empty/editable state instead of last week's values
       const newestProdEntry = prodHistory.length > 0 ? prodHistory[prodHistory.length - 1] : null;
       const newestWeekMissingProd = newestProdEntry && newestProdEntry.tA === 0 && newestProdEntry.tG === 0;
+      if (ownerNames.indexOf(name) < 3) {
+        console.log(`[PROD-DEBUG] ${name}: newestProdEntry=`, newestProdEntry?.date, 'tA=', newestProdEntry?.tA, 'tG=', newestProdEntry?.tG, 'missing=', newestWeekMissingProd, 'latestProdHealth date=', latestProdHealth?.date || 'none');
+      }
       if (newestWeekMissingProd) {
         currentProd = { totalGoal: 0, totalActual: 0, wirelessGoal: 0, wirelessActual: 0, products: {} };
         // Inherit product names from the entry (which inherited from prior weeks)
