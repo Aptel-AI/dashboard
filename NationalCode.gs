@@ -5194,7 +5194,7 @@ function odDeleteUser(body) {
 // Order matters: values are split in this order. If fewer values than products,
 // missing ones get 0. "TV" wasn't always tracked so Frontier may have 2 or 3 values.
 var CAMPAIGN_PRODUCTS = {
-  'frontier':        ['Frontier', 'Cell', 'TV'],
+  'frontier':        ['Frontier', 'TV', 'Cell'],
   'verizon-fios':    ['Units', 'Wireless'],
   'att-nds':         ['Units'],
   'att-res':         ['Internet', 'Wireless', 'DTV'],
