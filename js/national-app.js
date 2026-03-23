@@ -2456,10 +2456,11 @@ const NationalApp = {
     let goalFieldsHtml = '';
     if (productNames.length > 0) {
       // LeafGuard: only show Gross Sales + Gross Leads goals (skip Personal Prod + Number of Sales)
-      // All other campaigns: show ALL products so coaches can set goals even for new product lines
+      // All other campaigns: show ALL products so coaches can set goals for new product lines
+      // (Production Review cards still hide unsold products to avoid permanent red 0s)
       const goalProducts = this.state.campaign === 'leafguard'
         ? productNames.filter(p => p === 'Gross Sales' || p === 'Gross Leads')
-        : productNames;
+        : [...productNames];
       for (const pName of goalProducts) {
         goalFieldsHtml += `
           <div class="goal-field">
