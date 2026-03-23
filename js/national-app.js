@@ -1409,9 +1409,6 @@ const NationalApp = {
       // If so, override currentProd to show empty/editable state instead of last week's values
       const newestProdEntry = prodHistory.length > 0 ? prodHistory[prodHistory.length - 1] : null;
       const newestWeekMissingProd = newestProdEntry && newestProdEntry.tA === 0 && newestProdEntry.tG === 0;
-      if (ownerNames.indexOf(name) < 3) {
-        console.log(`[PROD-DEBUG] ${name}: newestProdEntry=`, newestProdEntry?.date, 'tA=', newestProdEntry?.tA, 'tG=', newestProdEntry?.tG, 'missing=', newestWeekMissingProd, 'latestProdHealth date=', latestProdHealth?.date || 'none');
-      }
       if (newestWeekMissingProd) {
         currentProd = { totalGoal: 0, totalActual: 0, wirelessGoal: 0, wirelessActual: 0, products: {} };
         // Inherit product names from the entry (which inherited from prior weeks)
@@ -5854,12 +5851,18 @@ const NationalApp = {
     return d.innerHTML;
   },
 
-  // Invalidate OwnerDev localStorage cache so next load fetches fresh data from server.
+  // Invalidate ALL caches so next load fetches fresh data from server.
   // Called after headcount/production saves so manual edits aren't lost on reload.
   _invalidateOdCache() {
     try { localStorage.removeItem('od_data_cache'); } catch {}
-    // Also bust the in-memory campaign cache for the current campaign so a
-    // back-to-landing → re-enter triggers a fresh server fetch
+    // Clear per-campaign coach cache (coach_cache_frontier, etc.)
+    try {
+      const keys = Object.keys(localStorage);
+      for (const k of keys) {
+        if (k.startsWith('coach_cache_')) localStorage.removeItem(k);
+      }
+    } catch {}
+    // Also bust the in-memory campaign cache so re-entering triggers fresh server fetch
     if (this._allCampaignsData && this.state.campaign) {
       delete this._allCampaignsData[this.state.campaign];
     }
