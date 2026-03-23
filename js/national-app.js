@@ -1239,8 +1239,8 @@ const NationalApp = {
     const campaignWeeks = pastWeeks.slice(0, 4).reverse();
     const campaignLabels = campaignWeeks.map(w => w.tabName);
 
-    // The actual "last week" date — pastWeeks[0] is this week, pastWeeks[1] is last week
-    const lastWeekTabName = pastWeeks.length >= 2 ? pastWeeks[1].tabName : null;
+    // The actual "last week" date — pastWeeks[0] is the most recent week with data (last week)
+    const lastWeekTabName = pastWeeks.length >= 1 ? pastWeeks[0].tabName : null;
 
     // Owner detail: ALL weeks, left-to-right chronological
     const allWeeksChron = [...allWeeks].reverse();
@@ -1809,7 +1809,7 @@ const NationalApp = {
     }
   },
 
-  _COACH_CACHE_VERSION: 6, // bump to invalidate all caches after code changes
+  _COACH_CACHE_VERSION: 7, // bump to invalidate all caches after code changes
   _COACH_CACHE_MAX_AGE: 15 * 60 * 1000, // 15 min per-campaign cache
 
   async selectCampaign(campaignKey) {
