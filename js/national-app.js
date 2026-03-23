@@ -5,6 +5,14 @@
 
 const NationalApp = {
 
+  // ── Per-campaign production config ──
+  // primaryProduct: only this product counts toward campaign total & ranking
+  // currency: true = format as $ (e.g. LeafGuard Gross Sales)
+  // If not listed, all products sum into totalActual (default behavior)
+  CAMPAIGN_PROD_CONFIG: {
+    'leafguard': { primaryProduct: 'Gross Sales', currency: true }
+  },
+
   // ── Status code definitions (matching Campaign Tracker) ──
   STATUS_CODES: {
     22: { label: 'Bored Leaders', css: 'sc-22' },
@@ -1333,14 +1341,17 @@ const NationalApp = {
             // New per-product format: { Frontier: {production, goals}, Cell: {production, goals}, ... }
             let totalProd = 0, totalGoal = 0;
             const entry = { date: allWeeksChron[wi].tabName, products: {} };
+            const _primaryOnly = this.CAMPAIGN_PROD_CONFIG[campaignKey]?.primaryProduct || null;
             for (const pName in prod) {
               if (pName === 'Total') continue;
               const pv = prod[pName];
               entry.products[pName] = { actual: pv.production || 0, goal: pv.goals || 0 };
-              totalProd += pv.production || 0;
-              totalGoal += pv.goals || 0;
+              if (!_primaryOnly || pName === _primaryOnly) {
+                totalProd += pv.production || 0;
+                totalGoal += pv.goals || 0;
+              }
             }
-            // Sum across products (no separate Total column)
+            // Sum across products (only primary if configured)
             entry.tA = totalProd;
             entry.tG = totalGoal;
             // Include newest week even if zeros (editable), skip older empty weeks
@@ -1403,13 +1414,18 @@ const NationalApp = {
         lastWeekProdEntry = prodHistory.find(p => p.date === lastWeekTabName) || null;
       }
       let currentProd = { totalGoal: 0, totalActual: 0, wirelessGoal: 0, wirelessActual: 0, products: {} };
+      const prodCfg = this.CAMPAIGN_PROD_CONFIG[campaignKey];
+      const primaryOnly = prodCfg?.primaryProduct || null;
       if (lastWeekProdEntry && lastWeekProdEntry.products) {
         let totalP = 0, totalG = 0;
         for (const pName in lastWeekProdEntry.products) {
           const pe = lastWeekProdEntry.products[pName];
           currentProd.products[pName] = { actual: pe.actual || 0, goal: pe.goal || 0 };
-          totalP += pe.actual || 0;
-          totalG += pe.goal || 0;
+          // If primaryProduct is set, only that product counts toward totals/ranking
+          if (!primaryOnly || pName === primaryOnly) {
+            totalP += pe.actual || 0;
+            totalG += pe.goal || 0;
+          }
         }
         currentProd.totalActual = totalP;
         currentProd.totalGoal = totalG;
@@ -1809,7 +1825,7 @@ const NationalApp = {
     }
   },
 
-  _COACH_CACHE_VERSION: 10, // bump to invalidate all caches after code changes
+  _COACH_CACHE_VERSION: 11, // bump to invalidate all caches after code changes
   _COACH_CACHE_MAX_AGE: 15 * 60 * 1000, // 15 min per-campaign cache
 
   async selectCampaign(campaignKey) {
@@ -2194,7 +2210,7 @@ const NationalApp = {
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Total Production</div>
-        <div class="kpi-value">${t.production?.toLocaleString() || '—'}</div>
+        <div class="kpi-value">${this.CAMPAIGN_PROD_CONFIG[this.state.campaign]?.currency ? '$' + (t.production?.toLocaleString() || '0') : (t.production?.toLocaleString() || '—')}</div>
         <div class="kpi-breakdown">${prodItems || '<div class="kpi-bd-empty">No breakdown</div>'}</div>
       </div>`;
 
@@ -2244,8 +2260,10 @@ const NationalApp = {
     container.innerHTML = owners.map((o, idx) => {
       const rankCls = o.d2dRank === 1 ? ' rank-gold' : o.d2dRank === 2 ? ' rank-silver' : o.d2dRank === 3 ? ' rank-bronze' : '';
       const cardCls = o.d2dRank <= 3 ? rankCls : '';
+      const _isCurrency = this.CAMPAIGN_PROD_CONFIG[this.state.campaign]?.currency;
+      const _prodLabel = _isCurrency ? '$' + (o.d2dTotalUnits || 0).toLocaleString() + ' LW' : (o.d2dTotalUnits || 0) + ' units LW';
       const rankBadge = o.d2dRank
-        ? `<span class="owner-rank-badge${rankCls}" title="#${o.d2dRank} — ${o.d2dTotalUnits || 0} units LW">#${o.d2dRank}</span>`
+        ? `<span class="owner-rank-badge${rankCls}" title="#${o.d2dRank} — ${_prodLabel}">#${o.d2dRank}</span>`
         : '';
       return `
         <div class="owner-card${cardCls}" onclick="NationalApp.openOwnerDetail(${idx})">
