@@ -1268,8 +1268,8 @@ const OwnerDev = {
   _renderCamSelect(row, mapping) {
     const val = mapping?.camCompany || '';
     const cellId = `cam-${this._rowId(row.campaign, row.ownerName)}`;
-    const campaign = this._esc(row.campaign);
-    const owner = this._esc(row.ownerName);
+    const campaign = this._escJs(row.campaign);
+    const owner = this._escJs(row.ownerName);
 
     return this._renderSearchDropdown(
       cellId, val, '-- Select Company --', false,
@@ -1321,8 +1321,8 @@ const OwnerDev = {
     const val = mapping?.nlrWorkbookId || '';
     const displayVal = mapping?.nlrWorkbookName || '';
     const cellId = `nlr-file-${this._rowId(row.campaign, row.ownerName)}`;
-    const campaign = this._esc(row.campaign);
-    const owner = this._esc(row.ownerName);
+    const campaign = this._escJs(row.campaign);
+    const owner = this._escJs(row.ownerName);
 
     return this._renderSearchDropdown(
       cellId, displayVal, '-- Select File --', false,
@@ -1373,8 +1373,8 @@ const OwnerDev = {
     const wbId = mapping?.nlrWorkbookId || '';
     const val = mapping?.nlrTab || '';
     const cellId = `nlr-tab-${this._rowId(row.campaign, row.ownerName)}`;
-    const campaign = this._esc(row.campaign);
-    const owner = this._esc(row.ownerName);
+    const campaign = this._escJs(row.campaign);
+    const owner = this._escJs(row.ownerName);
     const disabled = !wbId;
 
     return this._renderSearchDropdown(
@@ -1467,8 +1467,8 @@ const OwnerDev = {
     const tabMapping = this._findCampaignTabMap(row.campaign, row.ownerName);
     const val = tabMapping?.tabName || '';
     const cellId = `src-tab-${this._rowId(row.campaign, row.ownerName)}`;
-    const campaign = this._esc(row.campaign);
-    const owner = this._esc(row.ownerName);
+    const campaign = this._escJs(row.campaign);
+    const owner = this._escJs(row.ownerName);
     const hasTabs = (this.state.campaignTabsCache[row.campaign] || []).length > 0;
 
     return this._renderSearchDropdown(
@@ -2036,6 +2036,12 @@ const OwnerDev = {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  },
+
+  /** Escape a string for safe use inside inline JS single-quoted strings within HTML attributes */
+  _escJs(str) {
+    if (!str) return '';
+    return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\x22');
   },
 
   // ══════════════════════════════════════════════════════
