@@ -1395,14 +1395,16 @@ const NationalApp = {
       const newestWeekDate = allWeeksChron.length > 0 ? allWeeksChron[allWeeksChron.length - 1].tabName : null;
       if (newestWeekDate && !prodHistory.some(p => p.date === newestWeekDate)) {
         const inheritProducts = {};
+        let inheritTG = 0;
         for (let pi = prodHistory.length - 1; pi >= 0; pi--) {
           const prev = prodHistory[pi];
           if (prev.products && Object.keys(prev.products).length > 0) {
-            for (const pn of Object.keys(prev.products)) inheritProducts[pn] = { actual: 0, goal: 0 };
+            for (const pn of Object.keys(prev.products)) inheritProducts[pn] = { actual: 0, goal: prev.products[pn].goal || 0 };
+            inheritTG = prev.tG || 0;
             break;
           }
         }
-        prodHistory.push({ date: newestWeekDate, tA: 0, tG: 0, products: inheritProducts });
+        prodHistory.push({ date: newestWeekDate, tA: 0, tG: inheritTG, products: inheritProducts });
       }
 
       // Build current production strictly from LAST WEEK only.
@@ -1433,14 +1435,24 @@ const NationalApp = {
         currentProd.totalActual = lastWeekProdEntry.tA || 0;
         currentProd.totalGoal = lastWeekProdEntry.tG || 0;
       }
-      const newestWeekMissingProd = !lastWeekProdEntry || (lastWeekProdEntry.tA === 0 && lastWeekProdEntry.tG === 0);
-      // If currentProd has no products but prodHistory does, inherit product names
+      const newestWeekMissingProd = !lastWeekProdEntry || currentProd.totalActual === 0;
+      // If currentProd has no products but prodHistory does, inherit product names AND goals
       if (!Object.keys(currentProd.products).length && prodHistory.length > 0) {
-        const fallbackPH = prodHistory.find(p => p.products && Object.keys(p.products).length > 0);
-        if (fallbackPH) {
-          for (const pn of Object.keys(fallbackPH.products)) {
-            currentProd.products[pn] = { actual: 0, goal: 0 };
+        // Search from newest to oldest for the most recent goals
+        let fallbackPH = null;
+        for (let fi = prodHistory.length - 1; fi >= 0; fi--) {
+          if (prodHistory[fi].products && Object.keys(prodHistory[fi].products).length > 0) {
+            fallbackPH = prodHistory[fi]; break;
           }
+        }
+        if (fallbackPH) {
+          let fbTotalG = 0;
+          for (const pn of Object.keys(fallbackPH.products)) {
+            const fbGoal = fallbackPH.products[pn].goal || 0;
+            currentProd.products[pn] = { actual: 0, goal: fbGoal };
+            fbTotalG += fbGoal;
+          }
+          currentProd.totalGoal = fbTotalG;
         }
       }
 
@@ -3921,19 +3933,26 @@ const NationalApp = {
   },
 
   // ── Editable production card (for weeks with missing data) ──
+  // Fields with 0 render as editable inputs; fields with values render as static text
   _prodCardEditable(label, actual, goal, ownerIdx) {
     const safeLabel = label.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+    const actualHtml = actual
+      ? `<div class="prod-card-actual">${Number(actual).toLocaleString()}</div>`
+      : `<input type="number" class="hc-input prod-card-edit-input" id="prod-edit-${safeLabel}-${ownerIdx}"
+          value="" min="0" placeholder="—"
+          style="font-size:28px;font-weight:700;text-align:center;width:80%;margin:4px auto;">`;
+    const goalHtml = goal
+      ? `<div class="prod-card-goal">goal: ${Number(goal).toLocaleString()}</div>`
+      : `<div class="prod-card-goal" style="margin-top:4px;">
+          goal: <input type="number" class="hc-input prod-card-edit-input" id="prod-edit-goal-${safeLabel}-${ownerIdx}"
+            value="" min="0" placeholder="—"
+            style="font-size:13px;width:60px;text-align:center;display:inline-block;">
+        </div>`;
     return `
       <div class="prod-card pct-none" style="border:2px dashed var(--orange);">
         <div class="prod-card-label">${label}</div>
-        <input type="number" class="hc-input prod-card-edit-input" id="prod-edit-${safeLabel}-${ownerIdx}"
-          value="${actual || ''}" min="0" placeholder="—"
-          style="font-size:28px;font-weight:700;text-align:center;width:80%;margin:4px auto;">
-        <div class="prod-card-goal" style="margin-top:4px;">
-          goal: <input type="number" class="hc-input prod-card-edit-input" id="prod-edit-goal-${safeLabel}-${ownerIdx}"
-            value="${goal || ''}" min="0" placeholder="—"
-            style="font-size:13px;width:60px;text-align:center;display:inline-block;">
-        </div>
+        ${actualHtml}
+        ${goalHtml}
       </div>`;
   },
 
@@ -3952,15 +3971,19 @@ const NationalApp = {
     if (productNames.length > 0) {
       for (const pName of productNames) {
         const safeLabel = pName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
-        const actualVal = parseInt(document.getElementById('prod-edit-' + safeLabel + '-' + ownerIdx)?.value) || 0;
-        const goalVal = parseInt(document.getElementById('prod-edit-goal-' + safeLabel + '-' + ownerIdx)?.value) || 0;
+        const actualEl = document.getElementById('prod-edit-' + safeLabel + '-' + ownerIdx);
+        const goalEl = document.getElementById('prod-edit-goal-' + safeLabel + '-' + ownerIdx);
+        const actualVal = actualEl ? (parseInt(actualEl.value) || 0) : (productEntries[pName]?.actual || 0);
+        const goalVal = goalEl ? (parseInt(goalEl.value) || 0) : (productEntries[pName]?.goal || 0);
         updates[pName] = { actual: actualVal, goal: goalVal };
         totalActual += actualVal;
         totalGoal += goalVal;
       }
     } else {
-      totalActual = parseInt(document.getElementById('prod-edit-total-units-' + ownerIdx)?.value) || 0;
-      totalGoal = parseInt(document.getElementById('prod-edit-goal-total-units-' + ownerIdx)?.value) || 0;
+      const totalActualEl = document.getElementById('prod-edit-total-units-' + ownerIdx);
+      const totalGoalEl = document.getElementById('prod-edit-goal-total-units-' + ownerIdx);
+      totalActual = totalActualEl ? (parseInt(totalActualEl.value) || 0) : (prod.totalActual || 0);
+      totalGoal = totalGoalEl ? (parseInt(totalGoalEl.value) || 0) : (prod.totalGoal || 0);
     }
 
     if (!totalActual && !totalGoal) return;
