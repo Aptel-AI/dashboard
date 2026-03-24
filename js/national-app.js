@@ -1411,9 +1411,11 @@ const NationalApp = {
       // Find the prodHistory entry whose date matches the actual last week tab name.
       // If no entry matches, production is 0 (owner has no data for last week).
       let lastWeekProdEntry = null;
+      let lastWeekProdIdx = -1;
       if (lastWeekTabName) {
         // Normalize: lastWeekTabName is "MM/DD/YYYY", prodHistory dates are "MM/DD/YYYY"
-        lastWeekProdEntry = prodHistory.find(p => p.date === lastWeekTabName) || null;
+        lastWeekProdIdx = prodHistory.findIndex(p => p.date === lastWeekTabName);
+        lastWeekProdEntry = lastWeekProdIdx >= 0 ? prodHistory[lastWeekProdIdx] : null;
       }
       let currentProd = { totalGoal: 0, totalActual: 0, wirelessGoal: 0, wirelessActual: 0, products: {} };
       const prodCfg = this.CAMPAIGN_PROD_CONFIG[campaignKey];
@@ -1472,6 +1474,7 @@ const NationalApp = {
         production: currentProd,
         productionHistory: prodHistory,
         _newestWeekMissingProd: !!newestWeekMissingProd,
+        _editableProdIdx: lastWeekProdIdx,  // index into productionHistory for the editable week
         nextGoals: { totalUnits: 0, wirelessUnits: 0 },
         recruiting: {
           leaders: lastNonZeroLeaders || latestHeadcount.leaders || 0,
@@ -3998,15 +4001,15 @@ const NationalApp = {
       }
     }
 
-    // Update the production history entry for the week that was edited (latestWeekDate, not the newest week)
+    // Update the production history entry for the week that was edited
     const prodHist = owner.productionHistory || [];
-    const targetDate = this._latestWeekDate;
-    console.log('[NationalApp] Production save: targetDate=', targetDate, 'prodHist dates=', prodHist.map(e => e.date));
-    let targetEntry = prodHist.find(e => e.date === targetDate);
-    if (!targetEntry && prodHist.length > 0) {
-      // Fallback: last entry (shouldn't happen if dates match)
-      console.warn('[NationalApp] Production save: no match for targetDate, falling back to newest entry');
-      targetEntry = prodHist[prodHist.length - 1];
+    const editIdx = owner._editableProdIdx;
+    let targetEntry = (editIdx >= 0 && editIdx < prodHist.length) ? prodHist[editIdx] : null;
+    if (!targetEntry) {
+      // Fallback: try date match, then newest entry
+      const targetDate = this._latestWeekDate;
+      targetEntry = prodHist.find(e => e.date === targetDate);
+      if (!targetEntry && prodHist.length > 0) targetEntry = prodHist[prodHist.length - 1];
     }
     if (targetEntry) {
       targetEntry.tA = totalActual;
@@ -4027,7 +4030,7 @@ const NationalApp = {
     // Fire and forget — save in background
     const sheetName = owner._sheetName || owner.tab || owner.name;
     const campaignLabel = this._getCampaignLabel(owner);
-    const prodDate = this._latestWeekDate || (prodHist.length > 0 ? prodHist[prodHist.length - 1].date : '');
+    const prodDate = (targetEntry && targetEntry.date) || this._latestWeekDate || (prodHist.length > 0 ? prodHist[prodHist.length - 1].date : '');
     fetch(NATIONAL_CONFIG.appsScriptUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
