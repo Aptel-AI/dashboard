@@ -4123,8 +4123,9 @@ const NationalApp = {
     const el = document.getElementById('owner-indeed-costs');
     if (!el) return;
 
-    // Check if owner is Non-Partner or unmapped for NLR
-    if (this._isNonPartner(owner.name, 'nlrWorkbookId') || this._isUnmapped(owner.name, 'nlrWorkbookId')) {
+    // Check if owner is Non-Partner or unmapped for NLR (but skip if NLR data actually exists)
+    const hasNlrData = owner.nlrData && owner.nlrData.length > 0;
+    if (!hasNlrData && (this._isNonPartner(owner.name, 'nlrWorkbookId') || this._isUnmapped(owner.name, 'nlrWorkbookId'))) {
       const bannerEl = document.getElementById('recruiting-banner');
       if (bannerEl) bannerEl.innerHTML = '';
       el.innerHTML = `
