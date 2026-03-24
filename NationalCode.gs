@@ -6523,9 +6523,10 @@ function consolidateCampaignSlim_(campaignKey, campaign, destSS) {
     if (tn && SKIP_TABS_.indexOf(tn.toLowerCase()) < 0) allTabNames.push(tn);
   }
 
-  // ── Read existing headcount + goals from destination tab (to preserve manual entries) ──
+  // ── Read existing headcount + goals + production from destination tab (to preserve entries) ──
   var existingHC = {}; // 'ownerLower|dateKey' → { active, leaders, dist, training, closers, leadGen }
   var existingGoals = {}; // 'ownerLower|dateKey' → { productName: goalValue, ... }
+  var existingProd = {}; // 'ownerLower|dateKey' → { productName: prodValue, ... }
   var destTab = destSS.getSheetByName(campaign.label);
   var campaignHeaders = getConsolidatedHeaders_(campaignKey);
   if (destTab) {
@@ -6535,11 +6536,15 @@ function consolidateCampaignSlim_(campaignKey, campaign, destSS) {
       var exColMap = {};
       for (var c = 0; c < exHeaders.length; c++) exColMap[exHeaders[c]] = c;
 
-      // Identify goal columns
+      // Identify goal and production columns
       var goalCols = []; // [{ colIdx, productName }]
+      var prodCols = []; // [{ colIdx, productName }]
       for (var gc = 0; gc < exHeaders.length; gc++) {
         if (exHeaders[gc].indexOf('Goal: ') === 0) {
           goalCols.push({ colIdx: gc, productName: exHeaders[gc].replace('Goal: ', '') });
+        }
+        if (exHeaders[gc].indexOf('Prod: ') === 0) {
+          prodCols.push({ colIdx: gc, productName: exHeaders[gc].replace('Prod: ', '') });
         }
       }
 
@@ -6564,9 +6569,11 @@ function consolidateCampaignSlim_(campaignKey, campaign, destSS) {
           };
         }
 
-        // Preserve any non-zero goals
+        // Preserve any non-zero goals and production
         var ownerGoals = {};
+        var ownerProd = {};
         var hasGoals = false;
+        var hasProd = false;
         for (var gci = 0; gci < goalCols.length; gci++) {
           var gVal = parseInt(existingData[ei][goalCols[gci].colIdx]) || 0;
           if (gVal) {
@@ -6574,12 +6581,22 @@ function consolidateCampaignSlim_(campaignKey, campaign, destSS) {
             hasGoals = true;
           }
         }
+        for (var pci = 0; pci < prodCols.length; pci++) {
+          var pVal = parseInt(existingData[ei][prodCols[pci].colIdx]) || 0;
+          if (pVal) {
+            ownerProd[prodCols[pci].productName] = pVal;
+            hasProd = true;
+          }
+        }
         if (hasGoals) {
           existingGoals[exOwner + '|' + exDateKey] = ownerGoals;
         }
+        if (hasProd) {
+          existingProd[exOwner + '|' + exDateKey] = ownerProd;
+        }
       }
     }
-    Logger.log('consolidateCampaignSlim_ preserved ' + Object.keys(existingHC).length + ' headcount entries, ' + Object.keys(existingGoals).length + ' goal entries');
+    Logger.log('consolidateCampaignSlim_ preserved ' + Object.keys(existingHC).length + ' headcount, ' + Object.keys(existingGoals).length + ' goal, ' + Object.keys(existingProd).length + ' production entries');
   }
 
   var products = CAMPAIGN_PRODUCTS[campaignKey] || ['Total'];
@@ -6708,39 +6725,45 @@ function consolidateCampaignSlim_(campaignKey, campaign, destSS) {
     }
   }
 
-  // Also preserve headcount entries for dates NOT in the new 3-week window
-  // (older weeks where coach already entered data)
+  // Preserve older rows (outside the 3-week window) that have headcount, production, or goals
   var newDateOwnerKeys = {};
   for (var ri2 = 0; ri2 < rows.length; ri2++) {
     var rOwner = String(rows[ri2][1] || '').trim().toLowerCase();
     var rDate = _normalizeDateKey_(rows[ri2][0]);
     newDateOwnerKeys[rOwner + '|' + rDate] = true;
   }
-  for (var hcKey2 in existingHC) {
-    if (newDateOwnerKeys[hcKey2]) continue; // already covered
-    // Rebuild a row from the old data
-    var parts = hcKey2.split('|');
-    var hcOwner = parts[0];
-    var hcDateParts = parts[1].split('/');
-    var hcDate = new Date(Number(hcDateParts[2]), Number(hcDateParts[0]) - 1, Number(hcDateParts[1]), 12, 0, 0);
+
+  // Collect all unique keys that have any data worth preserving
+  var allPreserveKeys = {};
+  for (var hcK in existingHC) allPreserveKeys[hcK] = true;
+  for (var prK in existingProd) allPreserveKeys[prK] = true;
+  for (var glK in existingGoals) allPreserveKeys[glK] = true;
+
+  for (var pKey in allPreserveKeys) {
+    if (newDateOwnerKeys[pKey]) continue; // already covered by fresh 3-week data
+    var parts = pKey.split('|');
+    var pOwner = parts[0];
+    var pDateParts = parts[1].split('/');
+    var pDate = new Date(Number(pDateParts[2]), Number(pDateParts[0]) - 1, Number(pDateParts[1]), 12, 0, 0);
     // Find the original owner name (proper casing)
-    var hcOwnerName = hcOwner;
+    var pOwnerName = pOwner;
     for (var oni = 0; oni < ownerNames.length; oni++) {
-      if (ownerNames[oni].toLowerCase() === hcOwner) { hcOwnerName = ownerNames[oni]; break; }
+      if (ownerNames[oni].toLowerCase() === pOwner) { pOwnerName = ownerNames[oni]; break; }
     }
-    var hcEntry = existingHC[hcKey2];
-    var preservedRow = [hcDate, hcOwnerName, hcEntry.active, hcEntry.leaders, hcEntry.dist, hcEntry.training];
+    var hcEntry = existingHC[pKey] || { active: 0, leaders: 0, dist: 0, training: 0, closers: 0, leadGen: 0 };
+    var preservedRow = [pDate, pOwnerName, hcEntry.active, hcEntry.leaders, hcEntry.dist, hcEntry.training];
     for (var exi2 = 0; exi2 < extraHC.length; exi2++) {
       var exn = extraHC[exi2].toLowerCase().replace(/\s+/g, '');
       if (exn === 'closers') preservedRow.push(hcEntry.closers || 0);
       else if (exn === 'leadgen') preservedRow.push(hcEntry.leadGen || 0);
       else preservedRow.push(0);
     }
-    // Restore production + goals for these older rows
-    var oldGoals = existingGoals[hcKey2];
+    // Restore production + goals
+    var oldProd = existingProd[pKey];
+    var oldGoals = existingGoals[pKey];
     for (var pi2 = 0; pi2 < products.length; pi2++) {
-      preservedRow.push(0); // prod
-      preservedRow.push((oldGoals && oldGoals[products[pi2]]) ? oldGoals[products[pi2]] : 0); // goal
+      preservedRow.push((oldProd && oldProd[products[pi2]]) ? oldProd[products[pi2]] : 0);
+      preservedRow.push((oldGoals && oldGoals[products[pi2]]) ? oldGoals[products[pi2]] : 0);
     }
     for (var rci = 0; rci < 12; rci++) preservedRow.push(0); // recruiting
     rows.push(preservedRow);
