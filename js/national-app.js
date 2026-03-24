@@ -4013,8 +4013,12 @@ const NationalApp = {
     if (!targetEntry) {
       // Fallback: try date match, then newest entry
       const targetDate = this._latestWeekDate;
+      console.warn('[NationalApp] Production save: editIdx=' + editIdx + ' missed, targetDate=' + targetDate + ' prodHist dates=', prodHist.map(e => e.date));
       targetEntry = prodHist.find(e => e.date === targetDate);
-      if (!targetEntry && prodHist.length > 0) targetEntry = prodHist[prodHist.length - 1];
+      if (!targetEntry && prodHist.length > 0) {
+        console.warn('[NationalApp] Production save: date match also failed, using newest entry');
+        targetEntry = prodHist[prodHist.length - 1];
+      }
     }
     if (targetEntry) {
       targetEntry.tA = totalActual;
