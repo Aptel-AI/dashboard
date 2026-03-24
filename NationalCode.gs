@@ -5428,7 +5428,7 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
 
   var rows = [];
 
-  // Process each owner: saved mapping → exact match → fuzzy match → skip (but still include in owner list)
+  // Process each owner: saved mapping → exact match → skip (but still include in owner list with zeros)
   for (var oi = 0; oi < ownerNames.length; oi++) {
     var ownerName = ownerNames[oi];
     var ownerLower = ownerName.toLowerCase();
@@ -5444,16 +5444,8 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
       }
     }
     if (!tab && !targetTabName) {
-      // Fallback 1: exact name match
+      // Exact name match only — no fuzzy matching (avoids grabbing wrong tab)
       tab = tabByName[ownerLower] || null;
-
-      // Fallback 2: fuzzy matching — try contains, first+last name, initials
-      if (!tab) {
-        tab = _fuzzyFindTab_(ownerName, allTabNames, tabByName);
-        if (tab) {
-          Logger.log('consolidateCampaign_ FUZZY matched: "' + ownerName + '" → tab "' + tab.getName() + '"');
-        }
-      }
     }
 
     Logger.log('consolidateCampaign_ TAB MATCH: "' + ownerName + '" → ' + (tab ? '"' + tab.getName() + '"' : 'NONE') + (targetTabName ? ' (saved: ' + targetTabName + ')' : ''));
@@ -6616,8 +6608,8 @@ function consolidateCampaignSlim_(campaignKey, campaign, destSS) {
       }
     }
     if (!tab && !targetTabName) {
+      // Exact name match only — no fuzzy matching (avoids grabbing wrong tab)
       tab = tabByName[ownerLower] || null;
-      if (!tab) tab = _fuzzyFindTab_(ownerName, allTabNames, tabByName);
     }
 
     if (!tab) {
