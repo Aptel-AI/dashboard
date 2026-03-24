@@ -2695,7 +2695,7 @@ const NationalApp = {
       });
       const result = await resp.json();
       if (result.error) throw new Error(result.error);
-      console.log('[NationalApp] Headcount saved:', result);
+      console.log('[NationalApp] Headcount saved: sent date=' + newestWeekDate + ' wrote row=' + result.row + ' date=' + result.date + ' tab=' + result.tab, result);
       this._invalidateOdCache();
       if (note) {
         note.textContent = `Saved ✓ (row ${result.row})`;
