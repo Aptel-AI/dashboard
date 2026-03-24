@@ -4001,9 +4001,11 @@ const NationalApp = {
     // Update the production history entry for the week that was edited (latestWeekDate, not the newest week)
     const prodHist = owner.productionHistory || [];
     const targetDate = this._latestWeekDate;
+    console.log('[NationalApp] Production save: targetDate=', targetDate, 'prodHist dates=', prodHist.map(e => e.date));
     let targetEntry = prodHist.find(e => e.date === targetDate);
     if (!targetEntry && prodHist.length > 0) {
-      // Fallback: find entry closest to latestWeekDate
+      // Fallback: last entry (shouldn't happen if dates match)
+      console.warn('[NationalApp] Production save: no match for targetDate, falling back to newest entry');
       targetEntry = prodHist[prodHist.length - 1];
     }
     if (targetEntry) {
