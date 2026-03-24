@@ -2579,12 +2579,14 @@ const NationalApp = {
           </div>`;
       }
     } else {
+      // Use the campaign's first product name so the goal maps to the correct column
+      const fallbackProduct = (this._campaignData?.products || ['Units'])[0];
       goalFieldsHtml = `
         <div class="goal-field">
-          <label class="goal-field-label">Total Units</label>
+          <label class="goal-field-label">${this._esc(fallbackProduct)} Goal</label>
           <input type="number" class="goal-input" id="goal-total-${ownerIdx}" value="" min="0"
             placeholder="—"
-            onchange="NationalApp._updateGoal(${ownerIdx}, 'totalUnits', this.value)">
+            onchange="NationalApp._updateGoal(${ownerIdx}, '${fallbackProduct}', this.value)">
         </div>`;
     }
     goalsEl.innerHTML = `
