@@ -1862,6 +1862,11 @@ const NationalApp = {
       console.log('[NationalApp] Rendering campaign from cache:', campaignKey);
       this.state.owners = cached.owners;
       this.state.campaignTotals = cached.campaignTotals || {};
+      // Ensure _allCampaignsData reflects this campaign so landing page card stays visible
+      if (!this._allCampaignsData) this._allCampaignsData = {};
+      if (!this._allCampaignsData[campaignKey] || !(this._allCampaignsData[campaignKey].owners || []).length) {
+        this._allCampaignsData[campaignKey] = { owners: cached.owners, label: cached.label || campaignKey };
+      }
 
       // Ranking: att-res uses Tableau data (async fetch), all others use production (instant)
       const isRes = campaignKey === 'att-res';
