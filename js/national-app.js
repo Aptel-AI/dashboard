@@ -3998,15 +3998,20 @@ const NationalApp = {
       }
     }
 
-    // Also update the newest production history entry
+    // Update the production history entry for the week that was edited (latestWeekDate, not the newest week)
     const prodHist = owner.productionHistory || [];
-    if (prodHist.length > 0) {
-      const newest = prodHist[prodHist.length - 1];
-      newest.tA = totalActual;
-      newest.tG = totalGoal;
+    const targetDate = this._latestWeekDate;
+    let targetEntry = prodHist.find(e => e.date === targetDate);
+    if (!targetEntry && prodHist.length > 0) {
+      // Fallback: find entry closest to latestWeekDate
+      targetEntry = prodHist[prodHist.length - 1];
+    }
+    if (targetEntry) {
+      targetEntry.tA = totalActual;
+      targetEntry.tG = totalGoal;
       for (const pName in updates) {
-        if (!newest.products) newest.products = {};
-        newest.products[pName] = { actual: updates[pName].actual, goal: updates[pName].goal };
+        if (!targetEntry.products) targetEntry.products = {};
+        targetEntry.products[pName] = { actual: updates[pName].actual, goal: updates[pName].goal };
       }
     }
 
@@ -4020,7 +4025,7 @@ const NationalApp = {
     // Fire and forget — save in background
     const sheetName = owner._sheetName || owner.tab || owner.name;
     const campaignLabel = this._getCampaignLabel(owner);
-    const prodDate = prodHist.length > 0 ? prodHist[prodHist.length - 1].date : this._latestWeekDate;
+    const prodDate = this._latestWeekDate || (prodHist.length > 0 ? prodHist[prodHist.length - 1].date : '');
     fetch(NATIONAL_CONFIG.appsScriptUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
