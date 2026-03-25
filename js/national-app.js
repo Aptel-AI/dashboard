@@ -2364,7 +2364,7 @@ const NationalApp = {
         ? `<span class="owner-rank-badge${rankCls}" title="#${o.d2dRank} — ${_prodLabel}">#${o.d2dRank}</span>`
         : '';
       return `
-        <div class="owner-card${cardCls}" onclick="NationalApp.openOwnerDetail(${idx})">
+        <div class="owner-card${cardCls}" onclick="NationalApp.openOwnerDetail('${this._esc(o.name).replace(/'/g, "\\'")}')"
           ${rankBadge}
           <span class="owner-card-name">${this._esc(o.name)}</span>
           <span class="owner-card-arrow">→</span>
@@ -2386,8 +2386,13 @@ const NationalApp = {
   // RENDER: Owner Detail
   // ══════════════════════════════════════════════════
 
-  openOwnerDetail(idx) {
-    const owner = this.state.owners[idx];
+  openOwnerDetail(nameOrIdx) {
+    let owner;
+    if (typeof nameOrIdx === 'string') {
+      owner = this.state.owners.find(o => o.name === nameOrIdx);
+    } else {
+      owner = this.state.owners[nameOrIdx]; // legacy index support
+    }
     if (!owner) return;
     this.state.selectedOwner = owner;
     this.state.currentTab = 'health';
