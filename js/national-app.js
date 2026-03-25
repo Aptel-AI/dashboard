@@ -1735,13 +1735,12 @@ const NationalApp = {
     const container = document.getElementById('campaign-cards');
     if (!container) return;
 
-    // Include campaigns that have owners OR are in the config (so empty ones can still be refreshed)
+    // Only include campaigns that have owners
     const allKeys = new Set([...Object.keys(campaigns), ...Object.keys(configCampaigns)]);
     const activeKeys = [...allKeys].filter(key => {
       const cd = campaigns[key];
-      const inConfig = !!configCampaigns[key];
-      if (!cd && !inConfig) return false;
-      return (cd && (cd.owners || []).length > 0) || inConfig;
+      if (!cd) return false;
+      return (cd.owners || []).length > 0;
     });
     // Debug: log all campaigns and their owner counts
     console.log('[NationalApp] _showLandingPage — campaigns:', [...allKeys].map(k => k + ':' + (campaigns[k]?.owners?.length || 0)).join(', '));
@@ -1843,12 +1842,8 @@ const NationalApp = {
   /**
    * Prefetch full campaign data for today's scheduled campaigns.
    * Runs in background so clicking into a campaign is near-instant.
-   * Uses an isolated scratch state so we never mutate the live state.
    */
   async _prefetchTodaysCampaigns() {
-    // Disabled — prefetch race condition corrupts active campaign state.
-    // TODO: refactor to use isolated state object instead of mutating this.state
-    return;
     const sched = this._planningSchedule || [];
     if (!sched.length) return;
 
@@ -1873,7 +1868,8 @@ const NationalApp = {
 
       console.log('[NationalApp] Prefetching campaign data:', key);
       try {
-        // Save current state before prefetch
+        // Save current state, load campaign, cache it, restore state
+        // Guard: if user selected a different campaign during prefetch, abort
         const savedOwners = this.state.owners;
         const savedTotals = this.state.campaignTotals;
         const savedCampaign = this.state.campaign;
@@ -1896,7 +1892,6 @@ const NationalApp = {
         console.log('[NationalApp] Prefetched + cached:', key);
       } catch (err) {
         console.warn('[NationalApp] Prefetch failed for', key, ':', err.message);
-        this._prefetchingActive = false;
       }
       this._prefetching[key] = false;
     }
