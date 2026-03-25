@@ -290,6 +290,11 @@ const NationalApp = {
     });
 
     // ── Build owners from recruiting data ──
+    // Guard: if user navigated away during async fetch, don't overwrite their state
+    if (this.state.campaign !== campaignKey) {
+      console.log('[NationalApp] Stale load for', campaignKey, '(user now on', this.state.campaign + ') — skipping state update');
+      return;
+    }
     const sheetData = results.recruiting || null;
     console.log('[NationalApp] recruiting result for', campaignKey, ':',
       sheetData ? { owners: sheetData.owners?.length, weeks: sheetData.weeks?.length, products: sheetData.products } : 'null');
@@ -1934,6 +1939,7 @@ const NationalApp = {
         this._showLoading('Loading rankings...');
         try {
           const rankData = await this._fetchWithTimeout(this._fetchD2DResRanking(), 10000);
+          if (this.state.campaign !== campaignKey) return; // guard after await
           if (rankData?.ranking?.length) {
             this._enrichOwnersWithD2DRanking(rankData.ranking);
           }
@@ -1944,6 +1950,7 @@ const NationalApp = {
       } else {
         this._rankOwnersByProduction();
       }
+      if (this.state.campaign !== campaignKey) return; // guard before render
       this.renderCampaignOverview();
       this.renderOwnersList();
 
@@ -1952,6 +1959,8 @@ const NationalApp = {
         this._fetchOwnerCamMapping(),
         this._fetchOnlinePresence()
       ]).then(([camRes, auditRes]) => {
+        // Guard: user may have switched campaigns during fetch
+        if (this.state.campaign !== campaignKey) return;
         if (camRes.status === 'fulfilled' && camRes.value) {
           this.state.camMapping = camRes.value.mapping || camRes.value;
         }
@@ -1968,12 +1977,16 @@ const NationalApp = {
     this._showLoading('Loading campaign data...');
     try {
       await this.loadCampaignData(campaignKey);
+      // Guard: user may have switched campaigns during fetch
+      if (this.state.campaign !== campaignKey) return;
       // Cache post-enrichment state for next time
       this._writeCoachCampaignCache(campaignKey);
     } catch (err) {
       console.error('Failed to load campaign:', err);
     }
     this._hideLoading();
+    // Guard again after await
+    if (this.state.campaign !== campaignKey) return;
     console.log('[NationalApp] selectCampaign render:', campaignKey, 'owners:', this.state.owners.length);
     try { this.renderCampaignOverview(); } catch (e) { console.error('[NationalApp] renderCampaignOverview error:', e); }
     try { this.renderOwnersList(); } catch (e) { console.error('[NationalApp] renderOwnersList error:', e); }
