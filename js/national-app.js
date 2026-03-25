@@ -4929,12 +4929,21 @@ const NationalApp = {
             { label: 'Order Count', value: sm.orderCount }
           ]
         : isRes
-        ? [
-            { label: 'New Internet', value: sm.newInternet ?? 0, cls: 'big' },
-            { label: 'Wireless', value: sm.wirelessSales ?? 0 },
-            { label: 'DTV', value: sm.videoSales ?? 0 },
-            { label: 'Rep Count', value: sm.repCount ?? '—' }
-          ]
+        ? (() => {
+            const resReps = s.reps || [];
+            const resScoringHC = resReps.filter(r => (r.newInternet || 0) + (r.upgradeInternet || 0) + (r.wirelessSales || 0) + (r.videoSales || 0) > 0).length;
+            const resProductiveHC = resReps.filter(r => (r.newInternet || 0) + (r.upgradeInternet || 0) + (r.wirelessSales || 0) + (r.videoSales || 0) >= 6).length;
+            const resTotalUnits = (sm.newInternet || 0) + (sm.upgradeInternet || 0) + (sm.wirelessSales || 0) + (sm.videoSales || 0);
+            const resAvgUnits = resScoringHC > 0 ? Math.round(resTotalUnits / resScoringHC * 10) / 10 : '—';
+            return [
+              { label: 'New Internet', value: sm.newInternet ?? 0, cls: 'big' },
+              { label: 'Wireless', value: sm.wirelessSales ?? 0 },
+              { label: 'DTV', value: sm.videoSales ?? 0 },
+              { label: 'Scoring HC', value: resScoringHC, sub: 'Reps with 1+ sale' },
+              { label: 'Productive HC', value: resProductiveHC, sub: 'Reps with 6+ units' },
+              { label: 'Avg Units / Rep', value: resAvgUnits, sub: resScoringHC ? 'Based on ' + resScoringHC + ' scoring reps' : '' }
+            ];
+          })()
         : [
             { label: 'Total Volume', value: sm.totalVolume ?? '—', cls: 'big' },
             { label: 'Rep Count', value: sm.repCount ?? '—' },
