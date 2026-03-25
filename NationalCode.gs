@@ -5653,16 +5653,21 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
   var products = CAMPAIGN_PRODUCTS[campaignKey] || ['Total'];
   var extraHC = CAMPAIGN_EXTRA_HC[campaignKey] || [];
 
-  // ── Read existing goals before clearing (to preserve manual entries) ──
+  // ── Read existing goals + production before clearing (to preserve manual/synced entries) ──
   var existingGoals = {}; // 'ownerLower|dateKey' → { productName: goalValue, ... }
+  var existingProd = {};  // 'ownerLower|dateKey' → { productName: prodValue, ... }
   if (destTab) {
     var existingData = destTab.getDataRange().getValues();
     if (existingData.length > 1) {
       var exHeaders = existingData[0].map(function(h) { return String(h).trim(); });
       var goalCols = [];
+      var prodCols = [];
       for (var gc = 0; gc < exHeaders.length; gc++) {
         if (exHeaders[gc].indexOf('Goal: ') === 0) {
           goalCols.push({ colIdx: gc, productName: exHeaders[gc].replace('Goal: ', '') });
+        }
+        if (exHeaders[gc].indexOf('Prod: ') === 0) {
+          prodCols.push({ colIdx: gc, productName: exHeaders[gc].replace('Prod: ', '') });
         }
       }
       var exOwnerCol = exHeaders.indexOf('Owner');
@@ -5673,35 +5678,65 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
           var exDate = existingData[ei][exWeekCol];
           if (!exOwner || !exDate) continue;
           var exDateKey = _normalizeDateKey_(exDate instanceof Date ? exDate : _parseTabDate(String(exDate)));
-          var ownerGoals = {};
-          var hasGoals = false;
+          var ownerGoals = {}, ownerProd = {};
+          var hasGoals = false, hasProd = false;
           for (var gci = 0; gci < goalCols.length; gci++) {
             var gVal = parseInt(existingData[ei][goalCols[gci].colIdx]) || 0;
             if (gVal) { ownerGoals[goalCols[gci].productName] = gVal; hasGoals = true; }
           }
+          for (var pci = 0; pci < prodCols.length; pci++) {
+            var pVal = parseInt(existingData[ei][prodCols[pci].colIdx]) || 0;
+            if (pVal) { ownerProd[prodCols[pci].productName] = pVal; hasProd = true; }
+          }
           if (hasGoals) existingGoals[exOwner + '|' + exDateKey] = ownerGoals;
+          if (hasProd) existingProd[exOwner + '|' + exDateKey] = ownerProd;
         }
       }
     }
-    Logger.log('consolidateCampaign_ preserved ' + Object.keys(existingGoals).length + ' goal entries');
+    Logger.log('consolidateCampaign_ preserved ' + Object.keys(existingGoals).length + ' goal, ' + Object.keys(existingProd).length + ' production entries');
   }
 
-  // ── Restore goals into rows ──
+  // ── Restore goals + production into rows ──
   var prodStart = 6 + extraHC.length;
   for (var ri = 0; ri < rows.length; ri++) {
     var rOwner = String(rows[ri][1] || '').trim().toLowerCase();
     var rDateKey = _normalizeDateKey_(rows[ri][0]);
     var savedGoals = existingGoals[rOwner + '|' + rDateKey];
-    if (savedGoals) {
-      for (var pi = 0; pi < products.length; pi++) {
-        var goalIdx = prodStart + pi * 2 + 1;
-        // Only restore if current value is 0 (don't overwrite source-provided goals)
-        if (!rows[ri][goalIdx]) {
-          rows[ri][goalIdx] = savedGoals[products[pi]] || 0;
-        }
+    var savedProd = existingProd[rOwner + '|' + rDateKey];
+    for (var pi = 0; pi < products.length; pi++) {
+      var prodIdx = prodStart + pi * 2;
+      var goalIdx = prodStart + pi * 2 + 1;
+      // Production: keep existing if source is 0
+      if (!rows[ri][prodIdx] && savedProd && savedProd[products[pi]]) {
+        rows[ri][prodIdx] = savedProd[products[pi]];
+      }
+      // Goals: restore if current is 0
+      if (!rows[ri][goalIdx] && savedGoals && savedGoals[products[pi]]) {
+        rows[ri][goalIdx] = savedGoals[products[pi]];
       }
     }
   }
+
+  // ── Dedup: merge duplicate owner+date rows ──
+  var dedupMap = {};
+  for (var di = 0; di < rows.length; di++) {
+    var dOwner = String(rows[di][1] || '').trim().toLowerCase();
+    var dDate = _normalizeDateKey_(rows[di][0]);
+    var dKey = dOwner + '|' + dDate;
+    if (!dedupMap[dKey]) {
+      dedupMap[dKey] = di;
+    } else {
+      var existIdx = dedupMap[dKey];
+      for (var mi = 2; mi < rows[di].length; mi++) {
+        var existVal = Number(rows[existIdx][mi]) || 0;
+        var newVal = Number(rows[di][mi]) || 0;
+        if (newVal > existVal) rows[existIdx][mi] = rows[di][mi];
+      }
+      rows.splice(di, 1);
+      di--;
+    }
+  }
+  Logger.log('consolidateCampaign_ after dedup: ' + rows.length + ' rows');
 
   // Clear and write
   destTab.clear();
@@ -6833,12 +6868,17 @@ function consolidateCampaignSlim_(campaignKey, campaign, destSS) {
           else row[extraStart + exi] = 0;
         }
 
-        // Restore existing goals (instead of zeroing them out)
+        // Restore existing production and goals (don't overwrite Credico-synced values)
         var prodStart = 6 + extraHC.length;
         var rowDateKey = _normalizeDateKey_(row[0]);
         var savedGoals = existingGoals[ownerLower + '|' + rowDateKey];
+        var savedProd = existingProd[ownerLower + '|' + rowDateKey];
         for (var pi = 0; pi < products.length; pi++) {
-          // row[prodStart + pi*2] = production value (keep)
+          // Production: keep existing if source is 0
+          if (!row[prodStart + pi * 2] && savedProd && savedProd[products[pi]]) {
+            row[prodStart + pi * 2] = savedProd[products[pi]];
+          }
+          // Goals: restore from existing
           row[prodStart + pi * 2 + 1] = (savedGoals && savedGoals[products[pi]]) ? savedGoals[products[pi]] : 0;
         }
 
@@ -6892,6 +6932,29 @@ function consolidateCampaignSlim_(campaignKey, campaign, destSS) {
     for (var rci = 0; rci < 12; rci++) preservedRow.push(0); // recruiting
     rows.push(preservedRow);
   }
+
+  // ── Dedup: merge duplicate owner+date rows (keep the one with most data) ──
+  var dedupMap = {};
+  var prodStartDedup = 6 + extraHC.length;
+  for (var di = 0; di < rows.length; di++) {
+    var dOwner = String(rows[di][1] || '').trim().toLowerCase();
+    var dDate = _normalizeDateKey_(rows[di][0]);
+    var dKey = dOwner + '|' + dDate;
+    if (!dedupMap[dKey]) {
+      dedupMap[dKey] = di;
+    } else {
+      // Merge: keep whichever row has more non-zero values, preserving max of each field
+      var existIdx = dedupMap[dKey];
+      for (var mi = 2; mi < rows[di].length; mi++) {
+        var existVal = Number(rows[existIdx][mi]) || 0;
+        var newVal = Number(rows[di][mi]) || 0;
+        if (newVal > existVal) rows[existIdx][mi] = rows[di][mi];
+      }
+      rows.splice(di, 1);
+      di--; // re-check this index
+    }
+  }
+  Logger.log('consolidateCampaignSlim_ after dedup: ' + rows.length + ' rows');
 
   // Write to destination tab
   if (!destTab) destTab = destSS.insertSheet(campaign.label);
