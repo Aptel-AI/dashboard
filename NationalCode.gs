@@ -4442,6 +4442,16 @@ function readFiosOwnerSales(ownerName) {
     ? ownerParts[ownerParts.length - 1] + ', ' + ownerParts.slice(0, -1).join(' ')
     : ownerLower;
 
+  // Reverse alias lookup: consolidated name → Credico name
+  var FIOS_ALIASES = {
+    'abhriham potturu': 'potturu, abhriham',
+    'aj': 'ademaj, gent',
+    'day': 'dobson-diaz, day',
+    'jp morrone': 'morrone, john philip',
+    'ricky madureira': 'madureira, richard'
+  };
+  var aliasName = FIOS_ALIASES[ownerLower] || null;
+
   // Find the owner row (not indented) and collect rep rows (indented) below it
   var ownerRowIdx = -1;
   for (var i = 1; i < data.length; i++) {
@@ -4449,7 +4459,7 @@ function readFiosOwnerSales(ownerName) {
     // Owner rows are not indented; skip if starts with space
     if (name.charAt(0) === ' ') continue;
     var nameLower = name.toLowerCase();
-    if (nameLower === ownerLower || nameLower === ownerLastFirst) {
+    if (nameLower === ownerLower || nameLower === ownerLastFirst || (aliasName && nameLower === aliasName)) {
       ownerRowIdx = i;
       break;
     }
