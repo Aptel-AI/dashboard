@@ -291,7 +291,9 @@ const NationalApp = {
 
     // ── Build owners from recruiting data ──
     // Guard: if user navigated away during async fetch, don't overwrite their state
-    if (this.state.campaign !== campaignKey) {
+    // Exception: prefetch loads are allowed through since they restore state afterward
+    const isPrefetch = this._prefetchKey === campaignKey;
+    if (!isPrefetch && this.state.campaign !== campaignKey) {
       console.log('[NationalApp] Stale load for', campaignKey, '(user now on', this.state.campaign + ') — skipping state update');
       return;
     }
@@ -1873,30 +1875,34 @@ const NationalApp = {
 
       console.log('[NationalApp] Prefetching campaign data:', key);
       try {
-        // Save current state, load campaign, cache it, restore state
-        // Guard: if user selected a different campaign during prefetch, abort
+        // Prefetch uses a separate "scratch" campaign key so it never
+        // touches this.state.campaign — which would break the stale-load
+        // guard in loadCampaignData if the user navigates during the await.
         const savedOwners = this.state.owners;
         const savedTotals = this.state.campaignTotals;
         const savedCampaign = this.state.campaign;
         const savedLatestWeek = this._latestWeekDate;
 
         this._prefetchingActive = true;
+        // Tag this as a prefetch so loadCampaignData skips the stale guard
+        this._prefetchKey = key;
         this.state.campaign = key;
         await this.loadCampaignData(key);
         this._writeCoachCampaignCache(key);
+        this._prefetchKey = null;
 
-        // Restore previous state ONLY if user hasn't navigated away
-        if (this.state.campaign === key) {
-          this.state.owners = savedOwners;
-          this.state.campaignTotals = savedTotals;
-          this.state.campaign = savedCampaign;
-          this._latestWeekDate = savedLatestWeek;
-        }
+        // ALWAYS restore — prefetch should never leave its data behind
+        this.state.owners = savedOwners;
+        this.state.campaignTotals = savedTotals;
+        this.state.campaign = savedCampaign;
+        this._latestWeekDate = savedLatestWeek;
         this._prefetchingActive = false;
 
         console.log('[NationalApp] Prefetched + cached:', key);
       } catch (err) {
         console.warn('[NationalApp] Prefetch failed for', key, ':', err.message);
+        this._prefetchKey = null;
+        this._prefetchingActive = false;
       }
       this._prefetching[key] = false;
     }
