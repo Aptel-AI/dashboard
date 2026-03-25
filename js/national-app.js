@@ -4884,14 +4884,18 @@ const NationalApp = {
     // ── Card 1: Owner Summary ──
     const summaryEl = document.getElementById('sales-summary');
     if (sm) {
+      const activeHC = owner.headcount?.active || 0;
+      const avgUnitsPerActiveRep = activeHC > 0
+        ? Math.round(((sm.frontier || 0) + (sm.lines || 0)) / activeHC * 10) / 10
+        : '—';
+
       const kpis = isFios
         ? [
             { label: 'Frontier', value: sm.frontier ?? 0, cls: 'big' },
-            { label: 'TV', value: sm.tv ?? 0 },
             { label: 'Lines', value: sm.lines ?? 0 },
-            { label: 'Orders', value: sm.orderCount ?? 0 },
-            { label: 'Scoring HC', value: sm.scoringHC ?? 0 },
-            { label: 'Productive HC', value: sm.productiveHC ?? 0 }
+            { label: 'Scoring HC', value: sm.scoringHC ?? 0, sub: 'Reps with 1+ sale' },
+            { label: 'Productive HC', value: sm.productiveHC ?? 0, sub: 'Reps with 6+ units' },
+            { label: 'Avg Units / Rep', value: avgUnitsPerActiveRep, sub: activeHC ? 'Based on ' + activeHC + ' active reps' : 'Set active reps in Office Health' }
           ]
         : isNDS
         ? [
@@ -4925,10 +4929,6 @@ const NationalApp = {
               <div class="sales-metric-row"><span>NEW Phones</span><span class="num">${sm.newPhones ?? 0}</span></div>
               <div class="sales-metric-row"><span>CPO</span><span class="num">${sm.cpo ?? 0}</span></div>
               <div class="sales-metric-row"><span>BYOD</span><span class="num">${sm.byod ?? 0}</span></div>
-            </div>
-            <div class="sales-metric-group">
-              <div class="sales-metric-group-label">Office Metrics</div>
-              <div class="sales-metric-row"><span>Avg Units / Rep</span><span class="num">${sm.avgUnitsRep ?? 0}</span></div>
             </div>
           </div>`
         : isNDS
@@ -5003,6 +5003,7 @@ const NationalApp = {
               <div class="health-kpi${k.cls ? ' ' + k.cls : ''}">
                 <div class="health-kpi-value">${k.value}</div>
                 <div class="health-kpi-label">${k.label}</div>
+                ${k.sub ? `<div style="font-size:10px;color:var(--silver);margin-top:2px;">${k.sub}</div>` : ''}
               </div>
             `).join('')}
           </div>
@@ -5027,8 +5028,6 @@ const NationalApp = {
       const repHeaders = isFios
         ? `<th style="${_stickyTh0}"></th><th class="sortable-th" onclick="NationalApp._sortSalesReps('name')" style="${_stickyTh1}">Rep Name <span style="font-size:10px;opacity:0.5;">&#x25B2;&#x25BC;</span></th>
            ${_sh('Frontier','frontier')}
-           ${_sh('TV','tv')}
-           ${_sh('Orders','orderCount')}
            ${_sh('Gig %','gigPct')}
            ${_sh('Autobill %','autobillPct')}
            ${_sh('Avg Days','avgDaysPast')}
@@ -5093,8 +5092,6 @@ const NationalApp = {
       const repRows = isFios
         ? s.reps.map((rep, ri) => _repRow(rep, ri, `
               <td class="num">${rep.frontier ?? 0}</td>
-              <td class="num">${rep.tv ?? 0}</td>
-              <td class="num">${rep.orderCount ?? 0}</td>
               <td class="num">${rep.gigPct ?? 0}%</td>
               <td class="num">${rep.autobillPct ?? 0}%</td>
               <td class="num">${rep.avgDaysPast ?? 0}</td>
