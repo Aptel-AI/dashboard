@@ -5003,6 +5003,22 @@ const NationalApp = {
               { label: 'Avg Units / Rep', value: resAvgUnits, sub: activeHC ? 'Based on ' + activeHC + ' active reps' : 'Set active reps in Office Health' }
             ];
           })()
+        : isB2B
+        ? (() => {
+            const b2bReps = s.reps || [];
+            const b2bScoringHC = b2bReps.filter(r => (r.totalVolume || 0) > 0).length;
+            const b2bProductiveHC = b2bReps.filter(r => (r.totalVolume || 0) >= 6).length;
+            const b2bAvgUnits = activeHC > 0 ? Math.round((sm.totalVolume || 0) / activeHC * 10) / 10 : '—';
+            return [
+              { label: 'Total Volume', value: sm.totalVolume ?? '—', cls: 'big' },
+              { label: 'Rep Count', value: sm.repCount ?? '—' },
+              { label: 'Sales / Rep', value: sm.salesPerRep ?? '—' },
+              { label: 'Order Count', value: sm.orderCount ?? '—' },
+              { label: 'Scoring HC', value: b2bScoringHC, sub: 'Reps with 1+ sale' },
+              { label: 'Productive HC', value: b2bProductiveHC, sub: 'Reps with 6+ units' },
+              { label: 'Avg Units / Rep', value: b2bAvgUnits, sub: activeHC ? 'Based on ' + activeHC + ' active reps' : 'Set active reps in Office Health' }
+            ];
+          })()
         : [
             { label: 'Total Volume', value: sm.totalVolume ?? '—', cls: 'big' },
             { label: 'Rep Count', value: sm.repCount ?? '—' },
