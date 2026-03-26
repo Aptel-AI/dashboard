@@ -2879,54 +2879,64 @@ function saveGoalsRow_(ownerName, campaignLabel, campaignKey, goals) {
   var colOwner = colMap['Owner'];
   if (colOwner === undefined) return { error: 'Owner column not found' };
 
-  // Calculate next week's Sunday
+  // Find the most recent week row for this owner (the row the frontend is displaying).
+  // Goals are set FOR the displayed week, not a future one.
+  // The frontend shows pastWeeks[0] which is the newest week <= today.
   var now = new Date();
-  var daysUntilSunday = (7 - now.getDay()) || 7; // Sun=7, Mon=6, ..., Sat=1
-  var nextSunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilSunday);
-  var nextSundayKey = _normalizeDateKey_(nextSunday);
+  now.setHours(12, 0, 0, 0);
 
-  // Find existing row for this owner + next week
   var targetRow = -1;
+  var targetDateKey = '';
+  var ownerLc = ownerName.toLowerCase();
+
+  // Scan all rows for this owner, find the newest date <= today
   for (var i = 1; i < data.length; i++) {
     var rowOwner = String(data[i][colOwner] || '').trim().toLowerCase();
-    if (rowOwner !== ownerName.toLowerCase()) continue;
+    if (rowOwner !== ownerLc) continue;
     var rowDate = data[i][colWeek];
-    var rowKey = _normalizeDateKey_(rowDate instanceof Date ? rowDate : _parseTabDate(String(rowDate)));
-    if (rowKey === nextSundayKey) {
+    var parsed = rowDate instanceof Date ? rowDate : _parseTabDate(String(rowDate));
+    if (!parsed) continue;
+    var rowKey = _normalizeDateKey_(parsed);
+    if (!rowKey) continue;
+    // Check if this week is <= today
+    var parts = rowKey.split('/');
+    var rowDateObj = new Date(Number(parts[2]), Number(parts[0]) - 1, Number(parts[1]), 12, 0, 0);
+    if (rowDateObj <= now && (!targetDateKey || rowDateObj > new Date(Number(targetDateKey.split('/')[2]), Number(targetDateKey.split('/')[0]) - 1, Number(targetDateKey.split('/')[1]), 12, 0, 0))) {
       targetRow = i + 1; // 1-based
-      break;
+      targetDateKey = rowKey;
     }
   }
 
-  // If no row exists for next week, create one in the right position
+  // If no existing row found, fall back to next Sunday (create a new row)
   if (targetRow === -1) {
+    var daysUntilSunday = (7 - now.getDay()) || 7;
+    var targetSunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilSunday);
+    var targetKey = _normalizeDateKey_(targetSunday);
+
     var numCols = headers.length;
     var newRow = [];
     for (var h2 = 0; h2 < numCols; h2++) newRow.push('');
-    newRow[colWeek] = formatDate(nextSunday);
+    newRow[colWeek] = formatDate(targetSunday);
     newRow[colOwner] = ownerName;
 
-    // Find the right insertion point: after the last row of the target week
     var insertAfter = -1;
     for (var i2 = 1; i2 < data.length; i2++) {
-      var rowDate = data[i2][colWeek];
-      var rowKey = _normalizeDateKey_(rowDate instanceof Date ? rowDate : _parseTabDate(String(rowDate)));
-      if (rowKey === nextSundayKey) insertAfter = i2 + 1; // 1-based sheet row
+      var rd = data[i2][colWeek];
+      var rk = _normalizeDateKey_(rd instanceof Date ? rd : _parseTabDate(String(rd)));
+      if (rk === targetKey) insertAfter = i2 + 1;
     }
 
     if (insertAfter > 0) {
-      // Insert after the last row of the same week
       sheet.insertRowAfter(insertAfter);
       sheet.getRange(insertAfter + 1, 1, 1, newRow.length).setValues([newRow]);
       targetRow = insertAfter + 1;
     } else {
-      // No rows for this week yet — insert at row 2 (top of data)
       sheet.insertRowAfter(1);
       sheet.getRange(2, 1, 1, newRow.length).setValues([newRow]);
       targetRow = 2;
     }
+    targetDateKey = targetKey;
 
-    // Re-read headers in case of column shifts
     data = sheet.getDataRange().getValues();
     headers = data[0].map(function(h) { return String(h).trim(); });
     colMap = {};
@@ -2943,7 +2953,7 @@ function saveGoalsRow_(ownerName, campaignLabel, campaignKey, goals) {
     }
   }
 
-  return { ok: true, row: targetRow, owner: ownerName, date: formatDate(nextSunday), written: written };
+  return { ok: true, row: targetRow, owner: ownerName, date: targetDateKey, written: written };
 }
 
 function updateProductionRow(ownerName, date, campaignLabel, products, internet, wireless, dtv, goals) {
