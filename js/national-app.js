@@ -2433,7 +2433,10 @@ const NationalApp = {
     document.querySelector('.owners-section').style.display = 'none';
     const detail = document.getElementById('owner-detail');
     detail.style.display = 'block';
-    detail.classList.toggle('coach-readonly', this._isCoachReadOnly());
+    const _ro = this._isCoachReadOnly();
+    const _isNational = (typeof OwnerDev !== 'undefined') && (OwnerDev.state?.effectiveRole === 'national');
+    detail.classList.toggle('coach-readonly', _ro);
+    detail.classList.toggle('coach-notes-allowed', _ro && _isNational);
 
     document.getElementById('detail-owner-name').textContent = owner.name;
     const badge = document.getElementById('detail-owner-badge');
