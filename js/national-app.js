@@ -5011,12 +5011,9 @@ const NationalApp = {
             const b2bAvgUnits = activeHC > 0 ? Math.round((sm.totalVolume || 0) / activeHC * 10) / 10 : '—';
             return [
               { label: 'Total Volume', value: sm.totalVolume ?? '—', cls: 'big' },
-              { label: 'Rep Count', value: sm.repCount ?? '—' },
-              { label: 'Sales / Rep', value: sm.salesPerRep ?? '—' },
-              { label: 'Order Count', value: sm.orderCount ?? '—' },
+              { label: 'Avg Units / Rep', value: b2bAvgUnits, sub: activeHC ? 'Based on ' + activeHC + ' active reps' : 'Set active reps in Office Health' },
               { label: 'Scoring HC', value: b2bScoringHC, sub: 'Reps with 1+ sale' },
-              { label: 'Productive HC', value: b2bProductiveHC, sub: 'Reps with 6+ units' },
-              { label: 'Avg Units / Rep', value: b2bAvgUnits, sub: activeHC ? 'Based on ' + activeHC + ' active reps' : 'Set active reps in Office Health' }
+              { label: 'Productive HC', value: b2bProductiveHC, sub: 'Reps with 6+ units' }
             ];
           })()
         : [
