@@ -27,7 +27,7 @@ const OD_CONFIG = {
     'rogers':          { label: 'Rogers',             sheetId: '1o1MPKrAzzeaU2JWMODkR9M3uY5rOhIKo-Q64armeTvE' },
     'leafguard':       { label: 'Leafguard',          sheetId: '10Fy5XFWCuBmDwvpl4PG4FJT4krwX2ZqN12ARvQLpSuM' },
     'lumen':           { label: 'Lumen',              sheetId: '1P4DYlcV1hgNkaAapk3tWD7ytcRXw4K1n7R6EMKPCoSA' },
-    'att-b2b':         { label: 'AT&T B2B',           sheetId: '' },
+    'att-b2b':         { label: 'AT&T B2B',           sheetId: '1sxauFjNjq4_rRYM2PAl5cyOyHF3Hg4OkO-t_hLKDJB8' },
     'box':             { label: 'Box',                sheetId: '' }
   },
 

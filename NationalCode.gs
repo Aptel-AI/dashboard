@@ -16,7 +16,8 @@ var OD_CAMPAIGNS = {
   'att-res':         { label: 'AT&T Residential',   sheetId: '1HvWJYox3JXvxmza63YBWAqKPtUGPFuaV-s-BOfbWGKM' },
   'rogers':          { label: 'Rogers',             sheetId: '1o1MPKrAzzeaU2JWMODkR9M3uY5rOhIKo-Q64armeTvE' },
   'leafguard':       { label: 'LeafGuard',          sheetId: '10Fy5XFWCuBmDwvpl4PG4FJT4krwX2ZqN12ARvQLpSuM', ownerSource: 'tabs', excludeTabs: ['Blank Copy'] },
-  'lumen':           { label: 'Lumen',              sheetId: '1P4DYlcV1hgNkaAapk3tWD7ytcRXw4K1n7R6EMKPCoSA', sourceTab: 'Campaign', sectionHeader: 'LUMEN' }
+  'lumen':           { label: 'Lumen',              sheetId: '1P4DYlcV1hgNkaAapk3tWD7ytcRXw4K1n7R6EMKPCoSA', sourceTab: 'Campaign', sectionHeader: 'LUMEN' },
+  'att-b2b':         { label: 'AT&T B2B',           sheetId: '1sxauFjNjq4_rRYM2PAl5cyOyHF3Hg4OkO-t_hLKDJB8', ownerSource: 'visible-tabs', excludeTabs: [] }
 };
 var OD_NLR_FOLDER = '1hARjh3UH48CWhbYrYBJxFVwgynxapCjG';
 
@@ -2887,12 +2888,19 @@ function saveGoalsRow_(ownerName, campaignLabel, campaignKey, goals) {
   now.setHours(23, 59, 59, 999);
   var ownerLc = ownerName.toLowerCase();
 
-  // Find the most recent Sunday <= today
-  var dayOfWeek = now.getDay(); // 0=Sun
-  var lastSunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
-  // The goal targets NEXT Sunday (one week after the displayed week)
-  var goalSunday = new Date(lastSunday.getFullYear(), lastSunday.getMonth(), lastSunday.getDate() + 7);
-  var goalKey = _normalizeDateKey_(goalSunday);
+  // Find the most recent lock day (<= today): Sunday for most campaigns, Monday for att-b2b
+  var dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...
+  var goalTarget;
+  if (campaignKey === 'att-b2b') {
+    // Monday-lock: find most recent Monday, then add 7 for next Monday
+    var monOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    var lastMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + monOffset);
+    goalTarget = new Date(lastMonday.getFullYear(), lastMonday.getMonth(), lastMonday.getDate() + 7);
+  } else {
+    var lastSunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
+    goalTarget = new Date(lastSunday.getFullYear(), lastSunday.getMonth(), lastSunday.getDate() + 7);
+  }
+  var goalKey = _normalizeDateKey_(goalTarget, campaignKey);
 
   // Search for existing row matching owner + goal week
   var targetRow = -1;
@@ -2903,7 +2911,7 @@ function saveGoalsRow_(ownerName, campaignLabel, campaignKey, goals) {
     var rowDate = data[i][colWeek];
     var parsed = rowDate instanceof Date ? rowDate : _parseTabDate(String(rowDate));
     if (!parsed) continue;
-    var rowKey = _normalizeDateKey_(parsed);
+    var rowKey = _normalizeDateKey_(parsed, campaignKey);
     if (rowKey === goalKey) {
       targetRow = i + 1; // 1-based
       break;
@@ -2915,14 +2923,14 @@ function saveGoalsRow_(ownerName, campaignLabel, campaignKey, goals) {
     var numCols = headers.length;
     var newRow = [];
     for (var h2 = 0; h2 < numCols; h2++) newRow.push('');
-    newRow[colWeek] = formatDate(goalSunday);
+    newRow[colWeek] = formatDate(goalTarget);
     newRow[colOwner] = ownerName;
 
     // Find insertion point: after the last row of the same week, or at top
     var insertAfter = -1;
     for (var i2 = 1; i2 < data.length; i2++) {
       var rd = data[i2][colWeek];
-      var rk = _normalizeDateKey_(rd instanceof Date ? rd : _parseTabDate(String(rd)));
+      var rk = _normalizeDateKey_(rd instanceof Date ? rd : _parseTabDate(String(rd)), campaignKey);
       if (rk === goalKey) insertAfter = i2 + 1;
     }
 
@@ -5139,6 +5147,25 @@ function getOwnerNamesForCampaign_(cfg, ss) {
     return owners;
   }
 
+  // ── Strategy 2b: Visible (non-hidden) tab names as owners (AT&T B2B) ──
+  // Only includes tabs that are NOT hidden and not in excludeTabs/SKIP_TABS_.
+  // Tabs containing "INPUT" (case-insensitive) are also excluded.
+  if (cfg.ownerSource === 'visible-tabs') {
+    var exclude2 = (cfg.excludeTabs || []).map(function(t) { return t.toLowerCase(); });
+    var owners2 = [];
+    for (var s2 = 0; s2 < sheets.length; s2++) {
+      if (sheets[s2].isSheetHidden()) continue;
+      var tName2 = sheets[s2].getName().trim();
+      if (!tName2 || tName2.charAt(0) === '_') continue;
+      if (tName2.toLowerCase().indexOf('input') >= 0) continue;
+      if (exclude2.indexOf(tName2.toLowerCase()) >= 0) continue;
+      if (SKIP_TABS_.indexOf(tName2.toLowerCase()) >= 0) continue;
+      owners2.push(tName2);
+    }
+    Logger.log('getOwnerNames visible-tabs: ' + owners2.length + ' visible owners');
+    return owners2;
+  }
+
   // ── Strategy 3: Section header in a specific tab (Lumen) ──
   if (cfg.sectionHeader) {
     var tab = null;
@@ -5754,7 +5781,8 @@ var CAMPAIGN_PRODUCTS = {
   'att-res':         ['Internet', 'Wireless', 'DTV'],
   'rogers':          ['Units', 'Mobility'],
   'leafguard':       ['Personal Prod', 'Gross Leads', 'Number of Sales', 'Gross Sales'],
-  'lumen':           ['Lumen', 'DTV']
+  'lumen':           ['Lumen', 'DTV'],
+  'att-b2b':         ['Units']
 };
 
 // ── Build consolidated headers dynamically per campaign ──
@@ -5791,6 +5819,9 @@ var CAMPAIGN_PROD_COLUMNS = {
     'Internet':  { prod: ['internet'], goal: [] },
     'Wireless':  { prod: ['wireless'], goal: [] },
     'DTV':       { prod: ['dtv'], goal: [] }
+  },
+  'att-b2b': {
+    'Units':     { prod: ['personal production'], goal: ['production goals'] }
   }
 };
 
@@ -5798,7 +5829,8 @@ var CAMPAIGN_PROD_COLUMNS = {
 var CAMPAIGN_GOAL_PRODUCTS = {
   'leafguard': ['Gross Sales', 'Gross Leads'],
   'verizon-fios': ['Units'],  // Production Goals is combined (units + wireless) — shown against Units
-  'rogers': ['Units']         // Production Goals is combined (units + mobility) — shown against Units
+  'rogers': ['Units'],        // Production Goals is combined (units + mobility) — shown against Units
+  'att-b2b': ['Units']        // Production Goals → Goal: Units
 };
 
 // Campaigns with extra headcount columns (Closers, Lead Gen)
@@ -6008,12 +6040,19 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
       Logger.log('consolidateCampaign_ NO TAB for: "' + ownerName + '" in ' + campaignKey);
       // No tab found — still include owner with a minimal placeholder row
       // so they appear in the owner list (with no data)
-      // Snap to Sunday so placeholder rows align with real data rows
+      // Snap to Sunday (or Monday for att-b2b) so placeholder rows align with real data rows
       var campaignHeaders = getConsolidatedHeaders_(campaignKey);
       var now = new Date();
       var dayOfWeek = now.getDay(); // 0=Sun
-      var sundayPlaceholder = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek, 12, 0, 0);
-      var emptyRow = [sundayPlaceholder, ownerName];
+      var placeholderDate;
+      if (campaignKey === 'att-b2b') {
+        // Snap to Monday
+        var monOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        placeholderDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + monOffset, 12, 0, 0);
+      } else {
+        placeholderDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek, 12, 0, 0);
+      }
+      var emptyRow = [placeholderDate, ownerName];
       for (var ei = 2; ei < campaignHeaders.length; ei++) emptyRow.push(0);
       rows.push(emptyRow);
       continue;
@@ -6037,9 +6076,11 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
       var recruitingRows = extractHorizontalRecruitingRows_(data, sections.section1Start, sections.section1End, campaignKey);
       Logger.log('consolidateCampaign_ ' + ownerName + ': s2Start=' + sections.section2Start + ', recruitingRows=' + recruitingRows.length + ', healthRows=' + healthRows.length);
 
-      // All campaigns except LeafGuard have source dates offset by -7 days.
+      // All campaigns except LeafGuard and AT&T B2B have source dates offset by -7 days.
       // Shift dates forward by 7 days at extraction time so consolidated data has correct dates.
-      if (campaignKey !== 'leafguard') {
+      // LeafGuard: dates are direct. AT&T B2B: Monday-lock, dates are direct.
+      var NO_DATE_OFFSET_CAMPAIGNS = ['leafguard', 'att-b2b'];
+      if (NO_DATE_OFFSET_CAMPAIGNS.indexOf(campaignKey) < 0) {
         var offset = 7 * 86400000;
         for (var hi = 0; hi < healthRows.length; hi++) {
           if (healthRows[hi].date instanceof Date) {
@@ -6099,7 +6140,7 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
           var exOwner = String(existingData[ei][exOwnerCol] || '').trim().toLowerCase();
           var exDate = existingData[ei][exWeekCol];
           if (!exOwner || !exDate) continue;
-          var exDateKey = _normalizeDateKey_(exDate instanceof Date ? exDate : _parseTabDate(String(exDate)));
+          var exDateKey = _normalizeDateKey_(exDate instanceof Date ? exDate : _parseTabDate(String(exDate)), campaignKey);
           var ownerGoals = {}, ownerProd = {};
           var hasGoals = false, hasProd = false;
           for (var gci = 0; gci < goalCols.length; gci++) {
@@ -6122,7 +6163,7 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
   var prodStart = 6 + extraHC.length;
   for (var ri = 0; ri < rows.length; ri++) {
     var rOwner = String(rows[ri][1] || '').trim().toLowerCase();
-    var rDateKey = _normalizeDateKey_(rows[ri][0]);
+    var rDateKey = _normalizeDateKey_(rows[ri][0], campaignKey);
     var savedGoals = existingGoals[rOwner + '|' + rDateKey];
     var savedProd = existingProd[rOwner + '|' + rDateKey];
     for (var pi = 0; pi < products.length; pi++) {
@@ -6142,7 +6183,7 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
   // ── Restore orphaned goal/production rows (future weeks not in source data) ──
   var restoredKeys = {};
   for (var ri2 = 0; ri2 < rows.length; ri2++) {
-    var rk2 = String(rows[ri2][1] || '').trim().toLowerCase() + '|' + _normalizeDateKey_(rows[ri2][0]);
+    var rk2 = String(rows[ri2][1] || '').trim().toLowerCase() + '|' + _normalizeDateKey_(rows[ri2][0], campaignKey);
     restoredKeys[rk2] = true;
   }
   // Check existingGoals and existingProd for entries that weren't matched to any row
@@ -6186,7 +6227,7 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
   var dedupMap = {};
   for (var di = 0; di < rows.length; di++) {
     var dOwner = String(rows[di][1] || '').trim().toLowerCase();
-    var dDate = _normalizeDateKey_(rows[di][0]);
+    var dDate = _normalizeDateKey_(rows[di][0], campaignKey);
     var dKey = dOwner + '|' + dDate;
     if (!dedupMap[dKey]) {
       dedupMap[dKey] = di;
@@ -6653,7 +6694,7 @@ function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignK
   var dateMap = {};
 
   for (var i = 0; i < healthRows.length; i++) {
-    var key = _normalizeDateKey_(healthRows[i].date);
+    var key = _normalizeDateKey_(healthRows[i].date, campaignKey);
     if (!dateMap[key]) dateMap[key] = { date: healthRows[i].date };
     // Only overwrite health if new row has more data (avoid zero row clobbering real data)
     var existing = dateMap[key].health;
@@ -6663,7 +6704,7 @@ function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignK
   }
 
   for (var i = 0; i < recruitingRows.length; i++) {
-    var key = _normalizeDateKey_(recruitingRows[i].date);
+    var key = _normalizeDateKey_(recruitingRows[i].date, campaignKey);
     if (!dateMap[key]) dateMap[key] = { date: recruitingRows[i].date };
     // Only overwrite recruiting if new row has more data
     var existingR = dateMap[key].recruiting;
@@ -6726,12 +6767,13 @@ function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignK
     var goalParts = _splitSlashValues(h.goalsRaw);
 
     // Build the row: base columns first
-    // Use Sunday-snapped date so all owners share the same week date in consolidated tab
-    var snapKey = keys2[i]; // already "MM/DD/YYYY" Sunday format from _normalizeDateKey_
+    // Use snapped date so all owners share the same week date in consolidated tab
+    // (Sunday for most campaigns, Monday for att-b2b)
+    var snapKey = keys2[i]; // already "MM/DD/YYYY" format from _normalizeDateKey_
     var snapParts = snapKey.split('/');
-    var sundayDate = new Date(Number(snapParts[2]), Number(snapParts[0]) - 1, Number(snapParts[1]), 12, 0, 0);
+    var snappedDate = new Date(Number(snapParts[2]), Number(snapParts[0]) - 1, Number(snapParts[1]), 12, 0, 0);
     var row = [
-      sundayDate,          // 0: Week (Sunday of week)
+      snappedDate,         // 0: Week (Sunday or Monday of week)
       ownerName,           // 1: Owner
       h.active || 0,       // 2: Active HC
       h.leaders || 0,      // 3: Leaders
@@ -6759,9 +6801,9 @@ function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignK
 
     // Stash goals to be placed on next week's row after the main loop
     if (goalTotal > 0) {
-      var nextSunday = new Date(sundayDate.getTime() + 7 * 86400000);
-      var nextKey = _normalizeDateKey_(nextSunday);
-      if (!entry._goalForward) entry._goalForward = { nextKey: nextKey, nextDate: nextSunday, goalParts: goalParts };
+      var nextWeekDate = new Date(snappedDate.getTime() + 7 * 86400000);
+      var nextKey = _normalizeDateKey_(nextWeekDate, campaignKey);
+      if (!entry._goalForward) entry._goalForward = { nextKey: nextKey, nextDate: nextWeekDate, goalParts: goalParts };
     }
     // Recruiting metrics
     for (var ri = 0; ri < 12; ri++) {
@@ -6783,7 +6825,7 @@ function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignK
     // Find or create the next week's row in results
     var found = false;
     for (var ri = 0; ri < result.length; ri++) {
-      var rKey = _normalizeDateKey_(result[ri][0]);
+      var rKey = _normalizeDateKey_(result[ri][0], campaignKey);
       if (rKey === fwd.nextKey) {
         // Merge goals into this row's goal columns (don't overwrite non-zero)
         for (var gp = 0; gp < products.length; gp++) {
@@ -6893,10 +6935,19 @@ function _fuzzyFindTab_(ownerName, allTabNames, tabByName) {
   return bestScore >= 30 ? bestTab : null;
 }
 
-function _normalizeDateKey_(d) {
+function _normalizeDateKey_(d, campaignKey) {
   if (!d) return '';
   if (!(d instanceof Date)) d = new Date(d);
-  // Snap to Sunday of the same week (source spreadsheets use Sunday dates)
+
+  // AT&T B2B uses Monday-lock dates — snap to Monday instead of Sunday
+  if (campaignKey === 'att-b2b') {
+    var day = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    var offset = day === 0 ? -6 : 1 - day; // Sun→prev Mon, Mon→0, Tue→-1, ... Sat→-5
+    var mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset, 12, 0, 0);
+    return ('0' + (mon.getMonth() + 1)).slice(-2) + '/' + ('0' + mon.getDate()).slice(-2) + '/' + mon.getFullYear();
+  }
+
+  // Default: snap to Sunday of the same week (source spreadsheets use Sunday dates)
   var day = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
   var offset = -day; // Sun→0, Mon→-1, Tue→-2, ... Sat→-6
   var sun = new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset, 12, 0, 0);
