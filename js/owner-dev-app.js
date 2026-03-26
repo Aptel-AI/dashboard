@@ -48,23 +48,41 @@ const OwnerDev = {
       return;
     }
 
-    // Check superadmin status
+    // Detect superadmin + resolve role
     const email = (this.state.session.email || '').toLowerCase();
     this.state.isSuperadmin = (OD_CONFIG.superadmins || []).some(e => e.toLowerCase() === email);
     this.state.realTeam = this.state.session.team;
-    const role = (this.state.session.role || '').toLowerCase();
-    this.state.isCoachOnly = role === 'coach';
+    const role = this.state.isSuperadmin ? 'superadmin' : (this.state.session.role || '').toLowerCase();
+    this.state.effectiveRole = role;
 
     // Populate user info in top bar
     this._renderUserInfo();
 
-    // Coach-only mode: skip mapping/team, go straight to coach view
-    if (this.state.isCoachOnly) {
-      // Hide all nav tabs except coach
+    // ── Tab visibility via role-based config ──
+    const access = OD_CONFIG.tabAccess[role] || {};
+    const tabMap = {
+      'nav-team-tab': access.team,
+      'nav-coach-tab': access.coach,
+      'nav-planning-tab': access.planning
+    };
+    // Mapping tab is always visible (it's the default); others hidden by default in HTML
+    for (const [id, level] of Object.entries(tabMap)) {
+      const el = document.getElementById(id);
+      if (el) el.style.display = level ? '' : 'none';
+    }
+
+    // Store access levels for later permission checks
+    this.state.tabAccess = access;
+    this.state.columnEdit = OD_CONFIG.columnEdit[role] || {};
+
+    // National Consultant: coach-only entry (no mapping default)
+    if (role === 'national') {
       document.querySelectorAll('.nav-tab').forEach(t => t.style.display = 'none');
       const coachTab = document.getElementById('nav-coach-tab');
       if (coachTab) { coachTab.style.display = ''; coachTab.classList.add('active'); }
-      // Hide mapping view, show coach view
+      // Also show mapping tab (view-only)
+      const mappingTab = document.querySelector('.nav-tab[data-tab="mapping"]');
+      if (mappingTab) mappingTab.style.display = '';
       document.getElementById('view-mapping').style.display = 'none';
       const coachView = document.getElementById('view-coach');
       if (coachView) coachView.style.display = '';
@@ -76,27 +94,28 @@ const OwnerDev = {
       return;
     }
 
-    // Show team tab if manager or superadmin
-    if (role === 'manager' || this.state.isSuperadmin) {
-      document.getElementById('nav-team-tab').style.display = '';
-    }
-
-    // Show coach tab for superadmins or managers
-    if (this.state.isSuperadmin || role === 'manager') {
-      const coachTab = document.getElementById('nav-coach-tab');
-      if (coachTab) coachTab.style.display = '';
-    }
-
-    // Show planning tab for Maddie's team managers + superadmins
-    const initTeam = (this.state.session.team || '').toLowerCase();
-    if ((initTeam === 'maddie' && role === 'manager') || this.state.isSuperadmin) {
-      const planTab = document.getElementById('nav-planning-tab');
-      if (planTab) planTab.style.display = '';
-    }
-
     // Build View-As bar for superadmins
     if (this.state.isSuperadmin) {
       this._buildViewAsBar();
+    }
+
+    // Fetch campaign visibility for the current user
+    try {
+      const vizResp = await this._fetch('odGetVisibleCampaigns', { email, role });
+      if (vizResp && vizResp.visible) {
+        this.state.visibleCampaigns = new Set(vizResp.visible);
+        this.state.editableCampaigns = new Set(vizResp.editable);
+        this.state.campaignAccessMap = vizResp.accessMap || {};
+      }
+    } catch (err) {
+      console.warn('[OwnerDev] Could not resolve campaign visibility:', err);
+    }
+
+    // For global-view roles, all campaigns are visible
+    if (!this.state.visibleCampaigns) {
+      this.state.visibleCampaigns = new Set(Object.keys(OD_CONFIG.campaignSources));
+      this.state.editableCampaigns = new Set(role === 'superadmin' ? Object.keys(OD_CONFIG.campaignSources) : []);
+      this.state.campaignAccessMap = {};
     }
 
     // Load data (cache-first: shows cached data instantly, refreshes in background)
@@ -252,8 +271,9 @@ const OwnerDev = {
           this.state.session = this._saveSession({
             email: res.email || loginEmail,
             name: res.name || saName,
-            team: this._loginIsSA ? 'maddie' : res.team,
-            role: this._loginIsSA ? 'manager' : (res.role || 'member')
+            team: this._loginIsSA ? '' : (res.team || ''),
+            role: this._loginIsSA ? 'superadmin' : (res.role || 'member'),
+            managedBy: res.managedBy || ''
           });
           screen.style.display = 'none';
           this.init();
@@ -270,8 +290,8 @@ const OwnerDev = {
             await this._post('odSaveUser', {
               email: loginEmail,
               name: loginEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-              team: 'maddie',
-              role: 'manager',
+              team: '',
+              role: 'superadmin',
               pin: pin1
             });
           }
@@ -288,8 +308,9 @@ const OwnerDev = {
           this.state.session = this._saveSession({
             email: res.email || loginEmail,
             name: res.name || saName2,
-            team: this._loginIsSA ? 'maddie' : res.team,
-            role: this._loginIsSA ? 'manager' : (res.role || 'member')
+            team: this._loginIsSA ? '' : (res.team || ''),
+            role: this._loginIsSA ? 'superadmin' : (res.role || 'member'),
+            managedBy: res.managedBy || ''
           });
           screen.style.display = 'none';
           this.init();
@@ -1086,20 +1107,26 @@ const OwnerDev = {
     document.getElementById('stat-partial').textContent = partial;
     document.getElementById('stat-unmapped').textContent = unmapped;
 
-    // Update mapping nav badge with unmapped count for current team
+    // Update mapping nav badge — count unmapped items relevant to the user's role
     const allRows = this._getFilteredRows(true);
-    const team = this._getEffectiveTeam();
+    const role = this.state.effectiveRole || '';
+    const colEdit = this.state.columnEdit || {};
     let totalUnmapped = 0;
     for (const row of allRows) {
+      // Only count visible campaigns
+      if (this.state.visibleCampaigns && !this.state.visibleCampaigns.has(row.campaign)) continue;
       const m = this._findMapping(row.campaign, row.ownerName);
-      if (team === 'cam') {
+      if (colEdit.camCompany) {
         if (!m?.camCompany) totalUnmapped++;
-      } else if (team === 'nlr') {
+      } else if (colEdit.nlrFile || colEdit.nlrTab) {
         if (!m?.nlrTab) totalUnmapped++;
-      } else {
-        // Maddie: count owners missing a source tab mapping
-        const tabMap = this._findCampaignTabMap(row.campaign, row.ownerName);
-        if (!tabMap?.tabName) totalUnmapped++;
+      } else if (colEdit.sourceTab) {
+        // Org Manager/Admin: count missing source tabs for their campaigns only
+        const campAccess = (this.state.campaignAccessMap || {})[row.campaign] || '';
+        if (campAccess === 'own' || campAccess === 'edit' || role === 'superadmin') {
+          const tabMap = this._findCampaignTabMap(row.campaign, row.ownerName);
+          if (!tabMap?.tabName) totalUnmapped++;
+        }
       }
     }
     const badge = document.getElementById('mapping-notif-badge');
@@ -1126,19 +1153,28 @@ const OwnerDev = {
     }
     empty.style.display = 'none';
 
-    const team = this._getEffectiveTeam();
-    const isCam = team === 'cam';
-    const isNlr = team === 'nlr';
-    const isMaddie = team === 'maddie';
+    // ── Permission-based column editability ──
+    const role = this.state.effectiveRole || '';
+    const colEdit = this.state.columnEdit || {};
+    const accessMap = this.state.campaignAccessMap || {};
 
     let html = '';
     for (const row of sorted) {
+      // Campaign visibility filter — skip rows the user shouldn't see
+      if (this.state.visibleCampaigns && !this.state.visibleCampaigns.has(row.campaign)) continue;
+
       const mapping = this._findMapping(row.campaign, row.ownerName);
       const status = this._getRowStatus(row, mapping);
       const statusLabel = status === 'mapped' ? 'Mapped' : status === 'partial' ? 'Partial' : 'Unmapped';
       const statusIcon = status === 'mapped' ? '\u2705' : status === 'partial' ? '\u26A0\uFE0F' : '\u274C';
       const rowId = this._rowId(row.campaign, row.ownerName);
       const campaignLabel = OD_CONFIG.campaignSources[row.campaign]?.label || row.campaign;
+
+      // Per-campaign access level for sourceTab editability
+      const campAccess = accessMap[row.campaign] || '';
+      const canEditSourceTab = colEdit.sourceTab && (campAccess === 'own' || campAccess === 'edit' || role === 'superadmin');
+      const canEditBIS = colEdit.camCompany || false;
+      const canEditNLR = colEdit.nlrFile || false;
 
       html += `<tr data-row-id="${rowId}">`;
 
@@ -1148,37 +1184,37 @@ const OwnerDev = {
       // Owner name
       html += `<td><strong>${this._esc(row.ownerName)}</strong></td>`;
 
-      // Source Tab column (editable only when viewing as Maddie's team)
-      if (isMaddie) {
+      // Source Tab column — editable for campaign owners/admins/edit-granted + superadmin
+      if (canEditSourceTab) {
         html += `<td class="cell-editable">${this._renderSourceTabSelect(row)}</td>`;
       } else {
         const tabMapping = this._findCampaignTabMap(row.campaign, row.ownerName);
         const val = tabMapping?.tabName || '';
-        html += `<td class="cell-readonly">${val ? '<span class="readonly-value">' + this._esc(val) + '</span>' : '<span class="input-needed">Input Needed from Maddy</span>'}</td>`;
+        html += `<td class="cell-readonly">${val ? '<span class="readonly-value">' + this._esc(val) + '</span>' : '<span class="input-needed">Pending</span>'}</td>`;
       }
 
-      // Cam's Company column
-      if (isCam) {
+      // BIS Company column — editable for BIS roles + superadmin
+      if (canEditBIS) {
         html += `<td class="cell-editable">${this._renderCamSelect(row, mapping)}</td>`;
       } else {
         const val = mapping?.camCompany || '';
-        html += `<td class="cell-readonly">${val ? '<span class="readonly-value">' + this._esc(val) + '</span>' : '<span class="input-needed">Input Needed from BIS</span>'}</td>`;
+        html += `<td class="cell-readonly">${val ? '<span class="readonly-value">' + this._esc(val) + '</span>' : '<span class="input-needed">Pending</span>'}</td>`;
       }
 
-      // NLR File column
-      if (isNlr) {
+      // NLR File column — editable for NLR roles + superadmin
+      if (canEditNLR) {
         html += `<td class="cell-editable">${this._renderNlrFileSelect(row, mapping)}</td>`;
       } else {
         const val = mapping?.nlrWorkbookName || '';
-        html += `<td class="cell-readonly">${val ? '<span class="readonly-value">' + this._esc(val) + '</span>' : '<span class="input-needed">Input Needed from NLR</span>'}</td>`;
+        html += `<td class="cell-readonly">${val ? '<span class="readonly-value">' + this._esc(val) + '</span>' : '<span class="input-needed">Pending</span>'}</td>`;
       }
 
-      // NLR Tab column
-      if (isNlr) {
+      // NLR Tab column — editable for NLR roles + superadmin
+      if (canEditNLR) {
         html += `<td class="cell-editable">${this._renderNlrTabSelect(row, mapping)}</td>`;
       } else {
         const val = mapping?.nlrTab || '';
-        html += `<td class="cell-readonly">${val ? '<span class="readonly-value">' + this._esc(val) + '</span>' : '<span class="input-needed">Input Needed from NLR</span>'}</td>`;
+        html += `<td class="cell-readonly">${val ? '<span class="readonly-value">' + this._esc(val) + '</span>' : '<span class="input-needed">Pending</span>'}</td>`;
       }
 
       // Status badge
@@ -1792,42 +1828,254 @@ const OwnerDev = {
   // ══════════════════════════════════════════════════════
 
   renderTeam() {
+    const role = this.state.effectiveRole || '';
+    const email = (this.state.session?.email || '').toLowerCase();
     const team = this._getEffectiveTeam();
-    if (!team) return;
+    const isReadOnly = (this.state.tabAccess?.team === 'view');
 
-    const teamCfg = OD_CONFIG.teams[team];
-    const members = this.state.users.filter(u => u.team === team);
-
-    // Title
-    document.getElementById('team-view-title').textContent = (teamCfg?.label || 'Team') + ' Members';
-    document.getElementById('team-count').textContent = members.length + ' member' + (members.length !== 1 ? 's' : '');
-
-    // Member cards
+    const titleEl = document.getElementById('team-view-title');
+    const countEl = document.getElementById('team-count');
     const grid = document.getElementById('team-members-grid');
+
+    // ── Determine which users to show and what "team" label to use ──
+    let members = [];
+    let teamLabel = 'Team';
+    let canManageMembers = false;
+    let defaultNewRole = 'member'; // role to assign when adding a new member
+    let memberTeamKey = team;
+
+    if (role === 'org_manager') {
+      // Org Managers see their admins (managedBy = their email)
+      members = this.state.users.filter(u =>
+        (u.managedBy || '').toLowerCase() === email || u.email.toLowerCase() === email
+      );
+      const teamCfg = OD_CONFIG.teams[this.state.session?.team];
+      teamLabel = (teamCfg?.label || 'My Team');
+      canManageMembers = true;
+      defaultNewRole = 'admin';
+      memberTeamKey = this.state.session?.team || '';
+    } else if (role === 'nlr_manager') {
+      members = this.state.users.filter(u => u.team === 'nlr');
+      teamLabel = 'NLR Team';
+      canManageMembers = true;
+      defaultNewRole = 'nlr';
+      memberTeamKey = 'nlr';
+    } else if (role === 'bis_manager') {
+      members = this.state.users.filter(u => u.team === 'bis');
+      teamLabel = 'Better Image Solutions';
+      canManageMembers = true;
+      defaultNewRole = 'bis';
+      memberTeamKey = 'bis';
+    } else if (role === 'superadmin') {
+      // Superadmin with View-As: show that team; default: show all
+      if (team && OD_CONFIG.teams[team]) {
+        const teamCfg = OD_CONFIG.teams[team];
+        if (teamCfg.type === 'functional') {
+          members = this.state.users.filter(u => u.team === team);
+        } else {
+          // National team: show members on that team
+          members = this.state.users.filter(u => u.team === team);
+        }
+        teamLabel = teamCfg.label || team;
+      } else {
+        members = this.state.users;
+        teamLabel = 'All Users';
+      }
+      canManageMembers = true;
+      defaultNewRole = 'member';
+    } else if (role === 'aptel') {
+      // Aptel sees all but can't edit
+      members = this.state.users;
+      teamLabel = 'All Users';
+      canManageMembers = false;
+    }
+
+    titleEl.textContent = teamLabel + ' Members';
+    countEl.textContent = members.length + ' member' + (members.length !== 1 ? 's' : '');
+
+    // ── Render member cards ──
     if (members.length === 0) {
       grid.innerHTML = '<div class="empty-state"><div class="empty-state-text">No team members yet</div></div>';
+    } else {
+      let html = '';
+      for (const m of members) {
+        const initials = (m.name || m.email).split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        const roleDef = OD_CONFIG.roles[m.role];
+        const roleLabel = roleDef?.label || m.role || 'Member';
+        const isSelf = m.email.toLowerCase() === email;
+        const teamCfg = OD_CONFIG.teams[m.team];
+
+        html += `<div class="team-member-card">
+          <div class="team-member-avatar" style="background:${teamCfg?.color || 'var(--gray-400)'}">${initials}</div>
+          <div class="team-member-info">
+            <div class="team-member-name">${this._esc(m.name || m.email)}</div>
+            <div class="team-member-email">${this._esc(m.email)}</div>
+            <span class="team-member-role">${this._esc(roleLabel)}</span>
+          </div>
+          ${canManageMembers && !isSelf && !isReadOnly ? `<div class="team-member-actions"><button class="btn-remove-member" onclick="OwnerDev.removeMember('${this._esc(m.email)}')">Remove</button></div>` : ''}
+        </div>`;
+      }
+      grid.innerHTML = html;
+    }
+
+    // ── Access Grants section (Org Managers + Superadmin only) ──
+    const grantsSection = document.getElementById('access-grants-section');
+    if (grantsSection && (role === 'org_manager' || role === 'superadmin')) {
+      grantsSection.style.display = '';
+      this._renderAccessGrants();
+    } else if (grantsSection) {
+      grantsSection.style.display = 'none';
+    }
+
+    // Store context for addMember
+    this._teamAddContext = { team: memberTeamKey, defaultRole: defaultNewRole };
+  },
+
+  /**
+   * Render the Campaign Access Grants table for Org Managers
+   */
+  async _renderAccessGrants() {
+    const container = document.getElementById('access-grants-list');
+    if (!container) return;
+
+    // Fetch grants if not cached
+    if (!this.state.accessGrants) {
+      try {
+        const resp = await this._api('odGetAccessGrants', { email: this.state.session.email });
+        this.state.accessGrants = resp.grants || [];
+      } catch { this.state.accessGrants = []; }
+    }
+
+    // Fetch ownership if not cached
+    if (!this.state.campaignOwnership) {
+      try {
+        const resp = await this._api('odGetCampaignOwnership');
+        this.state.campaignOwnership = resp.ownership || [];
+      } catch { this.state.campaignOwnership = []; }
+    }
+
+    const role = this.state.effectiveRole || '';
+    const email = (this.state.session?.email || '').toLowerCase();
+
+    // Get campaigns this user owns (or all for superadmin)
+    const ownedCampaigns = this.state.campaignOwnership.filter(o => {
+      if (role === 'superadmin') return true;
+      return (o.ownerEmail || '').toLowerCase() === email;
+    });
+
+    if (ownedCampaigns.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-text">No campaigns assigned</div></div>';
       return;
     }
 
-    let html = '';
-    for (const m of members) {
-      const initials = (m.name || m.email).split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
-      const roleLabel = m.role === 'manager' ? 'Manager' : 'Member';
-      const isManager = this.state.session.role === 'manager';
-      const isSelf = m.email.toLowerCase() === this.state.session.email.toLowerCase();
+    let html = '<table class="access-grants-table"><thead><tr><th>Campaign</th><th>Shared With</th><th>Access</th><th></th></tr></thead><tbody>';
 
-      html += `<div class="team-member-card">
-        <div class="team-member-avatar" style="background:${teamCfg?.color || 'var(--gray-400)'}">${initials}</div>
-        <div class="team-member-info">
-          <div class="team-member-name">${this._esc(m.name || m.email)}</div>
-          <div class="team-member-email">${this._esc(m.email)}</div>
-          <span class="team-member-role">${roleLabel}</span>
-        </div>
-        ${isManager && !isSelf ? `<div class="team-member-actions"><button class="btn-remove-member" onclick="OwnerDev.removeMember('${this._esc(m.email)}')">Remove</button></div>` : ''}
-      </div>`;
+    for (const camp of ownedCampaigns) {
+      const campKey = camp.campaign;
+      const campLabel = OD_CONFIG.campaignSources[campKey]?.label || campKey;
+      const grants = this.state.accessGrants.filter(g => g.campaign === campKey);
+
+      if (grants.length === 0) {
+        html += `<tr>
+          <td><span class="campaign-pill">${this._esc(campLabel)}</span></td>
+          <td colspan="2" class="text-muted">No access shared</td>
+          <td><button class="btn-sm btn-grant" onclick="OwnerDev.showGrantModal('${this._esc(campKey)}')">+ Share</button></td>
+        </tr>`;
+      } else {
+        for (let i = 0; i < grants.length; i++) {
+          const g = grants[i];
+          html += `<tr>
+            ${i === 0 ? `<td rowspan="${grants.length}"><span class="campaign-pill">${this._esc(campLabel)}</span><br><button class="btn-sm btn-grant" style="margin-top:6px" onclick="OwnerDev.showGrantModal('${this._esc(campKey)}')">+ Share</button></td>` : ''}
+            <td>${this._esc(g.grantedToName || g.grantedToEmail)}</td>
+            <td><span class="access-badge access-${g.accessLevel}">${g.accessLevel}</span></td>
+            <td><button class="btn-sm btn-danger" onclick="OwnerDev.revokeGrant('${this._esc(campKey)}','${this._esc(g.grantedToEmail)}')">Revoke</button></td>
+          </tr>`;
+        }
+      }
     }
 
-    grid.innerHTML = html;
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  },
+
+  /**
+   * Show modal to grant campaign access
+   */
+  showGrantModal(campaignKey) {
+    const campLabel = OD_CONFIG.campaignSources[campaignKey]?.label || campaignKey;
+    // Build a list of potential grantees (all users except self)
+    const email = (this.state.session?.email || '').toLowerCase();
+    const candidates = this.state.users.filter(u =>
+      u.email.toLowerCase() !== email &&
+      (u.deactivated || '').toString().toLowerCase() !== 'true'
+    );
+
+    let optionsHtml = candidates.map(u =>
+      `<option value="${this._esc(u.email)}" data-name="${this._esc(u.name)}">${this._esc(u.name)} (${this._esc(u.email)})</option>`
+    ).join('');
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `<div class="modal-content" style="max-width:420px">
+      <h3>Share "${campLabel}"</h3>
+      <div class="form-group"><label>User</label><select id="grant-user">${optionsHtml}</select></div>
+      <div class="form-group"><label>Access Level</label><select id="grant-level"><option value="view">View</option><option value="edit">Edit</option></select></div>
+      <div id="grant-error" class="error-text"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+        <button class="btn-primary" onclick="OwnerDev._submitGrant('${this._esc(campaignKey)}')">Grant Access</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+  },
+
+  async _submitGrant(campaignKey) {
+    const userSelect = document.getElementById('grant-user');
+    const levelSelect = document.getElementById('grant-level');
+    const error = document.getElementById('grant-error');
+    if (!userSelect.value) { error.textContent = 'Select a user'; return; }
+
+    const grantedToEmail = userSelect.value;
+    const grantedToName = userSelect.options[userSelect.selectedIndex].getAttribute('data-name') || grantedToEmail;
+    const accessLevel = levelSelect.value;
+
+    try {
+      const res = await this._post('odSaveAccessGrant', {
+        campaign: campaignKey,
+        grantedToEmail,
+        grantedToName,
+        accessLevel,
+        grantedByEmail: this.state.session.email
+      });
+      if (res.success) {
+        this._toast('Access granted', 'success');
+        document.querySelector('.modal-overlay')?.remove();
+        this.state.accessGrants = null; // force re-fetch
+        this._renderAccessGrants();
+      } else {
+        error.textContent = res.error || 'Failed to grant access';
+      }
+    } catch (err) {
+      error.textContent = 'Connection error';
+    }
+  },
+
+  async revokeGrant(campaignKey, grantedToEmail) {
+    if (!confirm(`Revoke access to ${campaignKey} for ${grantedToEmail}?`)) return;
+    try {
+      const res = await this._post('odDeleteAccessGrant', {
+        campaign: campaignKey,
+        grantedToEmail,
+        callerEmail: this.state.session.email
+      });
+      if (res.success) {
+        this._toast('Access revoked', 'success');
+        this.state.accessGrants = null;
+        this._renderAccessGrants();
+      } else {
+        this._toast(res.error || 'Failed', 'error');
+      }
+    } catch { this._toast('Connection error', 'error'); }
   },
 
   /**
@@ -1848,14 +2096,24 @@ const OwnerDev = {
     const btn = document.querySelector('.btn-add-member');
     btn.disabled = true;
 
+    const ctx = this._teamAddContext || {};
+    const newRole = ctx.defaultRole || 'member';
+    const newTeam = ctx.team || this._getEffectiveTeam() || '';
+
     try {
-      const res = await this._post('odSaveUser', {
+      const body = {
         email,
         name,
-        team: this._getEffectiveTeam(),
-        role: 'member',
+        team: newTeam,
+        role: newRole,
         addedBy: this.state.session.email
-      });
+      };
+      // If adding an admin, set managedBy to the current Org Manager
+      if (newRole === 'admin') {
+        body.managedBy = this.state.session.email;
+      }
+
+      const res = await this._post('odSaveUser', body);
 
       if (res.success) {
         this._toast('Member added', 'success');
@@ -1919,7 +2177,10 @@ const OwnerDev = {
    */
   _getFilteredRows(ignoreFilter = false) {
     const rows = [];
+    const visible = this.state.visibleCampaigns;
     for (const [campaignKey, campaign] of Object.entries(this.state.campaigns)) {
+      // Campaign visibility check — global-view roles see everything, others only their campaigns
+      if (visible && visible.size > 0 && !visible.has(campaignKey)) continue;
       if (!ignoreFilter && this.state.activeCampaign !== 'all' && campaignKey !== this.state.activeCampaign) continue;
       for (const ownerName of (campaign.owners || [])) {
         if (this.state.searchQuery && !ownerName.toLowerCase().includes(this.state.searchQuery)) continue;
@@ -2238,13 +2499,17 @@ const OwnerDev = {
     const poolCards = document.getElementById('planning-pool-cards');
     if (!grid || !poolCards) return;
 
-    // All campaigns with owners
+    // All campaigns with owners, filtered by visibility
+    const visible = this.state.visibleCampaigns;
     const allCampaigns = {};
     for (const [key, camp] of Object.entries(this.state.campaigns)) {
       if (camp.owners && camp.owners.length > 0) {
+        if (visible && visible.size > 0 && !visible.has(key)) continue;
         allCampaigns[key] = camp;
       }
     }
+    // Check if planning is read-only for this role
+    const planningReadOnly = this.state.tabAccess?.planning === 'view';
 
     // Determine assigned campaigns (exist in planningData)
     const assignedKeys = new Set(this.state.planningData.map(p => p.campaignKey));
@@ -2296,12 +2561,13 @@ const OwnerDev = {
       logoHtml = `<span class="planning-card-logo-placeholder">&#x1F4CA;</span>`;
     }
 
-    const reorderBtn = day !== undefined
+    const isReadOnly = this.state.tabAccess?.planning === 'view';
+    const reorderBtn = (day !== undefined && !isReadOnly)
       ? `<button class="planning-card-reorder" onclick="event.stopPropagation();OwnerDev._openReorderModal('${campaignKey}',${day})" title="Reorder owners">&#x1F465;</button>`
       : '';
 
     return `
-      <div class="planning-card" draggable="true" data-campaign="${campaignKey}">
+      <div class="planning-card" ${!isReadOnly ? 'draggable="true"' : ''} data-campaign="${campaignKey}">
         ${logoHtml}
         <div class="planning-card-info">
           <div class="planning-card-label">${this._esc(label)}</div>
@@ -2597,6 +2863,10 @@ const OwnerDev = {
   // ── Save Planning ──
 
   async savePlanning() {
+    if (this.state.tabAccess?.planning === 'view') {
+      this._toast('View-only access', 'error');
+      return;
+    }
     const status = document.getElementById('planning-save-status');
     if (status) status.textContent = 'Saving...';
     try {

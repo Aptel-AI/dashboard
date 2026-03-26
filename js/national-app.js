@@ -1742,9 +1742,13 @@ const NationalApp = {
     const container = document.getElementById('campaign-cards');
     if (!container) return;
 
-    // Only include campaigns that have owners
+    // Only include campaigns that have owners AND are visible to this user
+    const visibleSet = (typeof OwnerDev !== 'undefined' && OwnerDev.state?.visibleCampaigns)
+      ? OwnerDev.state.visibleCampaigns : null;
     const allKeys = new Set([...Object.keys(campaigns), ...Object.keys(configCampaigns)]);
     const activeKeys = [...allKeys].filter(key => {
+      // Visibility filter: if we have a visibility set, enforce it
+      if (visibleSet && visibleSet.size > 0 && !visibleSet.has(key)) return false;
       const cd = campaigns[key];
       if (!cd) return false;
       return (cd.owners || []).length > 0;

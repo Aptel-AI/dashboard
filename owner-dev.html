@@ -151,7 +151,7 @@
       <!-- Populated dynamically -->
     </div>
 
-    <div class="add-member-card">
+    <div class="add-member-card" id="add-member-section">
       <h3>Add Team Member</h3>
       <div class="add-member-form">
         <div class="form-row">
@@ -160,6 +160,17 @@
         </div>
         <button class="btn-add-member" onclick="OwnerDev.addMember()">Add Member</button>
         <div id="add-member-error" class="login-error" style="text-align:left"></div>
+      </div>
+    </div>
+
+    <!-- Campaign Access Grants (Org Managers + Superadmin) -->
+    <div id="access-grants-section" class="access-grants-section" style="display:none">
+      <div class="team-header" style="margin-top:32px">
+        <h2>Campaign Access</h2>
+        <span class="text-muted">Control who can view or edit your campaigns</span>
+      </div>
+      <div id="access-grants-list">
+        <!-- Populated dynamically by _renderAccessGrants() -->
       </div>
     </div>
   </div>

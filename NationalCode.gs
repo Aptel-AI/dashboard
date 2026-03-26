@@ -232,6 +232,24 @@ function doGet(e) {
       return jsonResp(odGetNotes_());
     }
 
+    // ── OD: Campaign ownership (who owns which campaigns) ──
+    if (action === 'odGetCampaignOwnership') {
+      return jsonResp(odGetCampaignOwnership());
+    }
+
+    // ── OD: Access grants ──
+    if (action === 'odGetAccessGrants') {
+      var callerEmail = (e && e.parameter && e.parameter.email) || '';
+      return jsonResp(odGetAccessGrants(callerEmail));
+    }
+
+    // ── OD: Resolve visible campaigns for a user ──
+    if (action === 'odGetVisibleCampaigns') {
+      var email = (e && e.parameter && e.parameter.email) || '';
+      var role = (e && e.parameter && e.parameter.role) || '';
+      return jsonResp(odResolveVisibleCampaigns(email, role));
+    }
+
     if (owner) {
       return jsonResp(loadOwnerDetail(campaign, owner));
     } else {
@@ -338,6 +356,15 @@ function doPost(e) {
         break;
       case 'odUnflagRep':
         result = odUnflagRep(body);
+        break;
+      case 'odSaveCampaignOwnership':
+        result = odSaveCampaignOwnership(body);
+        break;
+      case 'odSaveAccessGrant':
+        result = odSaveAccessGrant(body);
+        break;
+      case 'odDeleteAccessGrant':
+        result = odDeleteAccessGrant(body);
         break;
       default:
         result = { error: 'unknown action: ' + body.action };
@@ -2871,17 +2898,34 @@ function saveGoalsRow_(ownerName, campaignLabel, campaignKey, goals) {
     }
   }
 
-  // If no row exists for next week, create one
+  // If no row exists for next week, create one in the right position
   if (targetRow === -1) {
-    var numCols = headers.length; // use actual sheet column count, not template
+    var numCols = headers.length;
     var newRow = [];
-    for (var h2 = 0; h2 < numCols; h2++) newRow.push(0);
-    // Write as formatted string to avoid timezone/time issues in Sheets
+    for (var h2 = 0; h2 < numCols; h2++) newRow.push('');
     newRow[colWeek] = formatDate(nextSunday);
     newRow[colOwner] = ownerName;
-    sheet.insertRowAfter(1);
-    sheet.getRange(2, 1, 1, newRow.length).setValues([newRow]);
-    targetRow = 2;
+
+    // Find the right insertion point: after the last row of the target week
+    var insertAfter = -1;
+    for (var i2 = 1; i2 < data.length; i2++) {
+      var rowDate = data[i2][colWeek];
+      var rowKey = _normalizeDateKey_(rowDate instanceof Date ? rowDate : _parseTabDate(String(rowDate)));
+      if (rowKey === nextSundayKey) insertAfter = i2 + 1; // 1-based sheet row
+    }
+
+    if (insertAfter > 0) {
+      // Insert after the last row of the same week
+      sheet.insertRowAfter(insertAfter);
+      sheet.getRange(insertAfter + 1, 1, 1, newRow.length).setValues([newRow]);
+      targetRow = insertAfter + 1;
+    } else {
+      // No rows for this week yet — insert at row 2 (top of data)
+      sheet.insertRowAfter(1);
+      sheet.getRange(2, 1, 1, newRow.length).setValues([newRow]);
+      targetRow = 2;
+    }
+
     // Re-read headers in case of column shifts
     data = sheet.getDataRange().getValues();
     headers = data[0].map(function(h) { return String(h).trim(); });
@@ -4693,6 +4737,296 @@ function odReadTab(tabName) {
 }
 
 // ═══════════════════════════════════════════════════════
+// OWNER DEVELOPMENT (OD) — Campaign Ownership & Access Grants
+// ═══════════════════════════════════════════════════════
+
+var OD_OWNERSHIP_HEADERS_ = ['campaign', 'ownerEmail', 'ownerName', 'updatedAt'];
+var OD_GRANTS_HEADERS_ = ['campaign', 'grantedToEmail', 'grantedToName', 'accessLevel', 'grantedByEmail', 'grantedAt'];
+var OD_USERS_HEADERS_ = ['email', 'name', 'team', 'role', 'pinHash', 'dateAdded', 'deactivated', 'managedBy'];
+
+/** Roles that see ALL campaigns (functional/oversight roles) */
+var OD_GLOBAL_VIEW_ROLES_ = { nlr: true, nlr_manager: true, bis: true, bis_manager: true, aptel: true, superadmin: true };
+
+/**
+ * Resolve which campaigns a user can see based on role + ownership + grants.
+ * Returns { visible: [campaignKeys], editable: [campaignKeys], role, accessMap }
+ * accessMap: { campaignKey: 'view'|'edit'|'own' }
+ */
+function odResolveVisibleCampaigns(email, role) {
+  if (!email) return { visible: [], editable: [], role: role || '', accessMap: {} };
+  email = email.toString().trim().toLowerCase();
+  role = (role || '').toString().trim().toLowerCase();
+
+  // Global-view roles see everything
+  if (OD_GLOBAL_VIEW_ROLES_[role]) {
+    // Get ALL campaign keys from ownership table
+    var ownershipRows = odReadTab('_OD_Campaign_Ownership');
+    var allCampaigns = [];
+    var accessMap = {};
+    for (var i = 0; i < ownershipRows.length; i++) {
+      var ck = String(ownershipRows[i].campaign || '').trim();
+      if (ck) {
+        allCampaigns.push(ck);
+        accessMap[ck] = role === 'superadmin' ? 'edit' : 'view';
+      }
+    }
+    // Also include campaigns from odGetCampaignOwners that may not be in ownership table yet
+    return { visible: allCampaigns, editable: role === 'superadmin' ? allCampaigns : [], role: role, accessMap: accessMap };
+  }
+
+  var accessMap = {};
+
+  // Org Manager: owns campaigns
+  if (role === 'org_manager') {
+    var ownershipRows = odReadTab('_OD_Campaign_Ownership');
+    for (var i = 0; i < ownershipRows.length; i++) {
+      var ownerEmail = String(ownershipRows[i].ownerEmail || '').trim().toLowerCase();
+      if (ownerEmail === email) {
+        var ck = String(ownershipRows[i].campaign || '').trim();
+        if (ck) accessMap[ck] = 'own';
+      }
+    }
+  }
+
+  // Admin: inherits their Org Manager's campaigns
+  if (role === 'admin') {
+    var managedBy = _odGetManagedBy(email);
+    if (managedBy) {
+      var ownershipRows = odReadTab('_OD_Campaign_Ownership');
+      for (var i = 0; i < ownershipRows.length; i++) {
+        var ownerEmail = String(ownershipRows[i].ownerEmail || '').trim().toLowerCase();
+        if (ownerEmail === managedBy) {
+          var ck = String(ownershipRows[i].campaign || '').trim();
+          if (ck) accessMap[ck] = 'edit'; // admins can edit their OM's campaigns
+        }
+      }
+    }
+  }
+
+  // All roles: check explicit access grants
+  var grantRows = odReadTab('_OD_Access_Grants');
+  for (var i = 0; i < grantRows.length; i++) {
+    var grantee = String(grantRows[i].grantedToEmail || '').trim().toLowerCase();
+    if (grantee !== email) continue;
+    var ck = String(grantRows[i].campaign || '').trim();
+    var level = String(grantRows[i].accessLevel || '').trim().toLowerCase();
+    if (!ck || !level) continue;
+    // Don't downgrade: own > edit > view
+    var current = accessMap[ck];
+    if (current === 'own') continue;
+    if (current === 'edit' && level === 'view') continue;
+    accessMap[ck] = level;
+  }
+
+  var visible = Object.keys(accessMap);
+  var editable = [];
+  for (var k in accessMap) {
+    if (accessMap[k] === 'own' || accessMap[k] === 'edit') editable.push(k);
+  }
+
+  return { visible: visible, editable: editable, role: role, accessMap: accessMap };
+}
+
+/**
+ * Look up a user's managedBy field from _OD_Users.
+ */
+function _odGetManagedBy(email) {
+  if (!email) return '';
+  var target = email.toString().trim().toLowerCase();
+  var sheet = odGetOrCreateTab('_OD_Users', OD_USERS_HEADERS_);
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return '';
+  var headers = data[0];
+  var emailCol = -1, mbCol = -1;
+  for (var c = 0; c < headers.length; c++) {
+    var h = String(headers[c]).trim().toLowerCase();
+    if (h === 'email') emailCol = c;
+    else if (h === 'managedby') mbCol = c;
+  }
+  if (emailCol < 0 || mbCol < 0) return '';
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][emailCol] || '').trim().toLowerCase() === target) {
+      return String(data[i][mbCol] || '').trim().toLowerCase();
+    }
+  }
+  return '';
+}
+
+/**
+ * Look up a user's role from _OD_Users.
+ */
+function _odGetUserRole(email) {
+  if (!email) return '';
+  var target = email.toString().trim().toLowerCase();
+  var rows = odReadTab('_OD_Users');
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].email || '').trim().toLowerCase() === target) {
+      return String(rows[i].role || '').trim().toLowerCase();
+    }
+  }
+  return '';
+}
+
+/**
+ * Check if a user can edit a specific mapping column for a campaign.
+ * Returns true/false.
+ *   - Source Tab: org_manager who owns it, admin under that OM, edit-granted users, superadmin
+ *   - BIS col: bis_manager, bis, superadmin
+ *   - NLR cols: nlr_manager, nlr, superadmin
+ */
+function _odCanEditColumn(email, role, campaign, column, accessMap) {
+  if (role === 'superadmin') return true;
+
+  // NLR columns
+  if (column === 'nlrWorkbook' || column === 'nlrWorkbookId' || column === 'nlrWorkbookName' || column === 'nlrTab') {
+    return role === 'nlr' || role === 'nlr_manager';
+  }
+  // BIS column
+  if (column === 'camCompany') {
+    return role === 'bis' || role === 'bis_manager';
+  }
+  // Source Tab (campaign tab map) — needs campaign ownership or edit grant
+  if (column === 'sourceTab' || column === 'tabName') {
+    var access = accessMap ? accessMap[campaign] : null;
+    return access === 'own' || access === 'edit';
+  }
+  return false;
+}
+
+// ── Campaign Ownership CRUD ──
+
+function odGetCampaignOwnership() {
+  odGetOrCreateTab('_OD_Campaign_Ownership', OD_OWNERSHIP_HEADERS_);
+  var rows = odReadTab('_OD_Campaign_Ownership');
+  return { success: true, ownership: rows };
+}
+
+function odSaveCampaignOwnership(body) {
+  var campaign = String(body.campaign || '').trim();
+  var ownerEmail = String(body.ownerEmail || '').trim().toLowerCase();
+  var ownerName = String(body.ownerName || '').trim();
+  if (!campaign || !ownerEmail) return { error: 'campaign and ownerEmail required' };
+
+  var sheet = odGetOrCreateTab('_OD_Campaign_Ownership', OD_OWNERSHIP_HEADERS_);
+  var data = sheet.getDataRange().getValues();
+
+  // Upsert by campaign key
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0] || '').trim().toLowerCase() === campaign.toLowerCase()) {
+      sheet.getRange(i + 1, 2).setValue(ownerEmail);
+      sheet.getRange(i + 1, 3).setValue(ownerName);
+      sheet.getRange(i + 1, 4).setValue(new Date().toISOString());
+      return { success: true, updated: true };
+    }
+  }
+
+  // Insert new
+  sheet.appendRow([campaign, ownerEmail, ownerName, new Date().toISOString()]);
+  return { success: true, created: true };
+}
+
+// ── Access Grants CRUD ──
+
+function odGetAccessGrants(callerEmail) {
+  odGetOrCreateTab('_OD_Access_Grants', OD_GRANTS_HEADERS_);
+  var rows = odReadTab('_OD_Access_Grants');
+  // If callerEmail provided, filter to grants relevant to that user
+  // (grants they created OR grants given to them)
+  if (callerEmail) {
+    var target = callerEmail.toString().trim().toLowerCase();
+    var filtered = [];
+    for (var i = 0; i < rows.length; i++) {
+      var grantee = String(rows[i].grantedToEmail || '').trim().toLowerCase();
+      var granter = String(rows[i].grantedByEmail || '').trim().toLowerCase();
+      if (grantee === target || granter === target) filtered.push(rows[i]);
+    }
+    return { success: true, grants: filtered };
+  }
+  return { success: true, grants: rows };
+}
+
+function odSaveAccessGrant(body) {
+  var campaign = String(body.campaign || '').trim();
+  var grantedToEmail = String(body.grantedToEmail || '').trim().toLowerCase();
+  var grantedToName = String(body.grantedToName || '').trim();
+  var accessLevel = String(body.accessLevel || '').trim().toLowerCase();
+  var grantedByEmail = String(body.grantedByEmail || '').trim().toLowerCase();
+  if (!campaign || !grantedToEmail || !accessLevel) return { error: 'campaign, grantedToEmail, and accessLevel required' };
+  if (accessLevel !== 'view' && accessLevel !== 'edit') return { error: 'accessLevel must be view or edit' };
+
+  // Permission check: caller must own this campaign or be superadmin
+  var callerRole = _odGetUserRole(grantedByEmail);
+  if (callerRole !== 'superadmin') {
+    var ownershipRows = odReadTab('_OD_Campaign_Ownership');
+    var isOwner = false;
+    for (var i = 0; i < ownershipRows.length; i++) {
+      if (String(ownershipRows[i].campaign || '').trim().toLowerCase() === campaign.toLowerCase() &&
+          String(ownershipRows[i].ownerEmail || '').trim().toLowerCase() === grantedByEmail) {
+        isOwner = true;
+        break;
+      }
+    }
+    if (!isOwner) return { error: 'Only the campaign owner or superadmin can grant access' };
+  }
+
+  var sheet = odGetOrCreateTab('_OD_Access_Grants', OD_GRANTS_HEADERS_);
+  var data = sheet.getDataRange().getValues();
+
+  // Upsert by campaign + grantedToEmail
+  for (var i = 1; i < data.length; i++) {
+    var existCamp = String(data[i][0] || '').trim().toLowerCase();
+    var existGrantee = String(data[i][1] || '').trim().toLowerCase();
+    if (existCamp === campaign.toLowerCase() && existGrantee === grantedToEmail) {
+      sheet.getRange(i + 1, 3).setValue(grantedToName);
+      sheet.getRange(i + 1, 4).setValue(accessLevel);
+      sheet.getRange(i + 1, 5).setValue(grantedByEmail);
+      sheet.getRange(i + 1, 6).setValue(new Date().toISOString());
+      return { success: true, updated: true };
+    }
+  }
+
+  // Insert new
+  sheet.appendRow([campaign, grantedToEmail, grantedToName, accessLevel, grantedByEmail, new Date().toISOString()]);
+  return { success: true, created: true };
+}
+
+function odDeleteAccessGrant(body) {
+  var campaign = String(body.campaign || '').trim().toLowerCase();
+  var grantedToEmail = String(body.grantedToEmail || '').trim().toLowerCase();
+  var callerEmail = String(body.callerEmail || '').trim().toLowerCase();
+  if (!campaign || !grantedToEmail) return { error: 'campaign and grantedToEmail required' };
+
+  // Permission check: caller must own this campaign or be superadmin
+  var callerRole = _odGetUserRole(callerEmail);
+  if (callerRole !== 'superadmin') {
+    var ownershipRows = odReadTab('_OD_Campaign_Ownership');
+    var isOwner = false;
+    for (var i = 0; i < ownershipRows.length; i++) {
+      if (String(ownershipRows[i].campaign || '').trim().toLowerCase() === campaign &&
+          String(ownershipRows[i].ownerEmail || '').trim().toLowerCase() === callerEmail) {
+        isOwner = true;
+        break;
+      }
+    }
+    if (!isOwner) return { error: 'Only the campaign owner or superadmin can revoke access' };
+  }
+
+  var sheet = odGetOrCreateTab('_OD_Access_Grants', OD_GRANTS_HEADERS_);
+  var data = sheet.getDataRange().getValues();
+
+  for (var i = 1; i < data.length; i++) {
+    var existCamp = String(data[i][0] || '').trim().toLowerCase();
+    var existGrantee = String(data[i][1] || '').trim().toLowerCase();
+    if (existCamp === campaign && existGrantee === grantedToEmail) {
+      sheet.deleteRow(i + 1);
+      return { success: true, deleted: true };
+    }
+  }
+
+  return { success: true, deleted: false, message: 'Grant not found' };
+}
+
+// ═══════════════════════════════════════════════════════
 // OWNER DEVELOPMENT (OD) — doGet Endpoints
 // ═══════════════════════════════════════════════════════
 
@@ -4894,7 +5228,7 @@ function odGetMappings() {
  * Read _OD_Users tab, return all rows as objects but EXCLUDE pinHash.
  */
 function odGetUsers() {
-  odGetOrCreateTab('_OD_Users', ['email', 'name', 'team', 'role', 'pinHash', 'dateAdded', 'deactivated']);
+  odGetOrCreateTab('_OD_Users', OD_USERS_HEADERS_);
   var rows = odReadTab('_OD_Users');
   var safe = [];
   for (var i = 0; i < rows.length; i++) {
@@ -4905,7 +5239,8 @@ function odGetUsers() {
       team: r.team,
       role: r.role,
       dateAdded: r.dateAdded,
-      deactivated: r.deactivated
+      deactivated: r.deactivated,
+      managedBy: r.managedBy || ''
     });
   }
   return { success: true, users: safe };
@@ -4918,7 +5253,7 @@ function odGetUsers() {
 function odCheckUser(email) {
   if (!email) return { success: false, message: 'Email is required' };
 
-  var sheet = odGetOrCreateTab('_OD_Users', ['email', 'name', 'team', 'role', 'pinHash', 'dateAdded', 'deactivated']);
+  var sheet = odGetOrCreateTab('_OD_Users', OD_USERS_HEADERS_);
   var data = sheet.getDataRange().getValues();
   if (data.length < 2) return { success: false, message: 'Contact your team manager to get added.' };
 
@@ -4959,12 +5294,12 @@ function odCheckUser(email) {
  * Returns flat user fields (email, name, team, role) directly on the response object.
  */
 function odLogin(email, pin, createPin) {
-  var sheet = odGetOrCreateTab('_OD_Users', ['email', 'name', 'team', 'role', 'pinHash', 'dateAdded', 'deactivated']);
+  var sheet = odGetOrCreateTab('_OD_Users', OD_USERS_HEADERS_);
   var data = sheet.getDataRange().getValues();
   if (data.length < 2) return { success: false, message: 'No users found' };
 
   var headers = data[0];
-  var emailCol = -1, pinCol = -1, nameCol = -1, teamCol = -1, roleCol = -1, deactCol = -1;
+  var emailCol = -1, pinCol = -1, nameCol = -1, teamCol = -1, roleCol = -1, deactCol = -1, mbCol = -1;
   for (var c = 0; c < headers.length; c++) {
     var h = String(headers[c]).trim().toLowerCase();
     if (h === 'email') emailCol = c;
@@ -4973,6 +5308,7 @@ function odLogin(email, pin, createPin) {
     else if (h === 'team') teamCol = c;
     else if (h === 'role') roleCol = c;
     else if (h === 'deactivated') deactCol = c;
+    else if (h === 'managedby') mbCol = c;
   }
   if (emailCol < 0 || pinCol < 0) return { success: false, message: 'Tab misconfigured' };
 
@@ -4990,32 +5326,29 @@ function odLogin(email, pin, createPin) {
     var storedHash = String(data[i][pinCol] || '').trim();
     var inputHash = odHashPin(pin);
 
+    var userFields = {
+      email: String(data[i][emailCol] || '').trim(),
+      name: String(data[i][nameCol] || '').trim(),
+      team: String(data[i][teamCol] || '').trim(),
+      role: String(data[i][roleCol] || '').trim(),
+      managedBy: mbCol >= 0 ? String(data[i][mbCol] || '').trim() : ''
+    };
+
     if (!storedHash && createPin) {
       // First login — set the PIN
       sheet.getRange(i + 1, pinCol + 1).setValue(inputHash);
-      return {
-        success: true,
-        firstLogin: true,
-        email: String(data[i][emailCol] || '').trim(),
-        name: String(data[i][nameCol] || '').trim(),
-        team: String(data[i][teamCol] || '').trim(),
-        role: String(data[i][roleCol] || '').trim()
-      };
+      userFields.success = true;
+      userFields.firstLogin = true;
+      return userFields;
     }
 
     if (!storedHash) {
-      // No PIN set but createPin not requested — should not happen in normal flow
       return { success: false, message: 'PIN not set. Please create a PIN.' };
     }
 
     if (inputHash === storedHash) {
-      return {
-        success: true,
-        email: String(data[i][emailCol] || '').trim(),
-        name: String(data[i][nameCol] || '').trim(),
-        team: String(data[i][teamCol] || '').trim(),
-        role: String(data[i][roleCol] || '').trim()
-      };
+      userFields.success = true;
+      return userFields;
     } else {
       return { success: false, message: 'Incorrect PIN' };
     }
@@ -5250,7 +5583,7 @@ function odBatchSaveMappings(body) {
 
 /**
  * action: 'odSaveUser'
- * body: { email, name, team, role, pin? }
+ * body: { email, name, team, role, pin?, managedBy? }
  * Add or update user in _OD_Users.
  */
 function odSaveUser(body) {
@@ -5259,11 +5592,11 @@ function odSaveUser(body) {
   var team = String(body.team || '').trim();
   var role = String(body.role || '').trim();
   var pin = body.pin ? String(body.pin).trim() : '';
+  var managedBy = String(body.managedBy || '').trim();
 
   if (!email) return { success: false, message: 'email is required' };
 
-  var tabHeaders = ['email', 'name', 'team', 'role', 'pinHash', 'dateAdded', 'deactivated'];
-  var sheet = odGetOrCreateTab('_OD_Users', tabHeaders);
+  var sheet = odGetOrCreateTab('_OD_Users', OD_USERS_HEADERS_);
   var data = sheet.getDataRange().getValues();
 
   // Find existing row by email (case-insensitive)
@@ -5278,18 +5611,19 @@ function odSaveUser(body) {
 
   if (foundRow > 0) {
     // Update existing user
-    sheet.getRange(foundRow, 2).setValue(name);   // name
-    sheet.getRange(foundRow, 3).setValue(team);   // team
-    sheet.getRange(foundRow, 4).setValue(role);   // role
+    sheet.getRange(foundRow, 2).setValue(name);       // name
+    sheet.getRange(foundRow, 3).setValue(team);       // team
+    sheet.getRange(foundRow, 4).setValue(role);       // role
     if (pin) {
       sheet.getRange(foundRow, 5).setValue(odHashPin(pin)); // pinHash
     }
-    sheet.getRange(foundRow, 7).setValue('');     // clear deactivated on save
+    sheet.getRange(foundRow, 7).setValue('');         // clear deactivated on save
+    sheet.getRange(foundRow, 8).setValue(managedBy);  // managedBy
   } else {
     // Add new user
     var pinHash = pin ? odHashPin(pin) : '';
     var now = new Date().toISOString();
-    sheet.appendRow([email, name, team, role, pinHash, now, '']);
+    sheet.appendRow([email, name, team, role, pinHash, now, '', managedBy]);
   }
 
   return { success: true };
@@ -5304,8 +5638,7 @@ function odDeleteUser(body) {
   var email = String(body.email || '').trim();
   if (!email) return { success: false, message: 'email is required' };
 
-  var tabHeaders = ['email', 'name', 'team', 'role', 'pinHash', 'dateAdded', 'deactivated'];
-  var sheet = odGetOrCreateTab('_OD_Users', tabHeaders);
+  var sheet = odGetOrCreateTab('_OD_Users', OD_USERS_HEADERS_);
   var data = sheet.getDataRange().getValues();
 
   var target = email.toLowerCase();
@@ -7686,4 +8019,98 @@ function odSavePlanning(body) {
   }
 
   return { success: true, saved: items.length };
+}
+
+
+// ═══════════════════════════════════════════════════════
+// SEED DATA — Run once from editor to populate initial roles
+// After running, delete this function or comment it out.
+// ═══════════════════════════════════════════════════════
+
+function seedODRolesAndOwnership() {
+  var now = new Date().toISOString();
+
+  // ── 1. Seed _OD_Campaign_Ownership ──
+  var ownershipSheet = odGetOrCreateTab('_OD_Campaign_Ownership', OD_OWNERSHIP_HEADERS_);
+  ownershipSheet.clearContents();
+  ownershipSheet.getRange(1, 1, 1, OD_OWNERSHIP_HEADERS_.length).setValues([OD_OWNERSHIP_HEADERS_]);
+
+  var ownershipRows = [
+    // Maddy's campaigns
+    ['att-nds',       'mdanesi3@gmail.com',                    'Maddy Komis',          now],
+    ['frontier',      'mdanesi3@gmail.com',                    'Maddy Komis',          now],
+    ['verizon-fios',  'mdanesi3@gmail.com',                    'Maddy Komis',          now],
+    ['att-res',       'mdanesi3@gmail.com',                    'Maddy Komis',          now],
+    ['lumen',         'mdanesi3@gmail.com',                    'Maddy Komis',          now],
+    ['rogers',        'mdanesi3@gmail.com',                    'Maddy Komis',          now],
+    ['leafguard',     'mdanesi3@gmail.com',                    'Maddy Komis',          now],
+    // Caitlyn's campaigns
+    ['att-b2b',       'caitlyn@nextlevelrecruitinginc.com',    'Caitlyn Carrafiello',  now],
+    ['box',           'caitlyn@nextlevelrecruitinginc.com',    'Caitlyn Carrafiello',  now]
+  ];
+  ownershipSheet.getRange(2, 1, ownershipRows.length, OD_OWNERSHIP_HEADERS_.length).setValues(ownershipRows);
+  Logger.log('Seeded _OD_Campaign_Ownership: ' + ownershipRows.length + ' rows');
+
+  // ── 2. Seed _OD_Users (upsert — preserves existing PIN hashes) ──
+  var usersSheet = odGetOrCreateTab('_OD_Users', OD_USERS_HEADERS_);
+  var existingData = usersSheet.getDataRange().getValues();
+  var existingMap = {}; // email → row index (1-based)
+  if (existingData.length > 1) {
+    for (var i = 1; i < existingData.length; i++) {
+      var em = String(existingData[i][0] || '').trim().toLowerCase();
+      if (em) existingMap[em] = i + 1;
+    }
+  }
+
+  // [email, name, team, role, pinHash, dateAdded, deactivated, managedBy]
+  var users = [
+    // National Consultants
+    ['kweinraub@gmail.com',                     'Ken Weinraub',          'ken',     'national',     '', now, '', ''],
+    ['vanberardino@gmail.com',                   'Van Berardino',         'van',     'national',     '', now, '', ''],
+    ['raffi127@gmail.com',                       'Rafael Hidalgo',        'rafael',  'national',     '', now, '', ''],
+    ['synergyadvmkg@gmail.com',                  'Sam Rabinowitz',        'sam',     'national',     '', now, '', ''],
+    // Org Managers
+    ['mdanesi3@gmail.com',                       'Maddy Komis',           'ken',     'org_manager',  '', now, '', 'kweinraub@gmail.com'],
+    ['caitlyn@nextlevelrecruitinginc.com',       'Caitlyn Carrafiello',   'van',     'org_manager',  '', now, '', 'vanberardino@gmail.com'],
+    // Admins
+    ['bruhncloie7@gmail.com',                    'Cloie Bruhn',           'ken',     'admin',        '', now, '', 'mdanesi3@gmail.com'],
+    // NLR
+    ['erica@nextlevelrecruitinginc.com',         'Erica Gordon',          'nlr',     'nlr_manager',  '', now, '', ''],
+    // BIS
+    ['cam@betterimagesolutions.com',             'Cam Besseda',           'bis',     'bis_manager',  '', now, '', ''],
+    // Aptel
+    ['austin.rios@thesmartcircle.com',           'Austin Rios',           '',        'aptel',        '', now, '', ''],
+    ['destiny@aptel.com',                        'Destiny Tuangco',       '',        'aptel',        '', now, '', ''],
+    ['jorton@thesmartcircle.com',                'Josh Orton',            '',        'aptel',        '', now, '', ''],
+    // Superadmin
+    ['alex.aspirehr@gmail.com',                  'Alex Prindle',          '',        'superadmin',   '', now, '', '']
+  ];
+
+  var added = 0, updated = 0;
+  for (var u = 0; u < users.length; u++) {
+    var row = users[u];
+    var email = row[0].toLowerCase();
+    var existingRow = existingMap[email];
+
+    if (existingRow) {
+      // Update: name, team, role, managedBy — PRESERVE pinHash
+      usersSheet.getRange(existingRow, 2).setValue(row[1]); // name
+      usersSheet.getRange(existingRow, 3).setValue(row[2]); // team
+      usersSheet.getRange(existingRow, 4).setValue(row[3]); // role
+      usersSheet.getRange(existingRow, 7).setValue('');      // clear deactivated
+      usersSheet.getRange(existingRow, 8).setValue(row[7]);  // managedBy
+      updated++;
+    } else {
+      usersSheet.appendRow(row);
+      added++;
+    }
+  }
+  Logger.log('Seeded _OD_Users: ' + added + ' added, ' + updated + ' updated (PINs preserved)');
+
+  // ── 3. Ensure _OD_Access_Grants tab exists ──
+  odGetOrCreateTab('_OD_Access_Grants', OD_GRANTS_HEADERS_);
+  Logger.log('_OD_Access_Grants tab ready');
+
+  Logger.log('=== SEED COMPLETE ===');
+  return { ownership: ownershipRows.length, usersAdded: added, usersUpdated: updated };
 }
