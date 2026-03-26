@@ -6139,6 +6139,49 @@ function consolidateCampaign_(campaignKey, campaign, destSS) {
     }
   }
 
+  // ── Restore orphaned goal/production rows (future weeks not in source data) ──
+  var restoredKeys = {};
+  for (var ri2 = 0; ri2 < rows.length; ri2++) {
+    var rk2 = String(rows[ri2][1] || '').trim().toLowerCase() + '|' + _normalizeDateKey_(rows[ri2][0]);
+    restoredKeys[rk2] = true;
+  }
+  // Check existingGoals and existingProd for entries that weren't matched to any row
+  var allPreservedKeys = {};
+  for (var gk in existingGoals) allPreservedKeys[gk] = true;
+  for (var pk in existingProd) allPreservedKeys[pk] = true;
+  for (var orphanKey in allPreservedKeys) {
+    if (restoredKeys[orphanKey]) continue; // already matched
+    var parts = orphanKey.split('|');
+    var orphanOwner = parts[0];
+    var orphanDate = parts[1];
+    if (!orphanOwner || !orphanDate) continue;
+    // Find proper-cased owner name from existing rows
+    var properOwner = orphanOwner;
+    for (var ni = 0; ni < rows.length; ni++) {
+      if (String(rows[ni][1] || '').trim().toLowerCase() === orphanOwner) {
+        properOwner = String(rows[ni][1] || '').trim();
+        break;
+      }
+    }
+    // Build a new row with goals/production preserved
+    var orphanRow = [];
+    for (var oi2 = 0; oi2 < campaignHeaders.length; oi2++) orphanRow.push(0);
+    var dateParts = orphanDate.split('/');
+    orphanRow[0] = new Date(Number(dateParts[2]), Number(dateParts[0]) - 1, Number(dateParts[1]), 12, 0, 0);
+    orphanRow[1] = properOwner;
+    // Fill in goals and production
+    var oGoals = existingGoals[orphanKey] || {};
+    var oProd = existingProd[orphanKey] || {};
+    for (var opi = 0; opi < products.length; opi++) {
+      var oProdIdx = prodStart + opi * 2;
+      var oGoalIdx = prodStart + opi * 2 + 1;
+      if (oProd[products[opi]]) orphanRow[oProdIdx] = oProd[products[opi]];
+      if (oGoals[products[opi]]) orphanRow[oGoalIdx] = oGoals[products[opi]];
+    }
+    rows.push(orphanRow);
+    Logger.log('consolidateCampaign_ restored orphaned row: ' + properOwner + ' | ' + orphanDate);
+  }
+
   // ── Dedup: merge duplicate owner+date rows ──
   var dedupMap = {};
   for (var di = 0; di < rows.length; di++) {
@@ -6704,15 +6747,21 @@ function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignK
       else row.push(0);
     }
 
-    // Per-product Prod/Goal pairs
-    var prodTotal = 0, goalTotal = 0;
+    // Per-product Prod pairs (goals go on NEXT week's row — separated below)
+    var prodTotal = 0;
     for (var p = 0; p < products.length; p++) {
       var prodVal = (p < prodParts.length) ? prodParts[p] : 0;
-      var goalVal = (p < goalParts.length) ? goalParts[p] : 0;
       row.push(prodVal);
-      row.push(goalVal);
+      row.push(0); // goal placeholder — actual goals written to next week's row below
       prodTotal += prodVal;
-      goalTotal += goalVal;
+    }
+    var goalTotal = goalParts.reduce(function(s, v) { return s + v; }, 0);
+
+    // Stash goals to be placed on next week's row after the main loop
+    if (goalTotal > 0) {
+      var nextSunday = new Date(sundayDate.getTime() + 7 * 86400000);
+      var nextKey = _normalizeDateKey_(nextSunday);
+      if (!entry._goalForward) entry._goalForward = { nextKey: nextKey, nextDate: nextSunday, goalParts: goalParts };
     }
     // Recruiting metrics
     for (var ri = 0; ri < 12; ri++) {
@@ -6720,6 +6769,45 @@ function mergeHealthRecruiting_(ownerName, healthRows, recruitingRows, campaignK
     }
 
     result.push(row);
+  }
+
+  // ── Second pass: forward goals to next week's row ──
+  // Goals from source row dated 3/15 (shifted to 3/22) belong on consolidated row 3/29.
+  var extraHCCount = (CAMPAIGN_EXTRA_HC[campaignKey] || []).length;
+  var baseCols = 6 + extraHCCount; // Week, Owner, Active, Leaders, Dist, Training + extras
+  for (var i = 0; i < keys2.length; i++) {
+    var entry = dateMap[keys2[i]];
+    if (!entry._goalForward) continue;
+    var fwd = entry._goalForward;
+
+    // Find or create the next week's row in results
+    var found = false;
+    for (var ri = 0; ri < result.length; ri++) {
+      var rKey = _normalizeDateKey_(result[ri][0]);
+      if (rKey === fwd.nextKey) {
+        // Merge goals into this row's goal columns (don't overwrite non-zero)
+        for (var gp = 0; gp < products.length; gp++) {
+          var goalIdx = baseCols + gp * 2 + 1; // goal column for this product
+          var existing = Number(result[ri][goalIdx]) || 0;
+          var fwdGoal = (gp < fwd.goalParts.length) ? fwd.goalParts[gp] : 0;
+          if (!existing && fwdGoal) result[ri][goalIdx] = fwdGoal;
+        }
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      // Create a new row for the goal week (no production data, just goals)
+      var goalRow = [fwd.nextDate, ownerName];
+      for (var gi = 2; gi < baseCols; gi++) goalRow.push(0); // HC zeros
+      for (var gp = 0; gp < products.length; gp++) {
+        goalRow.push(0); // prod = 0
+        goalRow.push((gp < fwd.goalParts.length) ? fwd.goalParts[gp] : 0); // goal
+      }
+      for (var ri2 = 0; ri2 < 12; ri2++) goalRow.push(0); // recruiting zeros
+      result.push(goalRow);
+    }
   }
 
   return result;
