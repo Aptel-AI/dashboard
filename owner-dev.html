@@ -157,6 +157,9 @@
         <div class="form-row">
           <input type="email" id="add-email" class="form-input" placeholder="Email address">
           <input type="text" id="add-name" class="form-input" placeholder="Full name">
+          <select id="add-role" class="form-input" style="max-width:180px">
+            <!-- Populated dynamically by renderTeam() -->
+          </select>
         </div>
         <button class="btn-add-member" onclick="OwnerDev.addMember()">Add Member</button>
         <div id="add-member-error" class="login-error" style="text-align:left"></div>

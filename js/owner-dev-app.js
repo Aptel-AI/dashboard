@@ -1927,6 +1927,24 @@ const OwnerDev = {
       grantsSection.style.display = 'none';
     }
 
+    // Populate role dropdown based on who's adding
+    const roleSelect = document.getElementById('add-role');
+    if (roleSelect) {
+      let roleOptions = [];
+      if (role === 'org_manager') {
+        roleOptions = [['admin', 'Admin']];
+      } else if (role === 'nlr_manager') {
+        roleOptions = [['nlr', 'NLR']];
+      } else if (role === 'bis_manager') {
+        roleOptions = [['bis', 'BIS']];
+      } else if (role === 'superadmin') {
+        roleOptions = Object.entries(OD_CONFIG.roles).map(([k, v]) => [k, v.label]);
+      }
+      roleSelect.innerHTML = roleOptions.map(([val, label]) =>
+        `<option value="${val}"${val === defaultNewRole ? ' selected' : ''}>${label}</option>`
+      ).join('');
+    }
+
     // Store context for addMember
     this._teamAddContext = { team: memberTeamKey, defaultRole: defaultNewRole };
   },
@@ -2262,8 +2280,24 @@ const OwnerDev = {
     btn.disabled = true;
 
     const ctx = this._teamAddContext || {};
-    const newRole = ctx.defaultRole || 'member';
-    const newTeam = ctx.team || this._getEffectiveTeam() || '';
+    const roleSelect = document.getElementById('add-role');
+    const newRole = roleSelect?.value || ctx.defaultRole || 'admin';
+    const myRole = this.state.effectiveRole || '';
+    const myEmail = this.state.session.email;
+
+    // Determine team and managedBy based on role being added
+    let newTeam = ctx.team || this._getEffectiveTeam() || '';
+    let managedBy = '';
+    if (newRole === 'admin') {
+      // Admin → managed by the OM adding them
+      managedBy = myEmail;
+    } else if (newRole === 'org_manager') {
+      // OM → managed by a National (superadmin must specify, for now use the team's National)
+      const teamNat = (this.state.users || []).find(u =>
+        (u.role || '').toLowerCase() === 'national' && u.team === newTeam
+      );
+      managedBy = teamNat?.email || '';
+    }
 
     try {
       const body = {
@@ -2271,12 +2305,9 @@ const OwnerDev = {
         name,
         team: newTeam,
         role: newRole,
-        addedBy: this.state.session.email
+        managedBy,
+        addedBy: myEmail
       };
-      // If adding an admin, set managedBy to the current Org Manager
-      if (newRole === 'admin') {
-        body.managedBy = this.state.session.email;
-      }
 
       const res = await this._post('odSaveUser', body);
 
