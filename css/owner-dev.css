@@ -132,6 +132,24 @@ input, select, textarea { font-family: inherit; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Coach Read-Only Mode (Aptel, NLR, BIS view-only roles) ── */
+.coach-readonly input,
+.coach-readonly textarea,
+.coach-readonly select {
+  pointer-events: none;
+  opacity: 0.55;
+  background: var(--card-bg, #ddeaf5) !important;
+  cursor: not-allowed;
+}
+.coach-readonly button:not(.detail-tab):not(.back-btn):not(.tab-btn) {
+  display: none;
+}
+.coach-readonly .note-input-row { display: none; }
+.coach-readonly .note-delete-btn { display: none; }
+.coach-readonly .rep-highlight-cb { pointer-events: none; opacity: 0.4; }
+.coach-readonly .hc-submit-btn { display: none; }
+.coach-readonly .reorder-btn { display: none; }
+
 /* ═══════════════════════════════════════════════════════
    TOP BAR
    ═══════════════════════════════════════════════════════ */

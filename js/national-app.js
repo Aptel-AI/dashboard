@@ -13,6 +13,14 @@ const NationalApp = {
     'leafguard': { primaryProduct: 'Gross Sales', currency: true }
   },
 
+  // ── Read-only mode (Aptel, NLR, BIS, etc. — coach: 'view' roles) ──
+  _isCoachReadOnly() {
+    if (typeof OwnerDev === 'undefined') return false;
+    const role = OwnerDev.state?.effectiveRole || '';
+    const access = OD_CONFIG?.tabAccess?.[role];
+    return access?.coach === 'view';
+  },
+
   // ── Status code definitions (matching Campaign Tracker) ──
   STATUS_CODES: {
     22: { label: 'Bored Leaders', css: 'sc-22' },
@@ -2425,6 +2433,7 @@ const NationalApp = {
     document.querySelector('.owners-section').style.display = 'none';
     const detail = document.getElementById('owner-detail');
     detail.style.display = 'block';
+    detail.classList.toggle('coach-readonly', this._isCoachReadOnly());
 
     document.getElementById('detail-owner-name').textContent = owner.name;
     const badge = document.getElementById('detail-owner-badge');
@@ -2686,12 +2695,13 @@ const NationalApp = {
           </div>`).join('')
         : '<div class="notes-empty">No notes yet</div>';
 
+      const _ro = this._isCoachReadOnly();
       notesEl.innerHTML = `
         <div class="coaching-label">Notes</div>
-        <div class="note-input-row">
+        ${_ro ? '' : `<div class="note-input-row">
           <textarea class="note-input" id="note-input-${ownerIdx}" placeholder="Add a note..." rows="2"></textarea>
           <button class="note-add-btn" onclick="NationalApp._addNote(${ownerIdx})">Add</button>
-        </div>
+        </div>`}
         <div class="notes-log" id="notes-log-${ownerIdx}">${notesHtml}</div>`;
     }
   },
