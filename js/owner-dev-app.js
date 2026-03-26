@@ -101,7 +101,7 @@ const OwnerDev = {
 
     // Fetch campaign visibility for the current user
     try {
-      const vizResp = await this._fetch('odGetVisibleCampaigns', { email, role });
+      const vizResp = await this._api('odGetVisibleCampaigns', { email, role });
       if (vizResp && vizResp.visible) {
         this.state.visibleCampaigns = new Set(vizResp.visible);
         this.state.editableCampaigns = new Set(vizResp.editable);
