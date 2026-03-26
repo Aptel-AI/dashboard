@@ -2010,7 +2010,25 @@ const OwnerDev = {
         (u.deactivated || '').toString().toLowerCase() !== 'true'
       ).forEach(a => autoEntries.push({ name: a.name || a.email, role: 'Aptel', level: 'view' }));
 
-      const totalRows = autoEntries.length + grants.length;
+      // Count inherited team members per grant for rowspan
+      let grantTeamCount = 0;
+      for (const g of grants) {
+        const natEmail = (g.grantedToEmail || '').toLowerCase();
+        grantTeamCount += allUsers.filter(u => {
+          const uRole = (u.role || '').toLowerCase();
+          const uManagedBy = (u.managedBy || '').toLowerCase();
+          if (uRole === 'org_manager' && uManagedBy === natEmail) return true;
+          if (uRole === 'admin') {
+            return !!allUsers.find(om =>
+              (om.role || '').toLowerCase() === 'org_manager' &&
+              om.email?.toLowerCase() === uManagedBy &&
+              (om.managedBy || '').toLowerCase() === natEmail
+            );
+          }
+          return false;
+        }).length;
+      }
+      const totalRows = autoEntries.length + grants.length + grantTeamCount;
 
       if (totalRows === 0) {
         html += `<tr>
@@ -2035,15 +2053,44 @@ const OwnerDev = {
         rowIdx++;
       }
 
-      // Explicit grant rows (revocable)
+      // Explicit grant rows (revocable) + their inherited team members
       for (const g of grants) {
+        // The grant recipient (National)
         html += `<tr>
           ${rowIdx === 0 ? campCell : ''}
-          <td>${this._esc(g.grantedToName || g.grantedToEmail)}</td>
+          <td>${this._esc(g.grantedToName || g.grantedToEmail)} <span class="text-muted" style="font-size:11px">(National)</span></td>
           <td><span class="access-badge access-${g.accessLevel}">${g.accessLevel}</span></td>
           <td><button class="btn-sm btn-danger" onclick="OwnerDev.revokeGrant('${this._esc(campKey)}','${this._esc(g.grantedToEmail)}')">Revoke</button></td>
         </tr>`;
         rowIdx++;
+
+        // Show their team members (OMs + Admins) as inherited
+        const natEmail = (g.grantedToEmail || '').toLowerCase();
+        const teamMembers = allUsers.filter(u => {
+          const uRole = (u.role || '').toLowerCase();
+          const uManagedBy = (u.managedBy || '').toLowerCase();
+          if (uRole === 'org_manager' && uManagedBy === natEmail) return true;
+          // Admins under this National's OMs
+          if (uRole === 'admin') {
+            const adminOM = allUsers.find(om =>
+              (om.role || '').toLowerCase() === 'org_manager' &&
+              om.email?.toLowerCase() === uManagedBy &&
+              (om.managedBy || '').toLowerCase() === natEmail
+            );
+            return !!adminOM;
+          }
+          return false;
+        });
+        for (const tm of teamMembers) {
+          const tmRole = OD_CONFIG.roles[(tm.role || '')]?.label || tm.role;
+          html += `<tr>
+            ${rowIdx === 0 ? campCell : ''}
+            <td style="padding-left:24px">${this._esc(tm.name || tm.email)} <span class="text-muted" style="font-size:11px">(${tmRole})</span></td>
+            <td><span class="access-badge access-auto">${g.accessLevel}</span></td>
+            <td><span class="text-muted" style="font-size:11px">Inherited</span></td>
+          </tr>`;
+          rowIdx++;
+        }
       }
     }
 
@@ -2058,32 +2105,21 @@ const OwnerDev = {
     const campLabel = OD_CONFIG.campaignSources[campaignKey]?.label || campaignKey;
     const email = (this.state.session?.email || '').toLowerCase();
 
-    // Build set of emails that already have access (auto + explicit)
-    const alreadyHasAccess = new Set();
-    alreadyHasAccess.add(email); // self
-
-    // Explicit grants
+    // Only Nationals can be granted access — their team (OMs + Admins) inherits automatically
+    const alreadyGranted = new Set();
+    alreadyGranted.add(email); // self
     (this.state.accessGrants || []).filter(g => g.campaign === campaignKey)
-      .forEach(g => alreadyHasAccess.add((g.grantedToEmail || '').toLowerCase()));
-
-    // Auto-access: find the OM for this campaign
+      .forEach(g => alreadyGranted.add((g.grantedToEmail || '').toLowerCase()));
+    // The OM's own National already has auto-access
     const camp = (this.state.campaignOwnership || []).find(c => c.campaign === campaignKey);
     const ownerEmail = (camp?.ownerEmail || '').toLowerCase();
-    alreadyHasAccess.add(ownerEmail);
     const om = (this.state.users || []).find(u => u.email?.toLowerCase() === ownerEmail);
     const omManagedBy = (om?.managedBy || '').toLowerCase();
-    if (omManagedBy) alreadyHasAccess.add(omManagedBy); // National
-    // Admins under the OM
-    (this.state.users || []).filter(u =>
-      (u.role || '').toLowerCase() === 'admin' && (u.managedBy || '').toLowerCase() === ownerEmail
-    ).forEach(u => alreadyHasAccess.add(u.email.toLowerCase()));
-    // Aptel users
-    (this.state.users || []).filter(u =>
-      (u.role || '').toLowerCase() === 'aptel'
-    ).forEach(u => alreadyHasAccess.add(u.email.toLowerCase()));
+    if (omManagedBy) alreadyGranted.add(omManagedBy);
 
-    const candidates = this.state.users.filter(u =>
-      !alreadyHasAccess.has(u.email.toLowerCase()) &&
+    const candidates = (this.state.users || []).filter(u =>
+      (u.role || '').toLowerCase() === 'national' &&
+      !alreadyGranted.has(u.email.toLowerCase()) &&
       (u.deactivated || '').toString().toLowerCase() !== 'true'
     );
 

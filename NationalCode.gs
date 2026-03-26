@@ -4836,7 +4836,7 @@ function odResolveVisibleCampaigns(email, role) {
     }
   }
 
-  // All roles: check explicit access grants
+  // All roles: check explicit access grants (direct grants to this user)
   var grantRows = odReadTab('_OD_Access_Grants');
   for (var i = 0; i < grantRows.length; i++) {
     var grantee = String(grantRows[i].grantedToEmail || '').trim().toLowerCase();
@@ -4847,9 +4847,34 @@ function odResolveVisibleCampaigns(email, role) {
     // Don't downgrade: own > auto > edit > view
     var current = accessMap[ck];
     if (current === 'own') continue;
-    if (current === 'auto') continue; // auto (National's OM) is highest non-owner level
+    if (current === 'auto') continue;
     if (current === 'edit' && level === 'view') continue;
     accessMap[ck] = level;
+  }
+
+  // Org Manager / Admin: inherit grants given to their National.
+  // Grants are given to Nationals — their team (OMs + Admins) inherits the same level.
+  if (role === 'org_manager' || role === 'admin') {
+    // Walk up the chain to find the National: OM → managedBy = National, Admin → managedBy = OM → OM.managedBy = National
+    var nationalEmail = '';
+    if (role === 'org_manager') {
+      nationalEmail = _odGetManagedBy(email); // OM's managedBy = National
+    } else if (role === 'admin') {
+      var omEmail = _odGetManagedBy(email);   // Admin's managedBy = OM
+      if (omEmail) nationalEmail = _odGetManagedBy(omEmail); // OM's managedBy = National
+    }
+    if (nationalEmail) {
+      for (var g = 0; g < grantRows.length; g++) {
+        var natGrantee = String(grantRows[g].grantedToEmail || '').trim().toLowerCase();
+        if (natGrantee !== nationalEmail) continue;
+        var gck = String(grantRows[g].campaign || '').trim();
+        var glevel = String(grantRows[g].accessLevel || '').trim().toLowerCase();
+        if (!gck || !glevel) continue;
+        var gcurrent = accessMap[gck];
+        if (gcurrent === 'own' || gcurrent === 'auto' || gcurrent === 'edit') continue;
+        accessMap[gck] = glevel;
+      }
+    }
   }
 
   var visible = Object.keys(accessMap);
