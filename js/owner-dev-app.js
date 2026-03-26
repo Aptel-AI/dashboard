@@ -2155,6 +2155,14 @@ const OwnerDev = {
     const grantedToName = userSelect.options[userSelect.selectedIndex].getAttribute('data-name') || grantedToEmail;
     const accessLevel = levelSelect.value;
 
+    // Optimistic: close modal, inject into local state, re-render immediately
+    document.querySelector('.modal-overlay')?.remove();
+    if (!this.state.accessGrants) this.state.accessGrants = [];
+    this.state.accessGrants.push({ campaign: campaignKey, grantedToEmail, grantedToName, accessLevel, grantedByEmail: this.state.session.email });
+    this._renderAccessGrants();
+    this._toast('Access granted', 'success');
+
+    // Write to backend in background
     try {
       const res = await this._post('odSaveAccessGrant', {
         campaign: campaignKey,
@@ -2163,22 +2171,32 @@ const OwnerDev = {
         accessLevel,
         grantedByEmail: this.state.session.email
       });
-      if (res.success) {
-        this._toast('Access granted', 'success');
-        document.querySelector('.modal-overlay')?.remove();
-        this.state.accessGrants = null; // force re-fetch
+      if (!res.success) {
+        // Rollback on failure
+        this.state.accessGrants = this.state.accessGrants.filter(g =>
+          !(g.campaign === campaignKey && (g.grantedToEmail || '').toLowerCase() === grantedToEmail.toLowerCase())
+        );
         this._renderAccessGrants();
-      } else {
-        error.textContent = res.error || 'Failed to grant access';
+        this._toast(res.error || 'Failed to save — reverted', 'error');
       }
     } catch (err) {
-      error.textContent = 'Connection error';
+      this.state.accessGrants = this.state.accessGrants.filter(g =>
+        !(g.campaign === campaignKey && (g.grantedToEmail || '').toLowerCase() === grantedToEmail.toLowerCase())
+      );
+      this._renderAccessGrants();
+      this._toast('Connection error — reverted', 'error');
     }
   },
 
   async toggleGrantLevel(campaignKey, grantedToEmail, newLevel) {
+    // Optimistic: update local state immediately
+    const grant = (this.state.accessGrants || []).find(g => g.campaign === campaignKey && (g.grantedToEmail || '').toLowerCase() === grantedToEmail.toLowerCase());
+    const oldLevel = grant?.accessLevel;
+    if (grant) grant.accessLevel = newLevel;
+    this._renderAccessGrants();
+    this._toast(`Switched to ${newLevel}`, 'success');
+
     try {
-      const grant = (this.state.accessGrants || []).find(g => g.campaign === campaignKey && (g.grantedToEmail || '').toLowerCase() === grantedToEmail.toLowerCase());
       const res = await this._post('odSaveAccessGrant', {
         campaign: campaignKey,
         grantedToEmail,
@@ -2186,30 +2204,41 @@ const OwnerDev = {
         accessLevel: newLevel,
         grantedByEmail: this.state.session.email
       });
-      if (res.success) {
-        this._toast(`Switched to ${newLevel}`, 'success');
-        this.state.accessGrants = null;
+      if (!res.success) {
+        if (grant) grant.accessLevel = oldLevel;
         this._renderAccessGrants();
-      } else {
-        this._toast(res.error || 'Failed', 'error');
+        this._toast(res.error || 'Failed — reverted', 'error');
       }
-    } catch { this._toast('Connection error', 'error'); }
+    } catch {
+      if (grant) grant.accessLevel = oldLevel;
+      this._renderAccessGrants();
+      this._toast('Connection error — reverted', 'error');
+    }
   },
 
   async revokeGrant(campaignKey, grantedToEmail) {
-    if (!confirm(`Revoke access to ${campaignKey} for ${grantedToEmail}?`)) return;
+    if (!confirm(`Revoke access for ${grantedToEmail}?`)) return;
+
+    // Optimistic: remove from local state immediately
+    const removed = (this.state.accessGrants || []).filter(g =>
+      g.campaign === campaignKey && (g.grantedToEmail || '').toLowerCase() === grantedToEmail.toLowerCase()
+    );
+    this.state.accessGrants = (this.state.accessGrants || []).filter(g =>
+      !(g.campaign === campaignKey && (g.grantedToEmail || '').toLowerCase() === grantedToEmail.toLowerCase())
+    );
+    this._renderAccessGrants();
+    this._toast('Access revoked', 'success');
+
     try {
       const res = await this._post('odDeleteAccessGrant', {
         campaign: campaignKey,
         grantedToEmail,
         callerEmail: this.state.session.email
       });
-      if (res.success) {
-        this._toast('Access revoked', 'success');
-        this.state.accessGrants = null;
+      if (!res.success) {
+        this.state.accessGrants.push(...removed);
         this._renderAccessGrants();
-      } else {
-        this._toast(res.error || 'Failed', 'error');
+        this._toast(res.error || 'Failed — reverted', 'error');
       }
     } catch { this._toast('Connection error', 'error'); }
   },
