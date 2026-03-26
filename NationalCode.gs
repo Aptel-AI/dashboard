@@ -4522,11 +4522,11 @@ function readB2BOwnerSales(ownerName) {
   var inOwnerSection = false;
 
   for (var i = 1; i < data.length; i++) {
-    var name = String(data[i][colMap['Name'] || 0] || '').trim();
-    if (!name) continue;
+    var rawName = String(data[i][colMap['Name'] || 0] || '');
+    var cleanName = rawName.trim();
+    if (!cleanName) continue;
 
-    var isIndented = name.charAt(0) === ' ';
-    var cleanName = name.replace(/^\s+/, '');
+    var isIndented = rawName.charAt(0) === ' ';
 
     if (!isIndented) {
       // Owner row — check if this is our target
