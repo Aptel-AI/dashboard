@@ -145,7 +145,6 @@ input, select, textarea { font-family: inherit; }
   display: none;
 }
 .coach-readonly:not(.coach-notes-allowed) .note-input-row { display: none; }
-.coach-readonly:not(.coach-notes-allowed) .note-delete-btn { display: none; }
 .coach-readonly .rep-highlight-cb { pointer-events: none; opacity: 0.4; }
 .coach-readonly .hc-submit-btn { display: none; }
 .coach-readonly .reorder-btn { display: none; }

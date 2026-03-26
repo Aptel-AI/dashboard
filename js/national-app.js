@@ -2684,18 +2684,24 @@ const NationalApp = {
       const ownerNotes = (this.state.campaignNotes || [])
         .filter(n => n.ownerName === owner.name)
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      const _myEmail = (this.state.session?.email || '').toLowerCase();
+      const _canEditCoach = !this._isCoachReadOnly();
       const notesHtml = ownerNotes.length
-        ? ownerNotes.map(n => `
+        ? ownerNotes.map(n => {
+          const _isMyNote = (n.coachEmail || '').toLowerCase() === _myEmail
+            || (!n.coachEmail && (n.coachName || '').toLowerCase() === (this.state.session?.name || '').toLowerCase());
+          const _canDelete = _canEditCoach || _isMyNote;
+          return `
           <div class="note-entry">
             <div class="note-entry-header">
               <span class="note-author">${this._esc(n.coachName || 'Unknown')}</span>
               <span class="note-time">${this._relativeTime(n.timestamp)}</span>
-              <button class="note-delete-btn" onclick="NationalApp._deleteNote('${n.noteId}', ${ownerIdx})" title="Delete note">
+              ${_canDelete ? `<button class="note-delete-btn" onclick="NationalApp._deleteNote('${n.noteId}', ${ownerIdx})" title="Delete note">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-              </button>
+              </button>` : ''}
             </div>
             <div class="note-text">${this._esc(n.text)}</div>
-          </div>`).join('')
+          </div>`}).join('')
         : '<div class="notes-empty">No notes yet</div>';
 
       const _ro = this._isCoachReadOnly();
@@ -3991,6 +3997,7 @@ const NationalApp = {
           campaign: this.state.campaign,
           ownerName: owner.name,
           coachName: coachName,
+          coachEmail: this.state.session?.email || '',
           text: text
         })
       });
@@ -4004,6 +4011,7 @@ const NationalApp = {
         campaign: this.state.campaign,
         ownerName: owner.name,
         coachName: coachName,
+        coachEmail: this.state.session?.email || '',
         text: text,
         timestamp: result.timestamp || new Date().toISOString()
       });
