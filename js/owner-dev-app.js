@@ -2060,7 +2060,10 @@ const OwnerDev = {
           ${rowIdx === 0 ? campCell : ''}
           <td>${this._esc(g.grantedToName || g.grantedToEmail)} <span class="text-muted" style="font-size:11px">(National)</span></td>
           <td><span class="access-badge access-${g.accessLevel}">${g.accessLevel}</span></td>
-          <td><button class="btn-sm btn-danger" onclick="OwnerDev.revokeGrant('${this._esc(campKey)}','${this._esc(g.grantedToEmail)}')">Revoke</button></td>
+          <td>
+            <button class="btn-sm" style="margin-right:4px" onclick="OwnerDev.toggleGrantLevel('${this._esc(campKey)}','${this._esc(g.grantedToEmail)}','${g.accessLevel === 'edit' ? 'view' : 'edit'}')">${g.accessLevel === 'edit' ? '→ View' : '→ Edit'}</button>
+            <button class="btn-sm btn-danger" onclick="OwnerDev.revokeGrant('${this._esc(campKey)}','${this._esc(g.grantedToEmail)}')">Revoke</button>
+          </td>
         </tr>`;
         rowIdx++;
 
@@ -2171,6 +2174,26 @@ const OwnerDev = {
     } catch (err) {
       error.textContent = 'Connection error';
     }
+  },
+
+  async toggleGrantLevel(campaignKey, grantedToEmail, newLevel) {
+    try {
+      const grant = (this.state.accessGrants || []).find(g => g.campaign === campaignKey && (g.grantedToEmail || '').toLowerCase() === grantedToEmail.toLowerCase());
+      const res = await this._post('odSaveAccessGrant', {
+        campaign: campaignKey,
+        grantedToEmail,
+        grantedToName: grant?.grantedToName || grantedToEmail,
+        accessLevel: newLevel,
+        grantedByEmail: this.state.session.email
+      });
+      if (res.success) {
+        this._toast(`Switched to ${newLevel}`, 'success');
+        this.state.accessGrants = null;
+        this._renderAccessGrants();
+      } else {
+        this._toast(res.error || 'Failed', 'error');
+      }
+    } catch { this._toast('Connection error', 'error'); }
   },
 
   async revokeGrant(campaignKey, grantedToEmail) {
