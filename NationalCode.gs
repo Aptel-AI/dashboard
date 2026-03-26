@@ -4722,8 +4722,17 @@ function odReadTab(tabName) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(tabName);
   if (!sheet) return [];
-  var data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  // Use header row to determine column count (getDataRange can miss trailing empty cols)
+  var headerRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
+  var headerVals = headerRange.getValues()[0];
+  var numCols = headerVals.length;
+  // Extend to at least the last header with a value
+  for (var hc = headerVals.length - 1; hc >= 0; hc--) {
+    if (String(headerVals[hc]).trim()) { numCols = hc + 1; break; }
+  }
+  var data = sheet.getRange(1, 1, lastRow, numCols).getValues();
   var headers = data[0].map(function(h) { return String(h).trim(); });
   var rows = [];
   for (var i = 1; i < data.length; i++) {
