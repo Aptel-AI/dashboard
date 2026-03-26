@@ -1940,6 +1940,7 @@ const OwnerDev = {
 
     // Fetch grants if not cached
     if (!this.state.accessGrants) {
+      container.innerHTML = '<div style="text-align:center;padding:24px 0;color:var(--silver-dim,#4a7090)"><div class="spinner" style="width:24px;height:24px;border:3px solid rgba(0,200,255,.2);border-top-color:var(--sc-cyan,#00c8ff);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 8px"></div>Loading access…</div>';
       try {
         const resp = await this._api('odGetAccessGrants', { email: this.state.session.email });
         this.state.accessGrants = resp.grants || [];
