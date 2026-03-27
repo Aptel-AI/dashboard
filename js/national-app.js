@@ -2497,6 +2497,7 @@ const NationalApp = {
     document.querySelector('.owners-section').style.display = 'none';
     const detail = document.getElementById('owner-detail');
     detail.style.display = 'block';
+    window.scrollTo(0, 0);
     const _ro = this._isCoachReadOnly();
     const _isNational = (typeof OwnerDev !== 'undefined') && (OwnerDev.state?.effectiveRole === 'national');
     detail.classList.toggle('coach-readonly', _ro);
