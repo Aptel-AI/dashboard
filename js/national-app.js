@@ -1853,6 +1853,32 @@ const NationalApp = {
         ? `<span class="campaign-card-day-pill">${dayNames[planEntry.day] || ''}</span>`
         : '';
 
+      // Production breakdown from cached week data
+      let prodHtml = '';
+      const cd = campaigns[key];
+      if (cd && cd.weeks && cd.weeks.length > 0 && cd.products) {
+        // Aggregate most recent week's production across all owners
+        const prodTotals = {};
+        const products = cd.products || ['Total'];
+        products.forEach(p => { prodTotals[p] = 0; });
+        const latestWeek = cd.weeks[0]; // weeks are sorted newest first
+        if (latestWeek && latestWeek.data) {
+          for (const ownerData of latestWeek.data) {
+            for (const p of products) {
+              const prodKey = 'Prod: ' + p;
+              prodTotals[p] += parseInt(ownerData[prodKey]) || 0;
+            }
+          }
+        }
+        const totalProd = Object.values(prodTotals).reduce((s, v) => s + v, 0);
+        if (totalProd > 0) {
+          const prodItems = products.map(p =>
+            `<span style="display:inline-flex;align-items:center;gap:3px;"><span style="font-weight:600;">${prodTotals[p]}</span><span style="font-size:9px;color:var(--silver);">${p}</span></span>`
+          ).join('<span style="color:var(--silver);margin:0 4px;">·</span>');
+          prodHtml = `<div style="font-size:11px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,0.06);">${prodItems}</div>`;
+        }
+      }
+
       return `
         <div class="campaign-card" onclick="NationalApp.selectCampaign('${key}')">
           ${dayPill}
@@ -1860,6 +1886,7 @@ const NationalApp = {
           <div class="campaign-card-label">${this._esc(label)}</div>
           ${variantHtml}
           ${ownerCount ? `<div class="campaign-card-owners">${ownerCount} owner${ownerCount !== 1 ? 's' : ''}</div>` : ''}
+          ${prodHtml}
         </div>`;
     }).join('');
 
