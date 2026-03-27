@@ -55,7 +55,7 @@ const OD_CONFIG = {
   tabAccess: {
     superadmin:    { mapping: 'edit', team: 'edit', coach: 'edit', planning: 'edit' },
     aptel:         { mapping: 'view', team: 'view', coach: 'view', planning: 'view' },
-    national:      { mapping: 'view', team: false,  coach: 'view', planning: false  },
+    national:      { mapping: false,  team: false,  coach: 'view', planning: false  },
     org_manager:   { mapping: 'edit', team: 'edit', coach: 'edit', planning: 'edit' },
     admin:         { mapping: 'edit', team: false,  coach: 'edit', planning: 'edit' },
     nlr_manager:   { mapping: 'edit', team: 'edit', coach: 'view', planning: 'view' },
