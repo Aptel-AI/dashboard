@@ -4571,7 +4571,162 @@ function readB2BOwnerSales(ownerName) {
     }
   }
 
-  return { summary: summary, reps: reps, dailyActivity: dailyActivity, tab: 'B2B Sales Metrics' };
+  // Read Market Fulfillment and Average Paychecks from source 1-on-1 sheet
+  var marketFulfillment = null;
+  var avgPaychecks = null;
+  try {
+    var srcSS = SpreadsheetApp.openById(OD_CAMPAIGNS['att-b2b'].sheetId);
+    var ownerTab = _findOwnerTab_(srcSS, ownerName);
+    if (ownerTab) {
+      var srcData = ownerTab.getDataRange().getValues();
+      marketFulfillment = _extractMarketFulfillment_(srcData, ownerName);
+      avgPaychecks = _extractAvgPaychecks_(srcData);
+    }
+  } catch (e) {
+    Logger.log('readB2BOwnerSales: source data read failed: ' + e.message);
+  }
+
+  return {
+    summary: summary, reps: reps, dailyActivity: dailyActivity,
+    marketFulfillment: marketFulfillment, avgPaychecks: avgPaychecks,
+    tab: 'B2B Sales Metrics'
+  };
+}
+
+/** Find an owner's tab in the source spreadsheet (case-insensitive) */
+function _findOwnerTab_(ss, ownerName) {
+  var ownerLower = ownerName.toLowerCase().trim();
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].getName().toLowerCase().trim() === ownerLower) return sheets[i];
+  }
+  // Fuzzy: tab contains owner name
+  for (var i = 0; i < sheets.length; i++) {
+    var tabLower = sheets[i].getName().toLowerCase().trim();
+    if (tabLower.indexOf(ownerLower) >= 0 || ownerLower.indexOf(tabLower) >= 0) return sheets[i];
+  }
+  return null;
+}
+
+/** Extract Market Fulfillment section from owner tab data */
+function _extractMarketFulfillment_(data, ownerName) {
+  // Find header row: "Owner (Owner>Rep>Zip)" in column A
+  var headerRow = -1;
+  for (var i = 0; i < data.length; i++) {
+    var cell = String(data[i][0] || '').trim().toLowerCase();
+    if (cell.indexOf('owner (owner>rep>zip)') >= 0 || cell.indexOf('owner(owner>rep>zip)') >= 0) {
+      headerRow = i;
+      break;
+    }
+  }
+  if (headerRow < 0) return null;
+
+  var headers = data[headerRow].map(function(h) { return String(h || '').trim(); });
+
+  // Find column indices
+  var colDMA = -1, colWorkable = -1, colTotal = -1, colPen = -1;
+  var colWeeklyTotal = -1, colWeeklyCRU = -1;
+  var dateCols = []; // { idx, label }
+
+  for (var c = 0; c < headers.length; c++) {
+    var h = headers[c].toLowerCase();
+    if (h.indexOf('dma') >= 0) colDMA = c;
+    else if (h.indexOf('total workable') >= 0) colWorkable = c;
+    else if (h.indexOf('total') >= 0 && h.indexOf('workable') < 0 && h.indexOf('weekly') < 0 && colTotal < 0) colTotal = c;
+    else if (h.indexOf('actual pen') >= 0) colPen = c;
+    else if (h.indexOf('weekly total') >= 0) colWeeklyTotal = c;
+    else if (h.indexOf('weekly cru') >= 0) colWeeklyCRU = c;
+    else if (h.match(/^\d{1,2}\/\d{1,2}/)) dateCols.push({ idx: c, label: headers[c] });
+    else if (h.indexOf('4 wk avg') >= 0 || h.indexOf('4wk avg') >= 0) dateCols.push({ idx: c, label: '4 Wk Avg' });
+    else if (h.indexOf('last wk') >= 0 || h.indexOf('last week') >= 0) dateCols.push({ idx: c, label: 'Last Wk' });
+  }
+
+  // Read data rows until blank
+  var markets = [];
+  for (var i = headerRow + 1; i < data.length; i++) {
+    var name = String(data[i][0] || '').trim();
+    if (!name) break;
+    var market = {
+      dma: colDMA >= 0 ? String(data[i][colDMA] || '').trim() : '',
+      totalWorkable: colWorkable >= 0 ? String(data[i][colWorkable] || '').trim() : '',
+      total: colTotal >= 0 ? String(data[i][colTotal] || '').trim() : '',
+      penRate: colPen >= 0 ? String(data[i][colPen] || '').trim() : '',
+      weeklyTotal: colWeeklyTotal >= 0 ? String(data[i][colWeeklyTotal] || '').trim() : '',
+      weeklyCRU: colWeeklyCRU >= 0 ? String(data[i][colWeeklyCRU] || '').trim() : '',
+      weeks: []
+    };
+    for (var d = 0; d < dateCols.length; d++) {
+      market.weeks.push({ label: dateCols[d].label, value: String(data[i][dateCols[d].idx] || '').trim() });
+    }
+    markets.push(market);
+  }
+
+  return markets.length > 0 ? markets : null;
+}
+
+/** Extract Average Paychecks section from owner tab data */
+function _extractAvgPaychecks_(data) {
+  // Find "Comm per Rep" row
+  var commRow = -1;
+  for (var i = 0; i < data.length; i++) {
+    var cell = String(data[i][0] || '').trim().toLowerCase();
+    if (cell === 'comm per rep') { commRow = i; break; }
+  }
+  if (commRow < 0) return null;
+
+  // Header row is next row (has cl.ICD_Owner_Name + dates)
+  var headerRow = commRow + 1;
+  if (headerRow >= data.length) return null;
+  var headers = data[headerRow].map(function(h) { return String(h || '').trim(); });
+
+  // Data row is next
+  var dataRow = headerRow + 1;
+  if (dataRow >= data.length) return null;
+  var row = data[dataRow];
+
+  // Parse Comm per Rep columns (columns 1-5 typically: dates + avg)
+  var commDates = [];
+  var commAvg = '';
+  for (var c = 1; c < headers.length; c++) {
+    var h = headers[c].toLowerCase();
+    if (!h) break; // gap = start of Total DD section
+    if (h.indexOf('last') >= 0 && h.indexOf('avg') >= 0) {
+      commAvg = String(row[c] || '').trim();
+    } else if (h) {
+      commDates.push({ label: headers[c], value: String(row[c] || '').trim() });
+    }
+  }
+
+  // Find Total DD section — look for gap then more dates
+  var totalDDDates = [];
+  var totalDDAvg = '';
+  // Find "Total DD" header in the commRow
+  var ddStartCol = -1;
+  for (var c = 0; c < data[commRow].length; c++) {
+    if (String(data[commRow][c] || '').trim().toLowerCase() === 'total dd') {
+      ddStartCol = c;
+      break;
+    }
+  }
+  if (ddStartCol >= 0) {
+    // DD date headers are in headerRow starting at ddStartCol
+    for (var c = ddStartCol; c < headers.length; c++) {
+      var h = headers[c].toLowerCase();
+      if (!h) continue;
+      if (h === 'total dd' || h === 'cl.icd_owner_name') continue;
+      var val = String(row[c] || '').trim();
+      if (h.indexOf('last') >= 0 && h.indexOf('avg') >= 0) {
+        totalDDAvg = val;
+      } else if (h) {
+        totalDDDates.push({ label: headers[c], value: val });
+      }
+    }
+  }
+
+  return {
+    commPerRep: { weeks: commDates, avg: commAvg },
+    totalDD: { weeks: totalDDDates, avg: totalDDAvg }
+  };
 }
 
 function _parseB2BRow_(row, colMap, name) {

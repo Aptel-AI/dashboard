@@ -801,9 +801,12 @@ const NationalApp = {
       const result = await resp.json();
       owner._b2bSalesFetching = false;
       if (!result.error && (result.summary || result.reps)) {
-        owner.sales = { summary: result.summary, reps: result.reps || [], dailyActivity: result.dailyActivity || [] };
+        owner.sales = {
+          summary: result.summary, reps: result.reps || [], dailyActivity: result.dailyActivity || [],
+          marketFulfillment: result.marketFulfillment || null, avgPaychecks: result.avgPaychecks || null
+        };
         owner._b2bSalesFetched = true;
-        console.log('[NationalApp] B2B sales loaded for', owner.name, ':', result.reps?.length, 'reps,', (result.dailyActivity || []).length, 'daily rows');
+        console.log('[NationalApp] B2B sales loaded for', owner.name, ':', result.reps?.length, 'reps,', (result.dailyActivity || []).length, 'daily,', result.marketFulfillment ? result.marketFulfillment.length + ' markets' : 'no MF', result.avgPaychecks ? 'has AP' : 'no AP');
       } else {
         console.warn('[NationalApp] B2B sales empty for', owner.name, ':', result.error || 'no data');
       }
@@ -5197,6 +5200,82 @@ const NationalApp = {
               </div>
             </div>
           </div>`;
+
+        // Market Fulfillment + Average Paychecks cards (side by side)
+        const mf = s.marketFulfillment;
+        const ap = s.avgPaychecks;
+        if (mf || ap) {
+          let mfHtml = '';
+          if (mf && mf.length > 0) {
+            const weekLabels = mf[0].weeks || [];
+            mfHtml = `
+              <div class="coaching-section" style="flex:1;min-width:0;">
+                <div class="coaching-label" style="font-size:13px;">Market Fulfillment</div>
+                <table style="width:100%;font-size:11px;border-collapse:collapse;">
+                  <thead><tr style="border-bottom:1px solid rgba(0,0,0,0.1);">
+                    <th style="text-align:left;padding:3px 4px;font-size:10px;color:var(--silver);">DMA</th>
+                    <th class="num" style="padding:3px 4px;font-size:10px;color:var(--silver);">Pen %</th>
+                    <th class="num" style="padding:3px 4px;font-size:10px;color:var(--silver);">Wkly</th>
+                    <th class="num" style="padding:3px 4px;font-size:10px;color:var(--silver);">CRU</th>
+                    ${weekLabels.map(w => `<th class="num" style="padding:3px 4px;font-size:10px;color:var(--silver);">${this._esc(w.label)}</th>`).join('')}
+                  </tr></thead>
+                  <tbody>
+                    ${mf.map(m => `<tr>
+                      <td style="padding:2px 4px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${this._esc(m.dma)}">${this._esc(m.dma.length > 20 ? m.dma.substring(0, 18) + '…' : m.dma)}</td>
+                      <td class="num" style="padding:2px 4px;">${m.penRate}</td>
+                      <td class="num" style="padding:2px 4px;">${m.weeklyTotal}</td>
+                      <td class="num" style="padding:2px 4px;">${m.weeklyCRU}</td>
+                      ${m.weeks.map(w => `<td class="num" style="padding:2px 4px;">${w.value}</td>`).join('')}
+                    </tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>`;
+          }
+
+          let apHtml = '';
+          if (ap) {
+            const commWeeks = ap.commPerRep?.weeks || [];
+            const ddWeeks = ap.totalDD?.weeks || [];
+            apHtml = `
+              <div class="coaching-section" style="flex:1;min-width:0;">
+                <div class="coaching-label" style="font-size:13px;">Average Paychecks</div>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                  <div>
+                    <div style="font-size:10px;text-transform:uppercase;color:var(--silver);margin-bottom:4px;">Comm per Rep</div>
+                    <table style="width:100%;font-size:11px;border-collapse:collapse;">
+                      <thead><tr style="border-bottom:1px solid rgba(0,0,0,0.1);">
+                        ${commWeeks.map(w => `<th class="num" style="padding:3px 4px;font-size:10px;color:var(--silver);">${this._esc(w.label)}</th>`).join('')}
+                        <th class="num" style="padding:3px 4px;font-size:10px;color:var(--silver);">4 Wk Avg</th>
+                      </tr></thead>
+                      <tbody><tr>
+                        ${commWeeks.map(w => `<td class="num" style="padding:2px 4px;">${w.value}</td>`).join('')}
+                        <td class="num" style="padding:2px 4px;font-weight:600;">${ap.commPerRep?.avg || '—'}</td>
+                      </tr></tbody>
+                    </table>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;text-transform:uppercase;color:var(--silver);margin-bottom:4px;">Total DD</div>
+                    <table style="width:100%;font-size:11px;border-collapse:collapse;">
+                      <thead><tr style="border-bottom:1px solid rgba(0,0,0,0.1);">
+                        ${ddWeeks.map(w => `<th class="num" style="padding:3px 4px;font-size:10px;color:var(--silver);">${this._esc(w.label)}</th>`).join('')}
+                        <th class="num" style="padding:3px 4px;font-size:10px;color:var(--silver);">4 Wk Avg</th>
+                      </tr></thead>
+                      <tbody><tr>
+                        ${ddWeeks.map(w => `<td class="num" style="padding:2px 4px;">${w.value}</td>`).join('')}
+                        <td class="num" style="padding:2px 4px;font-weight:600;">${ap.totalDD?.avg || '—'}</td>
+                      </tr></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>`;
+          }
+
+          summaryEl.innerHTML += `
+            <div style="display:flex;gap:16px;margin-top:16px;">
+              ${mfHtml}
+              ${apHtml}
+            </div>`;
+        }
       } else {
         summaryEl.innerHTML = `
           <div class="coaching-section">
