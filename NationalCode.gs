@@ -4547,7 +4547,31 @@ function readB2BOwnerSales(ownerName) {
   if (!summary) return { error: 'Owner not found: ' + ownerName };
   summary.repCount = reps.length;
 
-  return { summary: summary, reps: reps, tab: 'B2B Sales Metrics' };
+  // Read daily activity data
+  var dailyActivity = [];
+  var dailyTab = ss.getSheetByName('B2B Daily Activity');
+  if (dailyTab && dailyTab.getLastRow() > 1) {
+    var dailyData = dailyTab.getDataRange().getValues();
+    var dHeaders = dailyData[0].map(function(h) { return String(h).trim(); });
+    var dOwnerCol = dHeaders.indexOf('Owner');
+    var dDayCol = dHeaders.indexOf('Day');
+    var dFirstCol = dHeaders.indexOf('First Order');
+    var dLastCol = dHeaders.indexOf('Last Order');
+    var dOrdersCol = dHeaders.indexOf('Orders');
+
+    for (var di = 1; di < dailyData.length; di++) {
+      var dOwner = String(dailyData[di][dOwnerCol] || '').trim();
+      if (dOwner.toLowerCase() !== ownerLower) continue;
+      dailyActivity.push({
+        day: String(dailyData[di][dDayCol] || '').trim(),
+        firstOrder: String(dailyData[di][dFirstCol] || '').trim(),
+        lastOrder: String(dailyData[di][dLastCol] || '').trim(),
+        orders: parseInt(dailyData[di][dOrdersCol]) || 0
+      });
+    }
+  }
+
+  return { summary: summary, reps: reps, dailyActivity: dailyActivity, tab: 'B2B Sales Metrics' };
 }
 
 function _parseB2BRow_(row, colMap, name) {

@@ -5108,6 +5108,39 @@ const NationalApp = {
             </div>
           </div>`;
 
+      // Daily Activity section (B2B only)
+      let dailyHtml = '';
+      if (isB2B && s.dailyActivity && s.dailyActivity.length > 0) {
+        const weekAvg = s.dailyActivity.find(d => d.day === 'Week Avg');
+        const days = s.dailyActivity.filter(d => d.day !== 'Week Avg');
+        dailyHtml = `
+          <div class="coaching-section" style="margin-top:16px;">
+            <div class="coaching-label">Daily Activity</div>
+            <table class="data-table" style="width:100%;font-size:13px;">
+              <thead><tr>
+                <th style="text-align:left;">Day</th>
+                <th class="num">First Order</th>
+                <th class="num">Last Order</th>
+                <th class="num">Orders</th>
+              </tr></thead>
+              <tbody>
+                ${weekAvg ? `<tr style="font-weight:600;background:rgba(0,200,255,0.08);">
+                  <td>Week Avg</td>
+                  <td class="num">${weekAvg.firstOrder}</td>
+                  <td class="num">${weekAvg.lastOrder}</td>
+                  <td class="num">${weekAvg.orders}</td>
+                </tr>` : ''}
+                ${days.map(d => `<tr>
+                  <td>${d.day}</td>
+                  <td class="num">${d.firstOrder}</td>
+                  <td class="num">${d.lastOrder}</td>
+                  <td class="num">${d.orders}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      }
+
       summaryEl.innerHTML = `
         <div class="coaching-section">
           <div class="coaching-label">Owner Overview</div>
@@ -5121,7 +5154,8 @@ const NationalApp = {
             `).join('')}
           </div>
           ${metricsHtml}
-        </div>`;
+        </div>
+        ${dailyHtml}`;
     } else {
       summaryEl.innerHTML = `
         <div class="coaching-section">
