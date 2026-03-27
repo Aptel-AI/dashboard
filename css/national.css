@@ -1262,13 +1262,13 @@ input, select, textarea { font-family: inherit; }
   border-bottom: 1px solid var(--gray-100);
   white-space: nowrap;
 }
-.data-table thead th.num { text-align: right; }
+.data-table thead th.num { text-align: center; }
 .data-table tbody td {
   padding: 10px 14px;
   border-bottom: 1px solid var(--gray-50);
   color: var(--gray-700);
 }
-.data-table tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table tbody td.num { text-align: center; font-variant-numeric: tabular-nums; }
 .data-table tbody td.bold { font-weight: 700; }
 .data-table tbody tr:hover { background: var(--gray-50); }
 .data-table tbody tr:last-child td { border-bottom: none; }
