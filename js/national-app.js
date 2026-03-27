@@ -5231,7 +5231,7 @@ const NationalApp = {
                           <tr>${m.weeks.map(w => `<td style="text-align:center;padding:2px 4px;font-weight:600;">${w.value}</td>`).join('')}</tr>
                         </table>` : ''}
                       </td></tr>`;
-                      return `<tr style="cursor:pointer;" onclick="var el=document.getElementById('${popupId}');el.style.display=el.style.display==='none'?'':'none';">
+                      return `<tr style="cursor:pointer;" onmouseenter="document.getElementById('${popupId}').style.display=''" onmouseleave="document.getElementById('${popupId}').style.display='none'">
                         <td style="padding:3px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;" title="${this._esc(m.dma)}">${this._esc(m.dma.length > 30 ? m.dma.substring(0, 28) + '…' : m.dma)} <span style="font-size:9px;color:var(--silver);">▸</span></td>
                         <td style="text-align:center;padding:3px 8px;">${m.totalWorkable}</td>
                         <td style="text-align:center;padding:3px 8px;">${m.total}</td>
