@@ -5213,7 +5213,7 @@ const NationalApp = {
             const weekLabels = mf[0].weeks || [];
             mfHtml = `
               <div class="coaching-section" style="flex:1;min-width:0;">
-                <div class="coaching-label" style="font-size:13px;">Market Fulfillment</div>
+                <div class="coaching-label" style="font-size:13px;">Market Fulfillment <span style="font-size:9px;font-weight:400;color:var(--silver-dim);margin-left:6px;">Hover row for details</span></div>
                 <div style="position:relative;">
                 <div id="mf-tooltip" style="display:none;position:absolute;z-index:30;background:var(--card-bg,#fff);border:1px solid rgba(0,0,0,0.12);border-radius:8px;padding:10px 14px;box-shadow:0 4px 16px rgba(0,0,0,0.15);pointer-events:none;min-width:260px;"></div>
                 <table style="width:100%;font-size:11px;border-collapse:collapse;">
