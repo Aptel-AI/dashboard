@@ -7798,6 +7798,31 @@ function scheduledPlanningRefresh_() {
 function warmAllCaches(campaignKeys) {
   var start = new Date().getTime();
 
+  // If no keys provided (e.g. triggered by 5-min timer), check today's planning schedule
+  if (!campaignKeys) {
+    try {
+      var jsDay = new Date().getDay();
+      var todayIdx = (jsDay + 6) % 7; // Mon=0, Sun=6
+      var planningResult = odGetPlanning();
+      var planning = (planningResult && planningResult.planning) || [];
+      var todayKeys = [];
+      for (var p = 0; p < planning.length; p++) {
+        if (planning[p].day === todayIdx) todayKeys.push(planning[p].campaignKey);
+      }
+      if (todayKeys.length) {
+        campaignKeys = todayKeys;
+        Logger.log('warmAllCaches: planning-aware — today\'s campaigns: ' + todayKeys.join(', '));
+      } else {
+        // No campaigns scheduled today — only warm global caches, skip recruiting
+        Logger.log('warmAllCaches: no campaigns scheduled today, warming globals only');
+        campaignKeys = [];
+      }
+    } catch (e) {
+      Logger.log('warmAllCaches: planning read error, warming all: ' + e.message);
+      campaignKeys = Object.keys(OD_CAMPAIGNS);
+    }
+  }
+
   // Global caches (always warm)
   try {
     _cachedRead('cache_onlinePresence', 600, readOnlinePresence, true);
@@ -7809,15 +7834,18 @@ function warmAllCaches(campaignKeys) {
     Logger.log('warmAllCaches: ownerCamMapping OK');
   } catch (e) { Logger.log('warmAllCaches: ownerCamMapping ERROR: ' + e.message); }
 
-  // Per-campaign recruiting caches
-  var keysToWarm = campaignKeys || Object.keys(OD_CAMPAIGNS);
-  try {
-    readConsolidatedRecruiting(6, '', true); // bustCache=true forces fresh read + re-cache of all campaigns
-    Logger.log('warmAllCaches: recruiting OK (' + keysToWarm.length + ' campaigns)');
-  } catch (e) { Logger.log('warmAllCaches: recruiting ERROR: ' + e.message); }
+  // Per-campaign recruiting caches (only today's scheduled campaigns)
+  if (campaignKeys.length) {
+    for (var c = 0; c < campaignKeys.length; c++) {
+      try {
+        readConsolidatedRecruiting(6, campaignKeys[c], true);
+        Logger.log('warmAllCaches: recruiting ' + campaignKeys[c] + ' OK');
+      } catch (e) { Logger.log('warmAllCaches: recruiting ' + campaignKeys[c] + ' ERROR: ' + e.message); }
+    }
+  }
 
   var elapsed = new Date().getTime() - start;
-  Logger.log('warmAllCaches: done in ' + elapsed + 'ms');
+  Logger.log('warmAllCaches: done in ' + elapsed + 'ms (' + campaignKeys.length + ' campaigns)');
 }
 
 /**
