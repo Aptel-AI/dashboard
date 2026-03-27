@@ -2340,11 +2340,13 @@ const NationalApp = {
     const hc = t.hcBreakdown || {};
     const pb = t.prodBreakdown || {};
 
-    // Build production breakdown items (skip if only one product, skip zero values, sort desc)
+    // Build production breakdown items (skip zero values, sort desc)
     const prodEntries = Object.entries(pb).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-    const prodItems = prodEntries.length > 1
+    let prodItems = prodEntries.length > 1
       ? prodEntries.map(([name, val]) => `<div class="kpi-breakdown-item"><span class="kpi-bd-label">${this._esc(name)}</span><span class="kpi-bd-value">${val.toLocaleString()}</span></div>`).join('')
-      : '';
+      : prodEntries.length === 1
+        ? `<div class="kpi-breakdown-item"><span class="kpi-bd-label">${this._esc(prodEntries[0][0])}</span><span class="kpi-bd-value">${prodEntries[0][1].toLocaleString()}</span></div>`
+        : '';
 
     // Build headcount breakdown items
     const hcItems = [
