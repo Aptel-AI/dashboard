@@ -52,6 +52,55 @@ var CAMPAIGNS = {
 };
 
 // ══════════════════════════════════════════════════
+// CACHE HELPER
+// ══════════════════════════════════════════════════
+
+/**
+ * Cache-through wrapper for any read function.
+ * @param {string} cacheKey   - Unique cache key
+ * @param {number} ttlSeconds - TTL in seconds (max 21600 = 6 hours)
+ * @param {Function} readFn   - Zero-arg function returning data
+ * @param {boolean} [bustCache] - If true, skip cache lookup and force fresh read
+ * @returns {*} Cached or freshly-read data
+ */
+function _cachedRead(cacheKey, ttlSeconds, readFn, bustCache) {
+  var cache = CacheService.getScriptCache();
+
+  // Try cache first (unless busting)
+  if (!bustCache) {
+    try {
+      var cached = cache.get(cacheKey);
+      if (cached) {
+        var parsed = JSON.parse(cached);
+        Logger.log('_cachedRead HIT: ' + cacheKey);
+        return parsed;
+      }
+    } catch (e) {
+      Logger.log('_cachedRead parse error for ' + cacheKey + ': ' + e.message);
+    }
+  }
+
+  // Cache miss or bust — do the actual read
+  Logger.log('_cachedRead MISS: ' + cacheKey + (bustCache ? ' (bust)' : ''));
+  var result = readFn();
+
+  // Store in cache if under 100KB
+  try {
+    var json = JSON.stringify(result);
+    if (json.length < 100000) {
+      cache.put(cacheKey, json, ttlSeconds);
+      Logger.log('_cachedRead STORED: ' + cacheKey + ' (' + json.length + ' bytes, ' + ttlSeconds + 's TTL)');
+    } else {
+      Logger.log('_cachedRead TOO LARGE: ' + cacheKey + ' (' + json.length + ' bytes, skipping cache)');
+    }
+  } catch (e) {
+    Logger.log('_cachedRead store error for ' + cacheKey + ': ' + e.message);
+  }
+
+  return result;
+}
+
+// ══════════════════════════════════════════════════
 // ENTRY POINT
 // ══════════════════════════════════════════════════
 
@@ -62,13 +111,14 @@ function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
   const campaign = (e && e.parameter && e.parameter.campaign) || 'att-b2b';
   const owner = (e && e.parameter && e.parameter.owner) || '';
+  const bustCache = (e && e.parameter && e.parameter.bustCache) === 'true';
 
   try {
-    // ── Consolidated recruiting data (per-campaign tabs) ──
+    // ── Consolidated recruiting data (per-campaign tabs, cached per-campaign) ──
     if (action === 'recruiting') {
       var weeks = parseInt(e.parameter.weeks) || 6;
       var campaignFilter = (e.parameter.campaign !== 'att-b2b') ? e.parameter.campaign : '';
-      return jsonResp(readConsolidatedRecruiting(weeks, campaignFilter));
+      return jsonResp(readConsolidatedRecruiting(weeks, campaignFilter, bustCache));
     }
 
     // ── Refresh: pull latest data from source spreadsheets into consolidated tabs ──
@@ -80,14 +130,14 @@ function doGet(e) {
       return jsonResp(refreshSingleCampaign(campaignKey));
     }
 
-    // ── Owner → Cam Company mapping from _OwnerCamMapping tab ──
+    // ── Owner → Cam Company mapping (reads _OD_Mappings + legacy _OwnerCamMapping) ──
     if (action === 'ownerCamMapping') {
-      return jsonResp(readOwnerCamMapping());
+      return jsonResp(_cachedRead('cache_ownerCamMapping', 300, readOwnerCamMapping, bustCache));
     }
 
     // ── Online presence / audit data from Cam's sheet ──
     if (action === 'onlinePresence') {
-      return jsonResp(readOnlinePresence());
+      return jsonResp(_cachedRead('cache_onlinePresence', 600, readOnlinePresence, bustCache));
     }
 
     // ── Per-owner NLR data: reads single owner's mapped NLR workbook ──
@@ -376,6 +426,40 @@ function doPost(e) {
       default:
         result = { error: 'unknown action: ' + body.action };
     }
+
+    // ── Cache-bust after writes that affect cached data ──
+    try {
+      var _cache = CacheService.getScriptCache();
+      var _bustKeys = [];
+      switch (body.action) {
+        case 'claimCompany':
+        case 'unclaimCompany':
+        case 'claimCostSheet':
+        case 'unclaimCostSheet':
+          _bustKeys = ['cache_ownerCamMapping'];
+          break;
+        case 'updateHeadcount':
+        case 'updateProduction':
+        case 'saveGoals':
+          // Bust the campaign-specific recruiting cache
+          var _ck = String(body.campaignKey || body.campaignLabel || '').toLowerCase().replace(/\s+/g, '-');
+          if (_ck) _bustKeys.push('cache_recruiting_' + _ck);
+          break;
+        case 'refreshCampaigns':
+          // Bust all per-campaign recruiting caches
+          var _allKeys = Object.keys(typeof OD_CAMPAIGNS !== 'undefined' ? OD_CAMPAIGNS : {});
+          for (var _b = 0; _b < _allKeys.length; _b++) _bustKeys.push('cache_recruiting_' + _allKeys[_b]);
+          break;
+        case 'refreshCampaign':
+          if (body.campaign) _bustKeys.push('cache_recruiting_' + body.campaign);
+          break;
+      }
+      if (_bustKeys.length) {
+        _cache.removeAll(_bustKeys);
+        Logger.log('Cache busted: ' + _bustKeys.join(', '));
+      }
+    } catch (e) { Logger.log('Cache bust error: ' + e.message); }
+
     return jsonResp(result);
   } catch (err) {
     Logger.log('doPost error: ' + err.message + '\n' + err.stack);
@@ -7269,8 +7353,10 @@ function _normalizeDateKey_(d, campaignKey) {
  * in the same format the frontend expects:
  * { campaigns: { slug: { label, owners[], weeks[{ tabName, data }] } } }
  */
-function readConsolidatedRecruiting(weekCount, campaignFilter) {
+function readConsolidatedRecruiting(weekCount, campaignFilter, bustCache) {
   weekCount = weekCount || 6;
+
+  var cache = CacheService.getScriptCache();
 
   var ss;
   try {
@@ -7288,6 +7374,19 @@ function readConsolidatedRecruiting(weekCount, campaignFilter) {
     var campaign = OD_CAMPAIGNS[key];
     if (!campaign.sheetId) continue;
     if (campaignFilter && key !== campaignFilter) continue;
+
+    // ── Per-campaign cache check ──
+    var campaignCacheKey = 'cache_recruiting_' + key;
+    if (!bustCache) {
+      try {
+        var cached = cache.get(campaignCacheKey);
+        if (cached) {
+          campaigns[key] = JSON.parse(cached);
+          Logger.log('readConsolidatedRecruiting cache HIT: ' + key);
+          continue;
+        }
+      } catch (e) { /* parse error — fall through to fresh read */ }
+    }
 
     var tab = ss.getSheetByName(campaign.label);
     if (!tab) {
@@ -7442,6 +7541,17 @@ function readConsolidatedRecruiting(weekCount, campaignFilter) {
       weeks: weekEntries,
       products: CAMPAIGN_PRODUCTS[key] || ['Total']
     };
+
+    // ── Store per-campaign cache ──
+    try {
+      var cJson = JSON.stringify(campaigns[key]);
+      if (cJson.length < 100000) {
+        cache.put(campaignCacheKey, cJson, 300);
+        Logger.log('readConsolidatedRecruiting cached: ' + key + ' (' + cJson.length + ' bytes)');
+      } else {
+        Logger.log('readConsolidatedRecruiting TOO LARGE: ' + key + ' (' + cJson.length + ' bytes)');
+      }
+    } catch (e) { Logger.log('readConsolidatedRecruiting cache store error: ' + e.message); }
   }
 
   // B2B: include Tableau product breakdown grand totals
@@ -7618,6 +7728,66 @@ function scheduledPlanningRefresh_() {
       Logger.log('scheduledPlanningRefresh_: ERROR for ' + key + ': ' + err.message + '\n' + err.stack);
     }
   }
+
+  // Warm caches for today's scheduled campaigns + global caches
+  var todayKeys = todayCampaigns.map(function(c) { return c.campaignKey; });
+  Logger.log('scheduledPlanningRefresh_: warming caches for ' + todayKeys.join(', '));
+  warmAllCaches(todayKeys);
+}
+
+// ══════════════════════════════════════════════════
+// CACHE WARMING
+// ══════════════════════════════════════════════════
+
+/**
+ * Warm all CacheService caches. Called by scheduled trigger and manually.
+ * @param {string[]} [campaignKeys] - If provided, only warm these campaign recruiting caches.
+ *                                    If omitted, warms ALL campaigns.
+ */
+function warmAllCaches(campaignKeys) {
+  var start = new Date().getTime();
+
+  // Global caches (always warm)
+  try {
+    _cachedRead('cache_onlinePresence', 600, readOnlinePresence, true);
+    Logger.log('warmAllCaches: onlinePresence OK');
+  } catch (e) { Logger.log('warmAllCaches: onlinePresence ERROR: ' + e.message); }
+
+  try {
+    _cachedRead('cache_ownerCamMapping', 300, readOwnerCamMapping, true);
+    Logger.log('warmAllCaches: ownerCamMapping OK');
+  } catch (e) { Logger.log('warmAllCaches: ownerCamMapping ERROR: ' + e.message); }
+
+  // Per-campaign recruiting caches
+  var keysToWarm = campaignKeys || Object.keys(OD_CAMPAIGNS);
+  try {
+    readConsolidatedRecruiting(6, '', true); // bustCache=true forces fresh read + re-cache of all campaigns
+    Logger.log('warmAllCaches: recruiting OK (' + keysToWarm.length + ' campaigns)');
+  } catch (e) { Logger.log('warmAllCaches: recruiting ERROR: ' + e.message); }
+
+  var elapsed = new Date().getTime() - start;
+  Logger.log('warmAllCaches: done in ' + elapsed + 'ms');
+}
+
+/**
+ * Setup an every-5-minute trigger to keep caches warm throughout the day.
+ * Run once from the Apps Script editor to install.
+ */
+function setupCacheWarmingTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'warmAllCaches') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+
+  ScriptApp.newTrigger('warmAllCaches')
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+
+  Logger.log('Cache warming trigger installed: warmAllCaches every 5 minutes');
+  return { ok: true, message: 'Trigger set: warmAllCaches runs every 5 minutes' };
 }
 
 /**

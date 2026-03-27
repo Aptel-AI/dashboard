@@ -261,6 +261,14 @@ const NationalApp = {
     ]);
   },
 
+  // ── Fire-and-forget cache re-warm after writes ──
+  _rewarmCache(action) {
+    const url = NATIONAL_CONFIG.appsScriptUrl +
+      '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
+      '&action=' + action + '&bustCache=true&_t=' + Date.now();
+    fetch(url).catch(() => {});
+  },
+
   async loadCampaignData(campaignKey) {
     // Config entry may be dynamically created by _populateCampaignSelector
     if (!NATIONAL_CONFIG.campaigns[campaignKey]) {
@@ -273,16 +281,9 @@ const NationalApp = {
     // ── Fire ALL independent fetches in parallel (each with 20s timeout) ──
     const fetchPromises = {};
     if (hasNational) fetchPromises.recruiting = this._fetchWithTimeout(this._fetchRecruitingFromSheet(campaignKey));
-    if (hasApi)      fetchPromises.audit      = this._fetchWithTimeout(this._fetchOnlinePresence());
+    if (hasApi)      fetchPromises.audit      = this._fetchWithTimeout(this._fetchOnlinePresence(), 45000);
     if (hasApi)      fetchPromises.camMapping  = this._fetchWithTimeout(this._fetchOwnerCamMapping());
-    // Legacy B2B/NDS enrichment (still needed for campaigns using local tabs)
-    const isB2B = campaignKey === 'att-b2b';
-    const isNDS = campaignKey.indexOf('nds') >= 0 || campaignKey.indexOf('NDS') >= 0;
     const isRes = campaignKey === 'att-res';
-    if (isB2B && hasApi) fetchPromises.headcount  = this._fetchWithTimeout(this._fetchB2BHeadcount());
-    if (isB2B && hasApi) fetchPromises.production = this._fetchWithTimeout(this._fetchB2BProduction());
-    if (isNDS && hasApi) fetchPromises.ndsHeadcount  = this._fetchWithTimeout(this._fetchNDSHeadcount());
-    if (isNDS && hasApi) fetchPromises.ndsProduction = this._fetchWithTimeout(this._fetchNDSProduction());
     if (isRes && hasApi) fetchPromises.d2dResRanking = this._fetchWithTimeout(this._fetchD2DResRanking());
     // Indeed/recruiting costs excluded from initial load — fetched only via Import button
 
@@ -326,23 +327,6 @@ const NationalApp = {
       this.state.allCompanyNames = results.audit.allCompanyNames || [];
       this._cachedAuditBusinesses = results.audit.businesses;
       this._mapAuditToOwners(results.audit.businesses, this.state.camMapping || null);
-    }
-
-    // Legacy B2B/NDS headcount enrichment
-    if (results.headcount && results.headcount.owners && Object.keys(results.headcount.owners).length) {
-      this._enrichOwnersWithNLR(results.headcount.owners);
-    }
-
-    if (results.ndsHeadcount && results.ndsHeadcount.owners && Object.keys(results.ndsHeadcount.owners).length) {
-      this._enrichOwnersWithNLR(results.ndsHeadcount.owners);
-    }
-
-    if (results.ndsProduction && results.ndsProduction.owners && Object.keys(results.ndsProduction.owners).length) {
-      this._enrichOwnersWithProduction(results.ndsProduction.owners);
-    }
-
-    if (results.production && results.production.owners && Object.keys(results.production.owners).length) {
-      this._enrichOwnersWithProduction(results.production.owners);
     }
 
     // D2D Res ranking enrichment (att-res campaign only)
@@ -2889,6 +2873,7 @@ const NationalApp = {
       if (result.error) throw new Error(result.error);
       console.log('[NationalApp] Headcount saved: sent date=' + newestWeekDate + ' wrote row=' + result.row + ' date=' + result.date + ' tab=' + result.tab, result);
       this._invalidateOdCache();
+      this._rewarmCache('recruiting');
       if (note) {
         note.textContent = `Saved ✓ (row ${result.row})`;
         setTimeout(() => note.classList.remove('show'), 3000);
@@ -3315,7 +3300,7 @@ const NationalApp = {
       });
       const result = await resp.json();
       if (result.error) console.warn('[HC Save] Error:', result.error);
-      else console.log('[HC Save] Saved', owner.name, entry.date, '→', campaignLabel);
+      else { console.log('[HC Save] Saved', owner.name, entry.date, '→', campaignLabel); this._rewarmCache('recruiting'); }
     } catch (err) {
       console.warn('[HC Save] Network error:', err.message);
     }
@@ -3945,7 +3930,7 @@ const NationalApp = {
       })
     }).then(r => r.json()).then(result => {
       if (result.error) console.warn('[Prod Save] Error:', result.error);
-      else console.log('[Prod Save] Saved', sheetName, entry.date, productKeys.length ? productKeys : 'legacy');
+      else { console.log('[Prod Save] Saved', sheetName, entry.date, productKeys.length ? productKeys : 'legacy'); this._rewarmCache('recruiting'); }
     }).catch(err => console.warn('[Prod Save] Network error:', err.message));
   },
 
@@ -4279,7 +4264,7 @@ const NationalApp = {
       })
     }).then(r => r.json()).then(result => {
       if (result.error) console.warn('[Prod Cards] Error:', result.error);
-      else console.log('[Prod Cards] Saved:', sheetName, prodDate);
+      else { console.log('[Prod Cards] Saved:', sheetName, prodDate); this._rewarmCache('recruiting'); }
     }).catch(err => console.warn('[Prod Cards] Network error:', err.message));
   },
 
@@ -5905,6 +5890,9 @@ const NationalApp = {
       // Re-map audit data to owners with new mapping and re-render
       this._remapAndRenderAudit();
 
+      // Re-warm cache in background
+      this._rewarmCache('ownerCamMapping');
+
       if (status) {
         status.textContent = 'Claimed: ' + companyName;
         status.className = 'claim-status claim-success';
@@ -5945,6 +5933,9 @@ const NationalApp = {
 
       // Re-map audit data to owners with new mapping and re-render
       this._remapAndRenderAudit();
+
+      // Re-warm cache in background
+      this._rewarmCache('ownerCamMapping');
 
       if (status) {
         status.textContent = 'Removed: ' + companyName;
