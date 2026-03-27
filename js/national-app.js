@@ -5227,7 +5227,7 @@ const NationalApp = {
                     ${mf.map((m, mi) => `<tr style="cursor:pointer;" data-mf-idx="${mi}"
                         onmouseenter="NationalApp._showMfTooltip(event,${mi})"
                         onmouseleave="NationalApp._hideMfTooltip()">
-                        <td style="padding:3px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;" title="${this._esc(m.dma)}">${this._esc(m.dma.length > 30 ? m.dma.substring(0, 28) + '…' : m.dma)}</td>
+                        <td style="padding:3px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;">${this._esc(m.dma.length > 30 ? m.dma.substring(0, 28) + '…' : m.dma)}</td>
                         <td style="text-align:center;padding:3px 8px;">${m.totalWorkable}</td>
                         <td style="text-align:center;padding:3px 8px;">${m.total}</td>
                         <td style="text-align:center;padding:3px 8px;">${m.penRate}</td>
