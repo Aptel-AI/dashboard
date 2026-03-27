@@ -801,9 +801,9 @@ const NationalApp = {
       const result = await resp.json();
       owner._b2bSalesFetching = false;
       if (!result.error && (result.summary || result.reps)) {
-        owner.sales = { summary: result.summary, reps: result.reps || [] };
+        owner.sales = { summary: result.summary, reps: result.reps || [], dailyActivity: result.dailyActivity || [] };
         owner._b2bSalesFetched = true;
-        console.log('[NationalApp] B2B sales loaded for', owner.name, ':', result.reps?.length, 'reps');
+        console.log('[NationalApp] B2B sales loaded for', owner.name, ':', result.reps?.length, 'reps,', (result.dailyActivity || []).length, 'daily rows');
       } else {
         console.warn('[NationalApp] B2B sales empty for', owner.name, ':', result.error || 'no data');
       }
@@ -5144,7 +5144,7 @@ const NationalApp = {
       summaryEl.innerHTML = `
         <div class="coaching-section">
           <div class="coaching-label">Owner Overview</div>
-          <div class="sales-kpi-grid">
+          <div class="sales-kpi-grid"${isB2B ? ' style="grid-template-columns:repeat(2,1fr);"' : ''}>
             ${kpis.map(k => `
               <div class="health-kpi${k.cls ? ' ' + k.cls : ''}">
                 <div class="health-kpi-value">${k.value}</div>
