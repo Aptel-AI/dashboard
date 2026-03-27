@@ -1709,8 +1709,8 @@ const NationalApp = {
       newStartsBooked: _t(9),
       newStartsShowed: _t(10),
       newStartRetention: _t(9) ? Math.round((_t(10) / _t(9)) * 100) : 0,
-      // Production
-      production: totals.production,
+      // Production — use Tableau breakdown sum when available (more accurate than recruiting total)
+      production: Object.keys(prodBreakdown).length ? Object.values(prodBreakdown).reduce((s, v) => s + v, 0) : totals.production,
       prodBreakdown
     };
   },
