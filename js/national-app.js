@@ -553,6 +553,10 @@ const NationalApp = {
       // Dynamically populate campaign selector and config
       this._populateCampaignSelector(result.campaigns);
     }
+    // Cache B2B product totals from Tableau
+    if (result.b2bProductTotals) {
+      this._b2bProductTotals = result.b2bProductTotals;
+    }
 
     // Extract the campaign-specific data
     const campaignData = result.campaigns && result.campaigns[campaignKey];
@@ -1658,13 +1662,22 @@ const NationalApp = {
 
     // Aggregate production breakdown across all owners
     const prodBreakdown = {};
-    this.state.owners.forEach(o => {
-      if (!o.production || !o.production.products) return;
-      for (const [pName, pData] of Object.entries(o.production.products)) {
-        if (!prodBreakdown[pName]) prodBreakdown[pName] = 0;
-        prodBreakdown[pName] += pData.actual || 0;
-      }
-    });
+    // B2B: use Tableau product totals if available
+    const b2bPT = this._b2bProductTotals;
+    if (b2bPT && this.state.campaign === 'att-b2b') {
+      if (b2bPT.internet) prodBreakdown['Internet'] = b2bPT.internet;
+      if (b2bPT.voip) prodBreakdown['VOIP'] = b2bPT.voip;
+      if (b2bPT.wireless) prodBreakdown['Wireless'] = b2bPT.wireless;
+      if (b2bPT.air) prodBreakdown['AIR/AWB'] = b2bPT.air;
+    } else {
+      this.state.owners.forEach(o => {
+        if (!o.production || !o.production.products) return;
+        for (const [pName, pData] of Object.entries(o.production.products)) {
+          if (!prodBreakdown[pName]) prodBreakdown[pName] = 0;
+          prodBreakdown[pName] += pData.actual || 0;
+        }
+      });
+    }
 
     this.state.campaignTotals = {
       latestWeek: this._latestWeekDate || null,

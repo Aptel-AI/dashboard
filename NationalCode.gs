@@ -7444,7 +7444,34 @@ function readConsolidatedRecruiting(weekCount, campaignFilter) {
     };
   }
 
-  return { campaigns: campaigns };
+  // B2B: include Tableau product breakdown grand totals
+  var b2bProductTotals = null;
+  try {
+    var metricsSheet = ss.getSheetByName('B2B Sales Metrics');
+    if (metricsSheet && metricsSheet.getLastRow() > 1) {
+      var mData = metricsSheet.getDataRange().getDisplayValues();
+      var mHeaders = mData[0];
+      for (var r = mData.length - 1; r >= 1; r--) {
+        if (String(mData[r][0]).trim() === 'Grand Total') {
+          var iInt = mHeaders.indexOf('Internet');
+          var iVoip = mHeaders.indexOf('VOIP');
+          var iWrls = mHeaders.indexOf('Wireless');
+          var iAir = mHeaders.indexOf('AIR/AWB');
+          b2bProductTotals = {
+            internet: iInt >= 0 ? parseInt(mData[r][iInt]) || 0 : 0,
+            voip: iVoip >= 0 ? parseInt(mData[r][iVoip]) || 0 : 0,
+            wireless: iWrls >= 0 ? parseInt(mData[r][iWrls]) || 0 : 0,
+            air: iAir >= 0 ? parseInt(mData[r][iAir]) || 0 : 0
+          };
+          break;
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log('B2B product totals read error: ' + e.message);
+  }
+
+  return { campaigns: campaigns, b2bProductTotals: b2bProductTotals };
 }
 
 /**
