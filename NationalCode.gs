@@ -55,8 +55,71 @@ var CAMPAIGNS = {
 // CACHE HELPER
 // ══════════════════════════════════════════════════
 
+var CACHE_CHUNK_SIZE = 95000; // ~95KB per chunk (under 100KB CacheService limit)
+
+/**
+ * Store a JSON string across multiple cache keys if it exceeds the chunk size.
+ * Keys: baseKey_0, baseKey_1, ... baseKey_N, plus baseKey_meta with chunk count.
+ */
+function _cacheStore(cache, baseKey, json, ttlSeconds) {
+  var chunks = Math.ceil(json.length / CACHE_CHUNK_SIZE);
+  if (chunks === 1) {
+    cache.put(baseKey, json, ttlSeconds);
+  } else {
+    var pairs = {};
+    for (var i = 0; i < chunks; i++) {
+      pairs[baseKey + '_' + i] = json.substring(i * CACHE_CHUNK_SIZE, (i + 1) * CACHE_CHUNK_SIZE);
+    }
+    pairs[baseKey + '_meta'] = String(chunks);
+    cache.putAll(pairs, ttlSeconds);
+  }
+  Logger.log('_cacheStore: ' + baseKey + ' (' + json.length + ' bytes, ' + chunks + ' chunk' + (chunks > 1 ? 's' : '') + ', ' + ttlSeconds + 's TTL)');
+}
+
+/**
+ * Read a potentially multi-chunk cached value. Returns null on miss.
+ */
+function _cacheRead(cache, baseKey) {
+  // Try single-key first (small values)
+  var single = cache.get(baseKey);
+  if (single) return single;
+
+  // Try multi-chunk
+  var metaVal = cache.get(baseKey + '_meta');
+  if (!metaVal) return null;
+
+  var chunks = parseInt(metaVal) || 0;
+  if (chunks < 1) return null;
+
+  var chunkKeys = [];
+  for (var i = 0; i < chunks; i++) chunkKeys.push(baseKey + '_' + i);
+  var parts = cache.getAll(chunkKeys);
+
+  var assembled = '';
+  for (var i = 0; i < chunks; i++) {
+    var part = parts[baseKey + '_' + i];
+    if (!part) return null; // partial miss — treat as full miss
+    assembled += part;
+  }
+  return assembled;
+}
+
+/**
+ * Remove a potentially multi-chunk cached value.
+ */
+function _cacheRemove(cache, baseKey) {
+  var metaVal = cache.get(baseKey + '_meta');
+  var keysToRemove = [baseKey, baseKey + '_meta'];
+  if (metaVal) {
+    var chunks = parseInt(metaVal) || 0;
+    for (var i = 0; i < chunks; i++) keysToRemove.push(baseKey + '_' + i);
+  }
+  cache.removeAll(keysToRemove);
+}
+
 /**
  * Cache-through wrapper for any read function.
+ * Supports chunked storage for values >100KB.
  * @param {string} cacheKey   - Unique cache key
  * @param {number} ttlSeconds - TTL in seconds (max 21600 = 6 hours)
  * @param {Function} readFn   - Zero-arg function returning data
@@ -69,7 +132,7 @@ function _cachedRead(cacheKey, ttlSeconds, readFn, bustCache) {
   // Try cache first (unless busting)
   if (!bustCache) {
     try {
-      var cached = cache.get(cacheKey);
+      var cached = _cacheRead(cache, cacheKey);
       if (cached) {
         var parsed = JSON.parse(cached);
         Logger.log('_cachedRead HIT: ' + cacheKey);
@@ -84,15 +147,10 @@ function _cachedRead(cacheKey, ttlSeconds, readFn, bustCache) {
   Logger.log('_cachedRead MISS: ' + cacheKey + (bustCache ? ' (bust)' : ''));
   var result = readFn();
 
-  // Store in cache if under 100KB
+  // Store in cache (chunked if needed)
   try {
     var json = JSON.stringify(result);
-    if (json.length < 100000) {
-      cache.put(cacheKey, json, ttlSeconds);
-      Logger.log('_cachedRead STORED: ' + cacheKey + ' (' + json.length + ' bytes, ' + ttlSeconds + 's TTL)');
-    } else {
-      Logger.log('_cachedRead TOO LARGE: ' + cacheKey + ' (' + json.length + ' bytes, skipping cache)');
-    }
+    _cacheStore(cache, cacheKey, json, ttlSeconds);
   } catch (e) {
     Logger.log('_cachedRead store error for ' + cacheKey + ': ' + e.message);
   }
@@ -427,7 +485,7 @@ function doPost(e) {
         result = { error: 'unknown action: ' + body.action };
     }
 
-    // ── Cache-bust after writes that affect cached data ──
+    // ── Cache-bust after writes that affect cached data (supports chunked keys) ──
     try {
       var _cache = CacheService.getScriptCache();
       var _bustKeys = [];
@@ -441,12 +499,10 @@ function doPost(e) {
         case 'updateHeadcount':
         case 'updateProduction':
         case 'saveGoals':
-          // Bust the campaign-specific recruiting cache
           var _ck = String(body.campaignKey || body.campaignLabel || '').toLowerCase().replace(/\s+/g, '-');
           if (_ck) _bustKeys.push('cache_recruiting_' + _ck);
           break;
         case 'refreshCampaigns':
-          // Bust all per-campaign recruiting caches
           var _allKeys = Object.keys(typeof OD_CAMPAIGNS !== 'undefined' ? OD_CAMPAIGNS : {});
           for (var _b = 0; _b < _allKeys.length; _b++) _bustKeys.push('cache_recruiting_' + _allKeys[_b]);
           break;
@@ -455,7 +511,7 @@ function doPost(e) {
           break;
       }
       if (_bustKeys.length) {
-        _cache.removeAll(_bustKeys);
+        for (var _r = 0; _r < _bustKeys.length; _r++) _cacheRemove(_cache, _bustKeys[_r]);
         Logger.log('Cache busted: ' + _bustKeys.join(', '));
       }
     } catch (e) { Logger.log('Cache bust error: ' + e.message); }
@@ -7375,11 +7431,11 @@ function readConsolidatedRecruiting(weekCount, campaignFilter, bustCache) {
     if (!campaign.sheetId) continue;
     if (campaignFilter && key !== campaignFilter) continue;
 
-    // ── Per-campaign cache check ──
+    // ── Per-campaign cache check (supports chunked storage) ──
     var campaignCacheKey = 'cache_recruiting_' + key;
     if (!bustCache) {
       try {
-        var cached = cache.get(campaignCacheKey);
+        var cached = _cacheRead(cache, campaignCacheKey);
         if (cached) {
           campaigns[key] = JSON.parse(cached);
           Logger.log('readConsolidatedRecruiting cache HIT: ' + key);
@@ -7542,15 +7598,10 @@ function readConsolidatedRecruiting(weekCount, campaignFilter, bustCache) {
       products: CAMPAIGN_PRODUCTS[key] || ['Total']
     };
 
-    // ── Store per-campaign cache ──
+    // ── Store per-campaign cache (chunked if needed) ──
     try {
       var cJson = JSON.stringify(campaigns[key]);
-      if (cJson.length < 100000) {
-        cache.put(campaignCacheKey, cJson, 300);
-        Logger.log('readConsolidatedRecruiting cached: ' + key + ' (' + cJson.length + ' bytes)');
-      } else {
-        Logger.log('readConsolidatedRecruiting TOO LARGE: ' + key + ' (' + cJson.length + ' bytes)');
-      }
+      _cacheStore(cache, campaignCacheKey, cJson, 300);
     } catch (e) { Logger.log('readConsolidatedRecruiting cache store error: ' + e.message); }
   }
 
