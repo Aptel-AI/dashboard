@@ -5108,7 +5108,7 @@ const NationalApp = {
             </div>
           </div>`;
 
-      // B2B: unified 3-column layout
+      // B2B: compact 3-column layout
       if (isB2B) {
         const da = s.dailyActivity || [];
         const weekAvg = da.find(d => d.day === 'Week Avg');
@@ -5122,80 +5122,78 @@ const NationalApp = {
         summaryEl.innerHTML = `
           <div class="coaching-section">
             <div class="coaching-label">Owner Overview</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:16px;margin-top:12px;">
-              <!-- Column 1: KPIs left + Sales Breakdown -->
-              <div style="display:flex;flex-direction:column;gap:12px;">
-                <div class="health-kpi" style="text-align:center;padding:12px;">
-                  <div class="health-kpi-value" style="font-size:28px;">${sm.totalVolume ?? '—'}</div>
-                  <div class="health-kpi-label">Total Volume</div>
-                </div>
-                <div class="health-kpi" style="text-align:center;padding:12px;">
-                  <div class="health-kpi-value">${b2bScoringHC}</div>
-                  <div class="health-kpi-label">Scoring HC</div>
-                  <div style="font-size:10px;color:var(--silver);margin-top:2px;">Reps with 1+ sale</div>
-                </div>
-                <div>
-                  <div class="sales-metric-group-label">SALES BREAKDOWN</div>
-                  <div class="sales-metric-row"><span>Internet</span><span class="num">${sm.internet ?? 0}</span></div>
-                  <div class="sales-metric-row"><span>VOIP</span><span class="num">${sm.voip ?? 0}</span></div>
-                  <div class="sales-metric-row"><span>Wireless</span><span class="num">${sm.wireless ?? 0}</span></div>
-                  <div class="sales-metric-row"><span>AIR/AWB</span><span class="num">${sm.airAwb ?? 0}</span></div>
-                </div>
+            <!-- KPI strip -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0 16px;">
+              <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.5);border-radius:8px;">
+                <div style="font-size:24px;font-weight:700;">${sm.totalVolume ?? '—'}</div>
+                <div style="font-size:11px;color:var(--silver);">Total Volume</div>
               </div>
-              <!-- Column 2: KPIs right + Performance % -->
-              <div style="display:flex;flex-direction:column;gap:12px;">
-                <div class="health-kpi" style="text-align:center;padding:12px;">
-                  <div class="health-kpi-value" style="font-size:28px;">${b2bAvgUnits}</div>
-                  <div class="health-kpi-label">Avg Units / Rep</div>
-                  <div style="font-size:10px;color:var(--silver);margin-top:2px;">${activeHC2 ? 'Based on ' + activeHC2 + ' active reps' : 'Set active reps in Office Health'}</div>
-                </div>
-                <div class="health-kpi" style="text-align:center;padding:12px;">
-                  <div class="health-kpi-value">${b2bProductiveHC}</div>
-                  <div class="health-kpi-label">Productive HC</div>
-                  <div style="font-size:10px;color:var(--silver);margin-top:2px;">Reps with 6+ units</div>
-                </div>
-                <div>
-                  <div class="sales-metric-group-label">PERFORMANCE %</div>
-                  <div class="sales-metric-row"><span>Weekend Selling</span><span class="num">${this._pct(sm.weekendPct)}</span></div>
-                  <div class="sales-metric-row"><span>Rep Tier Attainment</span><span class="num">${this._pct(sm.tierPct)}</span></div>
-                  <div class="sales-metric-row"><span>ABP</span><span class="num">${this._pct(sm.abpPct)}</span></div>
-                  <div class="sales-metric-row"><span>CRU</span><span class="num">${this._pct(sm.cruPct)}</span></div>
-                  <div class="sales-metric-row"><span>New Wireless</span><span class="num">${this._pct(sm.newWrlsPct)}</span></div>
-                  <div class="sales-metric-row"><span>BYOD</span><span class="num">${this._pct(sm.byodPct)}</span></div>
-                </div>
+              <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.5);border-radius:8px;">
+                <div style="font-size:24px;font-weight:700;">${b2bAvgUnits}</div>
+                <div style="font-size:11px;color:var(--silver);">Avg Units / Rep</div>
+                <div style="font-size:9px;color:var(--silver-dim);margin-top:1px;">${activeHC2 ? activeHC2 + ' active reps' : 'Set in Office Health'}</div>
               </div>
-              <!-- Column 3: Daily Activity + Order Timing -->
-              <div style="display:flex;flex-direction:column;gap:16px;">
-                <div>
-                  <div class="sales-metric-group-label">DAILY ACTIVITY</div>
-                  <table style="width:100%;font-size:12px;border-collapse:collapse;">
-                    <thead><tr style="border-bottom:1px solid rgba(0,0,0,0.1);">
-                      <th style="text-align:left;padding:4px 6px;font-size:10px;text-transform:uppercase;color:var(--silver);">Day</th>
-                      <th class="num" style="padding:4px 6px;font-size:10px;text-transform:uppercase;color:var(--silver);">First</th>
-                      <th class="num" style="padding:4px 6px;font-size:10px;text-transform:uppercase;color:var(--silver);">Last</th>
-                      <th class="num" style="padding:4px 6px;font-size:10px;text-transform:uppercase;color:var(--silver);">Orders</th>
-                    </tr></thead>
-                    <tbody>
-                      ${weekAvg ? `<tr style="font-weight:600;background:rgba(0,200,255,0.06);">
-                        <td style="padding:3px 6px;">Week Avg</td>
-                        <td class="num" style="padding:3px 6px;">${weekAvg.firstOrder}</td>
-                        <td class="num" style="padding:3px 6px;">${weekAvg.lastOrder}</td>
-                        <td class="num" style="padding:3px 6px;">${weekAvg.orders}</td>
-                      </tr>` : ''}
-                      ${dailyDays.map(d => `<tr>
-                        <td style="padding:3px 6px;">${d.day}</td>
-                        <td class="num" style="padding:3px 6px;">${d.firstOrder}</td>
-                        <td class="num" style="padding:3px 6px;">${d.lastOrder}</td>
-                        <td class="num" style="padding:3px 6px;">${d.orders}</td>
-                      </tr>`).join('')}
-                    </tbody>
-                  </table>
-                </div>
-                <div>
+              <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.5);border-radius:8px;">
+                <div style="font-size:24px;font-weight:700;">${b2bScoringHC}</div>
+                <div style="font-size:11px;color:var(--silver);">Scoring HC</div>
+                <div style="font-size:9px;color:var(--silver-dim);margin-top:1px;">1+ sale</div>
+              </div>
+              <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.5);border-radius:8px;">
+                <div style="font-size:24px;font-weight:700;">${b2bProductiveHC}</div>
+                <div style="font-size:11px;color:var(--silver);">Productive HC</div>
+                <div style="font-size:9px;color:var(--silver-dim);margin-top:1px;">6+ units</div>
+              </div>
+            </div>
+            <!-- 3-column metrics grid -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1.5fr;gap:16px;">
+              <!-- Col 1: Sales Breakdown + Order Timing -->
+              <div>
+                <div class="sales-metric-group-label">SALES BREAKDOWN</div>
+                <div class="sales-metric-row"><span>Internet</span><span class="num">${sm.internet ?? 0}</span></div>
+                <div class="sales-metric-row"><span>VOIP</span><span class="num">${sm.voip ?? 0}</span></div>
+                <div class="sales-metric-row"><span>Wireless</span><span class="num">${sm.wireless ?? 0}</span></div>
+                <div class="sales-metric-row"><span>AIR/AWB</span><span class="num">${sm.airAwb ?? 0}</span></div>
+                <div style="margin-top:14px;">
                   <div class="sales-metric-group-label">ORDER TIMING</div>
                   <div class="sales-metric-row"><span>Before 12 PM</span><span class="num">${sm.ordersBefore ?? '—'} <small>(${this._pct(sm.earlyPct)})</small></span></div>
                   <div class="sales-metric-row"><span>After 5 PM</span><span class="num">${sm.ordersAfter ?? '—'} <small>(${this._pct(sm.latePct)})</small></span></div>
                 </div>
+              </div>
+              <!-- Col 2: Performance % -->
+              <div>
+                <div class="sales-metric-group-label">PERFORMANCE %</div>
+                <div class="sales-metric-row"><span>Weekend Selling</span><span class="num">${this._pct(sm.weekendPct)}</span></div>
+                <div class="sales-metric-row"><span>Rep Tier Attainment</span><span class="num">${this._pct(sm.tierPct)}</span></div>
+                <div class="sales-metric-row"><span>ABP</span><span class="num">${this._pct(sm.abpPct)}</span></div>
+                <div class="sales-metric-row"><span>CRU</span><span class="num">${this._pct(sm.cruPct)}</span></div>
+                <div class="sales-metric-row"><span>New Wireless</span><span class="num">${this._pct(sm.newWrlsPct)}</span></div>
+                <div class="sales-metric-row"><span>BYOD</span><span class="num">${this._pct(sm.byodPct)}</span></div>
+              </div>
+              <!-- Col 3: Daily Activity -->
+              <div>
+                <div class="sales-metric-group-label">DAILY ACTIVITY</div>
+                <table style="width:100%;font-size:12px;border-collapse:collapse;">
+                  <thead><tr style="border-bottom:1px solid rgba(0,0,0,0.1);">
+                    <th style="text-align:left;padding:3px 6px;font-size:10px;text-transform:uppercase;color:var(--silver);">Day</th>
+                    <th class="num" style="padding:3px 6px;font-size:10px;text-transform:uppercase;color:var(--silver);">First</th>
+                    <th class="num" style="padding:3px 6px;font-size:10px;text-transform:uppercase;color:var(--silver);">Last</th>
+                    <th class="num" style="padding:3px 6px;font-size:10px;text-transform:uppercase;color:var(--silver);">Orders</th>
+                  </tr></thead>
+                  <tbody>
+                    ${weekAvg ? `<tr style="font-weight:600;background:rgba(0,200,255,0.06);">
+                      <td style="padding:2px 6px;">Week Avg</td>
+                      <td class="num" style="padding:2px 6px;">${weekAvg.firstOrder}</td>
+                      <td class="num" style="padding:2px 6px;">${weekAvg.lastOrder}</td>
+                      <td class="num" style="padding:2px 6px;">${weekAvg.orders}</td>
+                    </tr>` : ''}
+                    ${dailyDays.map(d => `<tr>
+                      <td style="padding:2px 6px;">${d.day}</td>
+                      <td class="num" style="padding:2px 6px;">${d.firstOrder}</td>
+                      <td class="num" style="padding:2px 6px;">${d.lastOrder}</td>
+                      <td class="num" style="padding:2px 6px;">${d.orders}</td>
+                    </tr>`).join('')}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>`;
