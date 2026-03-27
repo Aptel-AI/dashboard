@@ -4593,6 +4593,34 @@ function readB2BOwnerSales(ownerName) {
   };
 }
 
+/** Format helpers for B2B source data */
+function _fmtPct_(v) {
+  var n = parseFloat(String(v).replace(/[%,]/g, ''));
+  if (isNaN(n)) return v;
+  if (n > 0 && n < 1) return (n * 100).toFixed(2) + '%';
+  return n.toFixed(2) + '%';
+}
+function _fmtNum_(v) {
+  var n = parseFloat(String(v).replace(/[$,]/g, ''));
+  if (isNaN(n)) return v;
+  return Math.round(n).toLocaleString();
+}
+function _fmtDollar_(v) {
+  var n = parseFloat(String(v).replace(/[$,]/g, ''));
+  if (isNaN(n)) return v;
+  return '$' + Math.round(n).toLocaleString();
+}
+function _fmtShortDate_(v) {
+  var s = String(v || '').trim();
+  // Handle Date objects or full datetime strings → M/D/YYYY
+  var d = new Date(s);
+  if (!isNaN(d.getTime()) && d.getFullYear() > 1900) {
+    return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear();
+  }
+  // Already short format
+  return s.replace(/\/\d{4}$/, function(m) { return m; }).substring(0, 15);
+}
+
 /** Find an owner's tab in the source spreadsheet (case-insensitive) */
 function _findOwnerTab_(ss, ownerName) {
   var ownerLower = ownerName.toLowerCase().trim();
@@ -4648,15 +4676,15 @@ function _extractMarketFulfillment_(data, ownerName) {
     if (!name) break;
     var market = {
       dma: colDMA >= 0 ? String(data[i][colDMA] || '').trim() : '',
-      totalWorkable: colWorkable >= 0 ? String(data[i][colWorkable] || '').trim() : '',
-      total: colTotal >= 0 ? String(data[i][colTotal] || '').trim() : '',
-      penRate: colPen >= 0 ? String(data[i][colPen] || '').trim() : '',
-      weeklyTotal: colWeeklyTotal >= 0 ? String(data[i][colWeeklyTotal] || '').trim() : '',
-      weeklyCRU: colWeeklyCRU >= 0 ? String(data[i][colWeeklyCRU] || '').trim() : '',
+      totalWorkable: colWorkable >= 0 ? _fmtNum_(data[i][colWorkable]) : '',
+      total: colTotal >= 0 ? _fmtNum_(data[i][colTotal]) : '',
+      penRate: colPen >= 0 ? _fmtPct_(data[i][colPen]) : '',
+      weeklyTotal: colWeeklyTotal >= 0 ? _fmtNum_(data[i][colWeeklyTotal]) : '',
+      weeklyCRU: colWeeklyCRU >= 0 ? _fmtNum_(data[i][colWeeklyCRU]) : '',
       weeks: []
     };
     for (var d = 0; d < dateCols.length; d++) {
-      market.weeks.push({ label: dateCols[d].label, value: String(data[i][dateCols[d].idx] || '').trim() });
+      market.weeks.push({ label: dateCols[d].label, value: _fmtNum_(data[i][dateCols[d].idx]) });
     }
     markets.push(market);
   }
@@ -4684,23 +4712,25 @@ function _extractAvgPaychecks_(data) {
   if (dataRow >= data.length) return null;
   var row = data[dataRow];
 
-  // Parse Comm per Rep columns (columns 1-5 typically: dates + avg)
+  // Parse Comm per Rep columns (columns 1 until empty gap or "Last 4 Wk Avg")
   var commDates = [];
   var commAvg = '';
   for (var c = 1; c < headers.length; c++) {
-    var h = headers[c].toLowerCase();
-    if (!h) break; // gap = start of Total DD section
+    var h = headers[c].toLowerCase().trim();
+    if (!h) break; // gap = end of Comm section
     if (h.indexOf('last') >= 0 && h.indexOf('avg') >= 0) {
-      commAvg = String(row[c] || '').trim();
-    } else if (h) {
-      commDates.push({ label: headers[c], value: String(row[c] || '').trim() });
+      commAvg = _fmtDollar_(row[c]);
+      break;
+    }
+    // Only include date-like headers (M/D/YYYY or similar)
+    if (headers[c].match(/\d{1,2}\/\d{1,2}\/\d{2,4}/) || new Date(headers[c]).getFullYear() > 2000) {
+      commDates.push({ label: _fmtShortDate_(headers[c]), value: _fmtDollar_(row[c]) });
     }
   }
 
-  // Find Total DD section — look for gap then more dates
+  // Find Total DD section
   var totalDDDates = [];
   var totalDDAvg = '';
-  // Find "Total DD" header in the commRow
   var ddStartCol = -1;
   for (var c = 0; c < data[commRow].length; c++) {
     if (String(data[commRow][c] || '').trim().toLowerCase() === 'total dd') {
@@ -4709,16 +4739,19 @@ function _extractAvgPaychecks_(data) {
     }
   }
   if (ddStartCol >= 0) {
-    // DD date headers are in headerRow starting at ddStartCol
+    // DD date headers are in headerRow starting after ddStartCol
     for (var c = ddStartCol; c < headers.length; c++) {
-      var h = headers[c].toLowerCase();
-      if (!h) continue;
-      if (h === 'total dd' || h === 'cl.icd_owner_name') continue;
-      var val = String(row[c] || '').trim();
+      var h = headers[c].toLowerCase().trim();
+      if (!h || h === 'total dd' || h === 'cl.icd_owner_name') continue;
+      var val = row[c];
       if (h.indexOf('last') >= 0 && h.indexOf('avg') >= 0) {
-        totalDDAvg = val;
-      } else if (h) {
-        totalDDDates.push({ label: headers[c], value: val });
+        totalDDAvg = _fmtDollar_(val);
+        break;
+      }
+      // Only include date-like headers
+      var testDate = new Date(headers[c]);
+      if (headers[c].match(/\d{1,2}\/\d{1,2}\/\d{2,4}/) || (testDate.getFullYear() > 2000 && testDate.getFullYear() < 2030)) {
+        totalDDDates.push({ label: _fmtShortDate_(headers[c]), value: _fmtDollar_(val) });
       }
     }
   }
