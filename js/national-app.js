@@ -5211,9 +5211,12 @@ const NationalApp = {
             mfHtml = `
               <div class="coaching-section" style="flex:1;min-width:0;">
                 <div class="coaching-label" style="font-size:13px;">Market Fulfillment</div>
-                <table style="width:100%;font-size:11px;border-collapse:collapse;">
+                <div style="overflow-x:auto;">
+                <table style="width:100%;font-size:11px;border-collapse:collapse;white-space:nowrap;">
                   <thead><tr style="border-bottom:1px solid rgba(0,0,0,0.1);">
                     <th style="text-align:left;padding:3px 4px;font-size:10px;color:var(--silver);">DMA</th>
+                    <th class="num" style="padding:3px 4px;font-size:10px;color:var(--silver);">Workable</th>
+                    <th class="num" style="padding:3px 4px;font-size:10px;color:var(--silver);">Total</th>
                     <th class="num" style="padding:3px 4px;font-size:10px;color:var(--silver);">Pen %</th>
                     <th class="num" style="padding:3px 4px;font-size:10px;color:var(--silver);">Wkly</th>
                     <th class="num" style="padding:3px 4px;font-size:10px;color:var(--silver);">CRU</th>
@@ -5221,7 +5224,9 @@ const NationalApp = {
                   </tr></thead>
                   <tbody>
                     ${mf.map(m => `<tr>
-                      <td style="padding:2px 4px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${this._esc(m.dma)}">${this._esc(m.dma.length > 20 ? m.dma.substring(0, 18) + '…' : m.dma)}</td>
+                      <td style="padding:2px 4px;max-width:160px;overflow:hidden;text-overflow:ellipsis;" title="${this._esc(m.dma)}">${this._esc(m.dma.length > 25 ? m.dma.substring(0, 23) + '…' : m.dma)}</td>
+                      <td class="num" style="padding:2px 4px;">${m.totalWorkable}</td>
+                      <td class="num" style="padding:2px 4px;">${m.total}</td>
                       <td class="num" style="padding:2px 4px;">${m.penRate}</td>
                       <td class="num" style="padding:2px 4px;">${m.weeklyTotal}</td>
                       <td class="num" style="padding:2px 4px;">${m.weeklyCRU}</td>
@@ -5229,6 +5234,7 @@ const NationalApp = {
                     </tr>`).join('')}
                   </tbody>
                 </table>
+                </div>
               </div>`;
           }
 
