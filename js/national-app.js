@@ -57,7 +57,8 @@ const NationalApp = {
     'rogers':          'references/logos/logo-rogers.png',
     'truconnect':      'references/logos/logo-truconnect.png',
     'verizon':         'references/logos/logo-verizon.png',
-    'verizon-fios':    'references/logos/logo-verizon.png'
+    'verizon-fios':    'references/logos/logo-verizon.png',
+    'box-energy':      'references/logos/logo-box-energy.png'
   },
 
   state: {
@@ -683,30 +684,6 @@ const NationalApp = {
     }
   },
 
-  // ── Fetch B2B headcount/production from local _B2B_Headcount tab ──
-  async _fetchB2BHeadcount() {
-    const url = NATIONAL_CONFIG.appsScriptUrl +
-      '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
-      '&action=b2bHeadcount' +
-      '&_t=' + Date.now();
-    const resp = await fetch(url);
-    const result = await resp.json();
-    if (result.error) throw new Error(result.error);
-    return result;
-  },
-
-  // ── Fetch NDS headcount from local _NDS_Headcount tab ──
-  async _fetchNDSHeadcount() {
-    const url = NATIONAL_CONFIG.appsScriptUrl +
-      '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
-      '&action=ndsHeadcount' +
-      '&_t=' + Date.now();
-    const resp = await fetch(url);
-    const result = await resp.json();
-    if (result.error) throw new Error(result.error);
-    return result;
-  },
-
   // ── Fetch NDS production/sales from NDS One-on-Ones sheet ──
   async _fetchNDSProduction() {
     const url = NATIONAL_CONFIG.appsScriptUrl +
@@ -837,68 +814,6 @@ const NationalApp = {
     }
   },
 
-  // ── Fetch B2B production/sales data from local _B2B_Production tab ──
-  async _fetchB2BProduction() {
-    const url = NATIONAL_CONFIG.appsScriptUrl +
-      '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
-      '&action=b2bProduction' +
-      '&_t=' + Date.now();
-    const resp = await fetch(url);
-    const result = await resp.json();
-    if (result.error) throw new Error(result.error);
-    return result;
-  },
-
-  // ── Enrich B2B owners with NLR production/sales data ──
-  _enrichOwnersWithProduction(prodOwners) {
-    // Build lowercase lookup of production tab names
-    const prodKeys = Object.keys(prodOwners);
-    const prodLower = {};
-    for (const key of prodKeys) {
-      prodLower[key.toLowerCase()] = key;
-    }
-
-    let matched = 0;
-    for (const owner of this.state.owners) {
-      const ownerLc = owner.name.toLowerCase().trim();
-
-      // Try exact match first
-      let prodKey = prodLower[ownerLc];
-
-      // Try starts-with
-      if (!prodKey) {
-        for (const lc in prodLower) {
-          if (lc.startsWith(ownerLc) || ownerLc.startsWith(lc)) {
-            prodKey = prodLower[lc];
-            break;
-          }
-        }
-      }
-
-      // Try contains
-      if (!prodKey) {
-        for (const lc in prodLower) {
-          if (lc.indexOf(ownerLc) >= 0 || ownerLc.indexOf(lc) >= 0) {
-            prodKey = prodLower[lc];
-            break;
-          }
-        }
-      }
-
-      if (!prodKey) continue;
-
-      const prod = prodOwners[prodKey];
-      if (prod.summary) {
-        owner.sales.summary = prod.summary;
-      }
-      if (prod.reps && prod.reps.length) {
-        owner.sales.reps = prod.reps;
-      }
-      matched++;
-    }
-    console.log('[NationalApp] Production enrichment: matched', matched, 'of', this.state.owners.length, 'owners');
-  },
-
   // ── Fetch D2D Residential ranking from _D2D_Res_Ranking tab ──
   async _fetchD2DResRanking() {
     const url = NATIONAL_CONFIG.appsScriptUrl +
@@ -1015,151 +930,6 @@ const NationalApp = {
       matched++;
     }
     console.log('[NationalApp] Indeed costs enrichment: matched', matched, 'of', this.state.owners.length, 'owners');
-  },
-
-  // ── Import NLR headcount data into local sheet (one-time sync) ──
-  async importNLRHeadcount() {
-    const btn = document.getElementById('btn-import-nlr');
-    if (btn) { btn.disabled = true; btn.textContent = 'Importing...'; }
-
-    try {
-      const resp = await fetch(NATIONAL_CONFIG.appsScriptUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          key: NATIONAL_CONFIG.apiKey,
-          action: 'importNLRHeadcount'
-        })
-      });
-      const result = await resp.json();
-      if (result.error) throw new Error(result.error);
-
-      console.log('[NationalApp] NLR import complete:', result);
-      if (btn) { btn.textContent = `Imported ${result.ownersImported} owners (${result.rowsWritten} rows)`; }
-
-      // Reload to pick up the freshly imported data
-      await this.loadCampaignData(this.state.campaign);
-      this.renderDashboard();
-    } catch (err) {
-      console.error('[NationalApp] NLR import failed:', err);
-      if (btn) { btn.disabled = false; btn.textContent = 'Import Failed — Retry'; }
-    }
-  },
-
-  // ── Enrich B2B owners with NLR headcount/production data ──
-  // Uses fuzzy name matching: NLR tabs have full names (e.g., "Alex Badawi"),
-  // while recruiting data may have short names (e.g., "Jay T", "Mason").
-  // Match by: exact match → starts-with → contains (case-insensitive).
-  _enrichOwnersWithNLR(nlrOwners) {
-    // Build lowercase lookup of NLR tab names
-    const nlrKeys = Object.keys(nlrOwners);
-    const nlrLower = {};
-    for (const key of nlrKeys) {
-      nlrLower[key.toLowerCase()] = key;
-    }
-
-    let matched = 0;
-    for (const owner of this.state.owners) {
-      const ownerLc = owner.name.toLowerCase().trim();
-
-      // Try exact match first
-      let nlrKey = nlrLower[ownerLc];
-
-      // Try starts-with: NLR "Justin Wood" starts with recruiting "Justin"
-      if (!nlrKey) {
-        for (const lc in nlrLower) {
-          if (lc.startsWith(ownerLc) || ownerLc.startsWith(lc)) {
-            nlrKey = nlrLower[lc];
-            break;
-          }
-        }
-      }
-
-      // Try contains: recruiting "Nigel Gil" contained in NLR "Nigel Gilbert"
-      if (!nlrKey) {
-        for (const lc in nlrLower) {
-          if (lc.indexOf(ownerLc) >= 0 || ownerLc.indexOf(lc) >= 0) {
-            nlrKey = nlrLower[lc];
-            break;
-          }
-        }
-      }
-
-      if (!nlrKey) continue;
-
-      // Store the matched sheet name for write-back
-      owner._sheetName = nlrKey;
-
-      const nlr = nlrOwners[nlrKey];
-
-      // Set current headcount from latest row
-      owner.headcount.active = nlr.current.active || 0;
-      owner.headcount.leaders = nlr.current.leaders || 0;
-      owner.headcount.training = nlr.current.training || 0;
-
-      // Tie leader headcount to recruiting tab leader count
-      if (owner.headcount.leaders && owner.recruiting) {
-        owner.recruiting.leaders = owner.headcount.leaders;
-        if (owner.recruiting.rows.length) {
-          const actuals = owner.recruiting.rows.map(r => r.values);
-          owner.recruiting.rows = this._buildRows(owner.headcount.leaders, actuals);
-        }
-      }
-
-      // Set current production from latest row (per-category breakdown)
-      // BUT skip if the newest consolidated week has no production — that means
-      // the coach needs to manually enter it, and we shouldn't override with NLR data
-      if (!owner._newestWeekMissingProd) {
-        const prod = nlr.current.production;
-        if (prod && typeof prod === 'object') {
-          let totalP = 0, totalG = 0;
-          for (const pName in prod) {
-            owner.production.products[pName] = {
-              actual: prod[pName].production || 0,
-              goal: prod[pName].goals || 0
-            };
-            totalP += prod[pName].production || 0;
-            totalG += prod[pName].goals || 0;
-          }
-          owner.production.totalActual = totalP;
-          owner.production.totalGoal = totalG;
-        } else {
-          // Fallback: single total (backward compat)
-          owner.production.totalActual = nlr.current.productionLW || 0;
-          owner.production.totalGoal = nlr.current.productionGoals || 0;
-        }
-      }
-
-      // Build headcount history from ALL trend rows
-      owner.headcountHistory = (nlr.trend || []).map(row => ({
-        date: row.date,
-        active: row.active,
-        leaders: row.leaders,
-        training: row.training
-      }));
-
-      // Build production history from ALL trend rows with per-product data
-      owner.productionHistory = (nlr.trend || []).map(row => {
-        const entry = {
-          date: row.date,
-          tA: row.productionLW || 0,
-          tG: row.productionGoals || 0,
-          products: {}
-        };
-        if (row.production && typeof row.production === 'object') {
-          for (const pName in row.production) {
-            entry.products[pName] = {
-              actual: row.production[pName].production || 0,
-              goal: row.production[pName].goals || 0
-            };
-          }
-        }
-        return entry;
-      });
-
-      matched++;
-    }
-    console.log('[NationalApp] NLR headcount enrichment: matched', matched, 'of', this.state.owners.length, 'owners');
   },
 
   // ── Map online presence businesses to owners ──
@@ -2328,14 +2098,27 @@ const NationalApp = {
       }
     }
 
-    // Clear all caches and reload
+    // Clear all caches and reload ALL campaigns (not just one)
     this._allCampaignsData = null;
     this._clearAllCoachCaches();
     this._coachInitDone = false;
+    this._prefetchingRemaining = false;  // allow prefetch to fire again
 
     try {
-      await this.loadCampaignData('att-b2b');
-    } catch (e) { /* landing page will show whatever loaded */ }
+      // Fetch all campaigns in one call (no campaign filter = returns all)
+      const url = NATIONAL_CONFIG.appsScriptUrl +
+        '?key=' + encodeURIComponent(NATIONAL_CONFIG.apiKey) +
+        '&action=recruiting&weeks=0&bustCache=true&_t=' + Date.now();
+      const resp = await fetch(url);
+      const result = await resp.json();
+      if (result.campaigns) {
+        this._allCampaignsData = result.campaigns;
+        this._populateCampaignSelector(this._allCampaignsData);
+        try { localStorage.setItem('od_data_cache', JSON.stringify({ campaigns: this._allCampaignsData })); } catch (e) {}
+      }
+    } catch (e) {
+      console.warn('[NationalApp] Post-refresh reload failed:', e.message);
+    }
 
     this._showLandingPage();
 
