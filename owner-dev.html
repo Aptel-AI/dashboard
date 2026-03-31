@@ -55,6 +55,10 @@
   <img src="references/logos/aptel-full-black.png" alt="Aptel" style="height:40px;width:auto;opacity:0.85">
   <div class="loading-spinner"></div>
   <div id="loading-text" style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#708090">Loading owner data...</div>
+  <div id="loading-retry-area" style="display:none;margin-top:20px;text-align:center;">
+    <div style="font-size:12px;color:#a0aab4;margin-bottom:10px;">Taking longer than expected…</div>
+    <button onclick="NationalApp._retryLoad()" style="padding:8px 20px;font-size:13px;font-weight:600;border:none;border-radius:6px;background:#3a7bd5;color:#fff;cursor:pointer;letter-spacing:0.5px;">Retry</button>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
@@ -386,7 +390,7 @@
      ═══════════════════════════════════════════════════════ -->
 <script src="js/owner-dev-config.js?v=4"></script>
 <script src="js/national-config.js?v=17"></script>
-<script src="js/national-app.js?v=176"></script>
+<script src="js/national-app.js?v=177"></script>
 <script src="js/owner-dev-app.js?v=22"></script>
 
 </body>

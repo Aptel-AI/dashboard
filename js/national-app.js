@@ -6456,16 +6456,39 @@ const NationalApp = {
     return 'grade-f';
   },
 
+  _loadingRetryTimer: null,
+
   _showLoading(msg) {
     const s = document.getElementById('loading-screen');
     const t = document.getElementById('loading-text');
+    const r = document.getElementById('loading-retry-area');
     if (s) s.style.display = 'flex';
     if (t && msg) t.textContent = msg;
+    if (r) r.style.display = 'none';
+    clearTimeout(this._loadingRetryTimer);
+    this._loadingRetryTimer = setTimeout(() => {
+      const ra = document.getElementById('loading-retry-area');
+      if (ra) ra.style.display = 'block';
+    }, 12000);
   },
 
   _hideLoading() {
     const s = document.getElementById('loading-screen');
+    const r = document.getElementById('loading-retry-area');
     if (s) s.style.display = 'none';
+    if (r) r.style.display = 'none';
+    clearTimeout(this._loadingRetryTimer);
+  },
+
+  _retryLoad() {
+    this._coachInitDone = false;
+    this._allCampaignsData = null;
+    this._prefetchingActive = false;
+    this._prefetchingRemaining = false;
+    const session = typeof OwnerDev !== 'undefined' && OwnerDev.state
+      ? { email: OwnerDev.state.session.email, name: OwnerDev.state.session.name, campaign: null }
+      : this.state.session;
+    this.initCoachView(session || {});
   }
 };
 
