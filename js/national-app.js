@@ -1555,7 +1555,7 @@ const NationalApp = {
   // ── Build recruiting rows from leader count + actuals arrays ──
   _buildRows(leaders, actuals) {
     const projected = this._calcProjected(leaders);
-    return this.RECRUITING_LABELS.map((def, i) => {
+    const rows = this.RECRUITING_LABELS.map((def, i) => {
       const vals = actuals[i] || [];
       const p = projected[i];
       let total;
@@ -1567,6 +1567,20 @@ const NationalApp = {
       }
       return { label: def.label, projected: p, values: vals, total, isRate: def.isRate };
     });
+
+    // Row 5 (% Call List Booked) is always derived: 1st Rounds Booked / Sent to List
+    // per-week values
+    const sentVals   = actuals[1] || [];
+    const bookedVals = actuals[2] || [];
+    const perWeek = sentVals.map((s, wi) => {
+      const b = bookedVals[wi] || 0;
+      return (s > 0) ? Math.round((b / s) * 100) : 0;
+    });
+    const nonZero = perWeek.filter(v => v > 0);
+    const derivedTotal = nonZero.length ? Math.round(nonZero.reduce((a, b) => a + b, 0) / nonZero.length) : 0;
+    rows[5] = { ...rows[5], values: perWeek, total: derivedTotal };
+
+    return rows;
   },
 
   // ── [REMOVED] _loadScaffoldData — hardcoded demo data for 7 test owners removed ──
