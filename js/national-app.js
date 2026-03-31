@@ -2302,7 +2302,7 @@ const NationalApp = {
         ? `<span class="owner-rank-badge${rankCls}" title="#${o.d2dRank} — ${_prodLabel}">#${o.d2dRank}</span>`
         : '';
       return `
-        <div class="owner-card${cardCls}" data-owner="${this._esc(o.name)}" onclick="NationalApp.openOwnerDetail(this.dataset.owner)"
+        <div class="owner-card${cardCls}" data-owner="${this._esc(o.name).replace(/"/g, '&quot;')}" onclick="NationalApp.openOwnerDetail(this.dataset.owner)"
           ${rankBadge}
           <span class="owner-card-name">${this._esc(o.name)}</span>
           <span class="owner-card-arrow">→</span>
