@@ -18,7 +18,7 @@ var OD_CAMPAIGNS = {
   'leafguard':       { label: 'LeafGuard',          sheetId: '10Fy5XFWCuBmDwvpl4PG4FJT4krwX2ZqN12ARvQLpSuM', ownerSource: 'tabs', excludeTabs: ['Blank Copy'] },
   'lumen':           { label: 'Lumen',              sheetId: '1P4DYlcV1hgNkaAapk3tWD7ytcRXw4K1n7R6EMKPCoSA', sourceTab: 'Campaign', sectionHeader: 'LUMEN' },
   'att-b2b':         { label: 'AT&T B2B',           sheetId: '1sxauFjNjq4_rRYM2PAl5cyOyHF3Hg4OkO-t_hLKDJB8', ownerSource: 'visible-tabs', excludeTabs: ["B2B Enery 1:1's", "B2B Energy 1:1's"] },
-  'box-energy':      { label: 'Box Energy',          sheetId: '1_PVzLcmlo6EzySNRfah-r-NLka3IthxzLZb4TjrDgtE', ownerSource: 'visible-tabs' }
+  'box-energy':      { label: 'Box Energy',          sheetId: '1_PVzLcmlo6EzySNRfah-r-NLka3IthxzLZb4TjrDgtE', ownerSource: 'visible-tabs', hidden: true }
 };
 var OD_NLR_FOLDER = '1hARjh3UH48CWhbYrYBJxFVwgynxapCjG';
 
@@ -4452,7 +4452,7 @@ function odResolveVisibleCampaigns(email, role) {
     var accessMap = {};
     for (var i = 0; i < ownershipRows.length; i++) {
       var ck = String(ownershipRows[i].campaign || '').trim();
-      if (ck) {
+      if (ck && !(OD_CAMPAIGNS[ck] && OD_CAMPAIGNS[ck].hidden)) {
         allCampaigns.push(ck);
         accessMap[ck] = role === 'superadmin' ? 'edit' : 'view';
       }
@@ -4553,6 +4553,11 @@ function odResolveVisibleCampaigns(email, role) {
         accessMap[gck] = glevel;
       }
     }
+  }
+
+  // Filter out campaigns marked hidden in OD_CAMPAIGNS config
+  for (var hk in accessMap) {
+    if (OD_CAMPAIGNS[hk] && OD_CAMPAIGNS[hk].hidden) delete accessMap[hk];
   }
 
   var visible = Object.keys(accessMap);

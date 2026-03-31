@@ -28,7 +28,7 @@ const OD_CONFIG = {
     'leafguard':       { label: 'Leafguard',          sheetId: '10Fy5XFWCuBmDwvpl4PG4FJT4krwX2ZqN12ARvQLpSuM' },
     'lumen':           { label: 'Lumen',              sheetId: '1P4DYlcV1hgNkaAapk3tWD7ytcRXw4K1n7R6EMKPCoSA' },
     'att-b2b':         { label: 'AT&T B2B',           sheetId: '1sxauFjNjq4_rRYM2PAl5cyOyHF3Hg4OkO-t_hLKDJB8' },
-    'box-energy':      { label: 'Box Energy',          sheetId: '1_PVzLcmlo6EzySNRfah-r-NLka3IthxzLZb4TjrDgtE' }
+    'box-energy':      { label: 'Box Energy',          sheetId: '1_PVzLcmlo6EzySNRfah-r-NLka3IthxzLZb4TjrDgtE', hidden: true }
   },
 
   // ── Roles ──
