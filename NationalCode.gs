@@ -8221,3 +8221,45 @@ function TEST_joey_ramirez() {
       + ' owner=' + merged[m][1]);
   }
 }
+
+// ── Diagnostic: compare column B (Total Volume) vs product breakdown sum for all B2B owners ──
+// Read-only. Run from Apps Script editor to check if totalVol = internet+voip+wireless+air.
+function TEST_b2b_volume_alignment() {
+  var ss = SpreadsheetApp.openById(SHEETS.NATIONAL);
+  var tab = ss.getSheetByName('B2B Sales Metrics');
+  if (!tab) { Logger.log('❌ B2B Sales Metrics tab not found'); return; }
+
+  var data = tab.getDataRange().getValues();
+  if (data.length < 2) { Logger.log('❌ No data'); return; }
+
+  var headers = data[0].map(function(h) { return String(h).trim(); });
+  var colName    = headers.indexOf('Name');
+  var colTV      = headers.indexOf('Total Volume');
+  var colInternet = headers.indexOf('Internet');
+  var colVOIP    = headers.indexOf('VOIP');
+  var colWireless = headers.indexOf('Wireless');
+  var colAIR     = headers.indexOf('AIR/AWB');
+
+  Logger.log('Columns — Name:' + colName + ' TV:' + colTV + ' Internet:' + colInternet
+    + ' VOIP:' + colVOIP + ' Wireless:' + colWireless + ' AIR:' + colAIR);
+
+  var mismatches = 0;
+  for (var i = 1; i < data.length; i++) {
+    var name = String(data[i][colName] || '').trim();
+    if (!name || name.charAt(0) === ' ') continue; // skip rep rows (indented) and blanks
+    var tv       = Number(data[i][colTV])      || 0;
+    var internet = Number(data[i][colInternet]) || 0;
+    var voip     = Number(data[i][colVOIP])     || 0;
+    var wireless = Number(data[i][colWireless]) || 0;
+    var air      = Number(data[i][colAIR])      || 0;
+    var breakdown = internet + voip + wireless + air;
+    var diff = tv - breakdown;
+    var status = diff === 0 ? '✅' : '❌ diff=' + diff;
+    Logger.log(status + '  ' + name + ':  TV=' + tv
+      + '  internet=' + internet + '  voip=' + voip
+      + '  wireless=' + wireless + '  air=' + air
+      + '  breakdown_sum=' + breakdown);
+    if (diff !== 0) mismatches++;
+  }
+  Logger.log('--- ' + mismatches + ' mismatches out of ' + (data.length - 1) + ' owner rows ---');
+}
