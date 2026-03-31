@@ -5223,6 +5223,7 @@ const NationalApp = {
                 <tbody>${mcoeRows}</tbody>
               </table>
             </div>`;
+        }
       } else {
         summaryEl.innerHTML = `
           <div class="coaching-section">
