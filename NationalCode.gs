@@ -3850,8 +3850,16 @@ function readB2BOwnerSales(ownerName) {
     }
   }
 
-  // Read Market Fulfillment and Average Paychecks from owner's source tab
+  // Read Market Fulfillment from the consolidated "B2B Market Fulfillment" tab
+  // (written weekly by fetch-fulfillment.js from the forwarded Fulfillment email)
   var marketFulfillment = null;
+  try {
+    marketFulfillment = _readMarketFulfillmentForOwner_(ownerName);
+  } catch (e) {
+    Logger.log('readB2BOwnerSales: market fulfillment read failed: ' + e.message);
+  }
+
+  // Average Paychecks still comes from the owner's source tab
   var avgPaychecks = null;
   try {
     if (!srcSS) srcSS = SpreadsheetApp.openById(OD_CAMPAIGNS['att-b2b'].sheetId);
@@ -3860,11 +3868,10 @@ function readB2BOwnerSales(ownerName) {
       var range = ownerTab.getDataRange();
       var srcData = range.getValues();
       var srcDisplay = range.getDisplayValues();
-      marketFulfillment = _extractMarketFulfillment_(srcData, ownerName, srcDisplay);
       avgPaychecks = _extractAvgPaychecks_(srcData, srcDisplay);
     }
   } catch (e) {
-    Logger.log('readB2BOwnerSales: source tab read failed: ' + e.message);
+    Logger.log('readB2BOwnerSales: avg paychecks read failed: ' + e.message);
   }
 
   return {
@@ -3974,6 +3981,74 @@ function _findOwnerTab_(ss, ownerName) {
     if (tabLower.indexOf(ownerLower) >= 0 || ownerLower.indexOf(tabLower) >= 0) return sheets[i];
   }
   return null;
+}
+
+/**
+ * Read Market Fulfillment rows for a given owner from the consolidated
+ * "B2B Market Fulfillment" tab in the National sheet (written by fetch-fulfillment.js).
+ * Returns the same structure as _extractMarketFulfillment_ so the frontend is unchanged.
+ */
+function _readMarketFulfillmentForOwner_(ownerName) {
+  var ss  = SpreadsheetApp.openById(SHEETS.NATIONAL);
+  var tab = ss.getSheetByName('B2B Market Fulfillment');
+  if (!tab) {
+    Logger.log('_readMarketFulfillmentForOwner_: tab not found');
+    return null;
+  }
+
+  var data = tab.getDataRange().getValues();
+  if (data.length < 2) return null;
+
+  var headers = data[0].map(function(h) { return String(h || '').trim(); });
+
+  // Map column indices from headers
+  var colOwner = -1, colDMA = -1, colWorkable = -1, colTotal = -1;
+  var colPen = -1, colWeeklyTotal = -1, colWeeklyCRU = -1;
+  var dateCols = []; // { idx, label }
+
+  for (var c = 0; c < headers.length; c++) {
+    var h = headers[c].toLowerCase();
+    if (h.indexOf('owner') >= 0 && colOwner < 0)              colOwner      = c;
+    else if (h.indexOf('dma') >= 0)                            colDMA        = c;
+    else if (h.indexOf('total workable') >= 0)                 colWorkable   = c;
+    else if (h.indexOf('total assigned') >= 0)                 colTotal      = c;
+    else if (h.indexOf('pen %') >= 0 || h.indexOf('pen%') >= 0) colPen      = c;
+    else if (h.indexOf('weekly total') >= 0)                   colWeeklyTotal = c;
+    else if (h.indexOf('weekly cru') >= 0)                     colWeeklyCRU  = c;
+    else if (h.match(/^\d{1,2}\/\d{1,2}/))                    dateCols.push({ idx: c, label: headers[c] });
+    else if (h.indexOf('4 wk avg') >= 0 || h.indexOf('4wk avg') >= 0) dateCols.push({ idx: c, label: '4 Wk Avg' });
+    else if (h.indexOf('last wk') >= 0 || h.indexOf('last week') >= 0) dateCols.push({ idx: c, label: 'Last Wk' });
+  }
+
+  if (colOwner < 0 || colDMA < 0) {
+    Logger.log('_readMarketFulfillmentForOwner_: could not find Owner/DMA columns');
+    return null;
+  }
+
+  var ownerLower = ownerName.toLowerCase().trim();
+  var markets = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var rowOwner = String(data[i][colOwner] || '').trim().toLowerCase();
+    if (rowOwner !== ownerLower) continue;
+
+    var market = {
+      dma:         colDMA         >= 0 ? String(data[i][colDMA]         || '').trim() : '',
+      totalWorkable: colWorkable   >= 0 ? String(data[i][colWorkable]    || '').trim() : '',
+      total:       colTotal        >= 0 ? String(data[i][colTotal]       || '').trim() : '',
+      penRate:     colPen          >= 0 ? String(data[i][colPen]         || '').trim() : '',
+      weeklyTotal: colWeeklyTotal  >= 0 ? String(data[i][colWeeklyTotal] || '').trim() : '',
+      weeklyCRU:   colWeeklyCRU   >= 0 ? String(data[i][colWeeklyCRU]   || '').trim() : '',
+      weeks: []
+    };
+    for (var d = 0; d < dateCols.length; d++) {
+      market.weeks.push({ label: dateCols[d].label, value: String(data[i][dateCols[d].idx] || '').trim() });
+    }
+    markets.push(market);
+  }
+
+  Logger.log('_readMarketFulfillmentForOwner_: ' + ownerName + ' → ' + markets.length + ' markets');
+  return markets.length > 0 ? markets : null;
 }
 
 /** Extract Market Fulfillment section from owner tab data + display data */
