@@ -276,7 +276,7 @@ const OwnerDevTools = {
       'sent to call list', 'manual apps entry', 'no answers',
       'left message one', 'left message two', 'left message three',
       'removed from call list', 'administrative booking data',
-      'interviews booked', 'ai messaging', 'retention call list',
+      'interviews booked', 'retention call list',
       'total daily bob', 'second interviews booked',
       'total first interviews', 'first interviews showed up',
       'cancel first interview', 'retention first interviews',
@@ -315,15 +315,13 @@ const OwnerDevTools = {
       const labelLower = label.toLowerCase();
       const isKnownCategory = KNOWN_CATEGORIES.some(k => labelLower.startsWith(k));
 
-      // Category detection: known label OR first cell has values across most columns
-      const hasFullSpread = values.filter((v, idx) => idx < 7 && v !== 0).length >= 3;
-
-      if (isKnownCategory || (hasFullSpread && !currentCategory)) {
+      if (isKnownCategory) {
+        // Definitely a category row
         currentCategory = label;
         result.categories[label] = { values, subs: {} };
         result.categoryOrder.push(label);
       } else if (currentCategory) {
-        // Sub-row under current category
+        // Sub-row under current category (person names, AI Messaging, etc.)
         result.categories[currentCategory].subs[label] = { values };
       } else {
         // No current category yet — treat as category
