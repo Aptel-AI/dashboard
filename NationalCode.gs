@@ -469,6 +469,9 @@ function doPost(e) {
       case 'odSaveOfficeId':
         result = odSaveOfficeId(body);
         break;
+      case 'odDeleteOfficeId':
+        result = odDeleteOfficeId(body);
+        break;
       default:
         result = { error: 'unknown action: ' + body.action };
     }
@@ -5111,6 +5114,27 @@ function odSaveOfficeId(body) {
   // New entry
   sheet.appendRow([officeNumber, ownerName, email, now]);
   return { success: true, updated: false, officeNumber: officeNumber, ownerName: ownerName };
+}
+
+/**
+ * action=odDeleteOfficeId (POST)
+ * Delete an office number mapping from _OD_Office_IDs.
+ * Body: { officeNumber }
+ */
+function odDeleteOfficeId(body) {
+  var officeNumber = String(body.officeNumber || '').trim();
+  if (!officeNumber) return { error: 'Missing officeNumber' };
+
+  var sheet = odGetOrCreateTab('_OD_Office_IDs', ['officeNumber', 'ownerName', 'updatedBy', 'updatedAt']);
+  var data = sheet.getDataRange().getValues();
+
+  for (var r = 1; r < data.length; r++) {
+    if (String(data[r][0]).trim() === officeNumber) {
+      sheet.deleteRow(r + 1);
+      return { success: true, deleted: officeNumber };
+    }
+  }
+  return { success: true, deleted: null };
 }
 
 /**

@@ -14,6 +14,7 @@ const OwnerDevTools = {
   _officeMappings: {},   // { officeNumber: ownerName } — from server
   _outputRows: [],       // accumulated rows for current session
   _loading: false,
+  _editingMappings: false,
 
   // ── localStorage keys (session rows + mode only) ──
   _LS_ROWS_KEY: 'asrf_session_rows',
@@ -118,7 +119,10 @@ const OwnerDevTools = {
       <div class="tools-card">
         <div class="tools-card-header">
           <h3>Saved Office Mappings</h3>
-          <button class="tools-btn tools-btn-icon" id="asrf-refresh-btn" title="Refresh from server">&#x21bb;</button>
+          <div style="display:flex;gap:6px">
+            <button class="tools-btn tools-btn-icon" id="asrf-edit-mappings-btn" title="Edit mappings">&#x270E;</button>
+            <button class="tools-btn tools-btn-icon" id="asrf-refresh-btn" title="Refresh from server">&#x21bb;</button>
+          </div>
         </div>
         <div id="asrf-office-tags" class="tools-office-tags">
           <span class="tools-muted">Loading...</span>
@@ -186,6 +190,9 @@ const OwnerDevTools = {
 
     // Refresh office mappings
     document.getElementById('asrf-refresh-btn').addEventListener('click', () => this._fetchOfficeIds());
+
+    // Edit office mappings
+    document.getElementById('asrf-edit-mappings-btn').addEventListener('click', () => this._toggleEditMappings());
 
     // Prompt overlay
     document.getElementById('asrf-prompt-cancel').addEventListener('click', () => {
@@ -508,11 +515,73 @@ const OwnerDevTools = {
       return;
     }
 
-    container.innerHTML = entries
-      .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
-      .map(([num, name]) =>
+    const sorted = entries.sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
+
+    if (this._editingMappings) {
+      container.innerHTML = sorted.map(([num, name]) =>
+        `<div class="tools-office-edit-row" data-office="${this._escHtml(num)}">
+          <span class="tools-office-tag-num">#${this._escHtml(num)}</span>
+          <input type="text" class="tools-input tools-edit-name-input" value="${this._escHtml(name)}" data-office="${this._escHtml(num)}">
+          <button class="tools-btn-inline tools-btn-save-mapping" data-office="${this._escHtml(num)}" title="Save">&#x2713;</button>
+          <button class="tools-btn-inline tools-btn-delete-mapping" data-office="${this._escHtml(num)}" title="Delete">&times;</button>
+        </div>`
+      ).join('');
+
+      // Bind edit row events
+      container.querySelectorAll('.tools-btn-save-mapping').forEach(btn => {
+        btn.addEventListener('click', () => this._onSaveMapping(btn.dataset.office));
+      });
+      container.querySelectorAll('.tools-btn-delete-mapping').forEach(btn => {
+        btn.addEventListener('click', () => this._onDeleteMapping(btn.dataset.office));
+      });
+      container.querySelectorAll('.tools-edit-name-input').forEach(input => {
+        input.addEventListener('keydown', e => {
+          if (e.key === 'Enter') this._onSaveMapping(input.dataset.office);
+        });
+      });
+    } else {
+      container.innerHTML = sorted.map(([num, name]) =>
         `<span class="tools-office-tag">#${this._escHtml(num)} &rarr; ${this._escHtml(name)}</span>`
       ).join('');
+    }
+  },
+
+  _toggleEditMappings() {
+    this._editingMappings = !this._editingMappings;
+    const btn = document.getElementById('asrf-edit-mappings-btn');
+    if (btn) btn.classList.toggle('active', this._editingMappings);
+    this._renderOfficeTags();
+  },
+
+  async _onSaveMapping(officeNum) {
+    const input = document.querySelector(`.tools-edit-name-input[data-office="${officeNum}"]`);
+    if (!input) return;
+    const newName = input.value.trim();
+    if (!newName) return this._toast('Name cannot be empty', 'error');
+
+    this._officeMappings[officeNum] = newName;
+    try {
+      const email = (typeof OwnerDev !== 'undefined' && OwnerDev.state.session)
+        ? OwnerDev.state.session.email : '';
+      await OwnerDev._post('odSaveOfficeId', { officeNumber: officeNum, ownerName: newName, email });
+      this._toast(`Updated Office #${officeNum}`, 'success');
+    } catch (err) {
+      console.warn('[ASRF] Failed to save:', err);
+    }
+    this._renderOfficeTags();
+  },
+
+  async _onDeleteMapping(officeNum) {
+    delete this._officeMappings[officeNum];
+    try {
+      const email = (typeof OwnerDev !== 'undefined' && OwnerDev.state.session)
+        ? OwnerDev.state.session.email : '';
+      await OwnerDev._post('odDeleteOfficeId', { officeNumber: officeNum, email });
+    } catch (err) {
+      console.warn('[ASRF] Failed to delete:', err);
+    }
+    this._toast(`Removed Office #${officeNum}`, 'info');
+    this._renderOfficeTags();
   },
 
 
