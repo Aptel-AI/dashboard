@@ -9,7 +9,7 @@ const OwnerDevTools = {
   // ── State ──
   _initialized: false,
   _mode: 'week',        // 'week' or 'day'
-  _selectedDay: 2,      // 0=Mon … 6=Sun (default Wed)
+  _selectedDay: 3,      // 0=Sun … 6=Sat (default Wed)
   _officeNumber: '',
   _officeMappings: {},   // { officeNumber: ownerName } — from server
   _outputRows: [],       // accumulated rows for current session
@@ -27,7 +27,7 @@ const OwnerDevTools = {
     'Retention (2nd)', 'New Starts Scheduled', 'New Starts Showed', 'New Starts Showed (Retention)'
   ],
 
-  DAY_LABELS: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+  DAY_LABELS: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
 
 
   // ══════════════════════════════════════════════════════
