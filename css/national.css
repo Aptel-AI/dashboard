@@ -2192,10 +2192,119 @@ td.cell-red    { background: #e53935 !important; color: #fff !important; font-we
   font-size: 12px;
 }
 
-/* Plan column color coding */
-.it-plan-skip { color: var(--gray-400); font-style: italic; }
-.it-plan-repost { color: var(--green); font-weight: 600; }
-.it-plan-paused { color: var(--orange); font-weight: 600; }
+/* ── Plan column color coding ── */
+.it-plan-maintain { color: #2e7d32; font-weight: 600; }
+.it-plan-repost { color: #1565c0; font-weight: 600; }
+.it-plan-repost-edit { color: #1565c0; font-weight: 600; }
+.it-plan-replace { color: #e65100; font-weight: 600; }
+.it-plan-edit { color: #f9a825; font-weight: 600; }
+.it-plan-budget { color: #7b1fa2; font-weight: 600; }
+.it-plan-close { color: var(--gray-400); font-style: italic; }
+
+/* ── Status badges ── */
+.it-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.it-status-live { background: #2e7d32; color: #fff; }
+.it-status-new { background: #4caf50; color: #fff; }
+.it-status-paused { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+.it-status-disabled { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
+.it-status-transparency { background: #ffe0b2; color: #e65100; border: 1px solid #ffcc80; }
+.it-status-review { background: #fff9c4; color: #856404; border: 1px solid #fff176; }
+.it-status-reserve { background: var(--gray-200); color: var(--gray-600); }
+
+/* ── Secondary KPI row (smaller) ── */
+.it-kpi-row-secondary .it-kpi-card {
+  min-width: 80px;
+  padding: 6px 10px;
+}
+.it-kpi-row-secondary .it-kpi-value { font-size: 16px; }
+.it-kpi-row-secondary .it-kpi-label { font-size: 9px; }
+
+/* ── Premium star indicator ── */
+.it-premium-star {
+  color: #f9a825;
+  font-size: 12px;
+  margin-right: 3px;
+  vertical-align: middle;
+}
+
+/* ── Lifecycle tooltip (on ad title hover) ── */
+.it-ad-title-cell {
+  position: relative;
+  max-width: 220px;
+}
+.it-ad-title-cell .it-ad-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  max-width: 180px;
+  vertical-align: middle;
+  cursor: default;
+}
+.it-lifecycle-tooltip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  z-index: 50;
+  background: var(--gray-900, #1a2332);
+  color: #fff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 11px;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  pointer-events: none;
+}
+.it-ad-title-cell:hover .it-lifecycle-tooltip {
+  display: block;
+}
+.it-tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+.it-tt-row span { color: rgba(255,255,255,0.6); }
+.it-tt-row strong { color: #fff; }
+
+/* ── Historic Ad Performance table ── */
+.it-history-wrap {
+  overflow-x: auto;
+  max-height: 480px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+.it-history-table { font-size: 12px; }
+.it-history-table th {
+  font-size: 10px;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--card-bg);
+}
+.it-history-table .it-ad-title {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Performance tier coloring */
+.it-perf-good td { background: rgba(76, 175, 80, 0.08) !important; }
+.it-perf-mid td { background: var(--card-bg) !important; }
+.it-perf-poor td { background: rgba(229, 57, 53, 0.06) !important; }
 
 /* Mobile responsive */
 @media (max-width: 768px) {
@@ -2203,4 +2312,6 @@ td.cell-red    { background: #e53935 !important; color: #fff !important; font-we
   .it-kpi-card { min-width: 80px; padding: 8px; }
   .it-kpi-value { font-size: 16px; }
   .it-ad-title { max-width: 120px; }
+  .it-status-badge { font-size: 8px; padding: 1px 5px; }
+  .it-lifecycle-tooltip { min-width: 160px; font-size: 10px; }
 }

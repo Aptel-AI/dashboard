@@ -283,6 +283,11 @@ function doGet(e) {
       return jsonResp(odGetNlrTabs(sheetId));
     }
 
+    // ── OD: One-time bulk auto-map nlrTab from starred (*) tabs ──
+    if (action === 'odAutoMapNlrTabs') {
+      return jsonResp(odAutoMapNlrTabs());
+    }
+
     // ── OD: Get office ID → owner name mappings ──
     if (action === 'odGetOfficeIds') {
       return jsonResp(odGetOfficeIds());
@@ -2044,151 +2049,211 @@ function readOwnerNlrData(ownerName, campaignFilter) {
     var data = tab.getDataRange().getValues();
     if (data.length < 2) return { mapped: true, owner: ownerName, trend: [] };
 
-    // Parse weekly sections: "WEEK OF X/XX" header, column headers, then data rows
-    var weeks = [];
-    var currentWeek = null;
-    var colHeaders = null;
+    // ── Parse flat table: row 1 = headers, rows 2+ = ad data grouped by Report Date ──
+    var headers = data[0].map(function(h) { return String(h || '').toLowerCase().trim(); });
 
-    for (var i = 0; i < data.length; i++) {
-      var cell0 = String(data[i][0] || '').trim();
-      var cell0Lower = cell0.toLowerCase();
-
-      // Detect week header rows
-      var dateMatch = cell0.match(/(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/);
-      if (cell0Lower.indexOf('week') >= 0 && dateMatch) {
-        if (currentWeek && currentWeek.rows.length > 0) weeks.push(currentWeek);
-        currentWeek = { date: dateMatch[1], rows: [], colHeaders: null };
-        colHeaders = null;
-        continue;
-      }
-
-      // Detect column header row — any row where multiple cells look like text headers
-      if (!colHeaders && currentWeek) {
-        var textCells = 0;
-        for (var tc = 0; tc < Math.min(data[i].length, 10); tc++) {
-          var v = String(data[i][tc] || '').trim();
-          if (v.length > 1 && isNaN(Number(v))) textCells++;
-        }
-        if (textCells >= 3) {
-          // Dedup headers: first "total spend" keeps its name, subsequent get "__2", "__3" etc.
-          // This prevents the rightmost running-total column from overwriting the per-ad spend.
-          var rawHeaders = data[i].map(function(h) { return String(h).toLowerCase().trim().replace(/[:\s]+$/, ''); });
-          var seen = {};
-          colHeaders = rawHeaders.map(function(h) {
-            if (!h) return h;
-            if (seen[h]) {
-              seen[h]++;
-              return h + '__' + seen[h]; // e.g. "total spend__2"
-            }
-            seen[h] = 1;
-            return h;
-          });
-          if (currentWeek) currentWeek.colHeaders = colHeaders;
-          continue;
+    // Build column index lookup (flexible matching)
+    function col(patterns) {
+      for (var ci = 0; ci < headers.length; ci++) {
+        for (var pi = 0; pi < patterns.length; pi++) {
+          if (headers[ci].indexOf(patterns[pi]) >= 0) return ci;
         }
       }
-
-      // Data row — check for any meaningful data, not just col A (merged cells leave it blank)
-      if (currentWeek && colHeaders) {
-        var hasData = false;
-        for (var dc = 0; dc < Math.min(colHeaders.length, 10); dc++) {
-          var dv = data[i][dc];
-          if (dv !== null && dv !== undefined && String(dv).trim() !== '') { hasData = true; break; }
-        }
-        if (hasData) {
-          var rowObj = {};
-          for (var c = 0; c < colHeaders.length; c++) {
-            if (colHeaders[c]) rowObj[colHeaders[c]] = data[i][c];
-          }
-          currentWeek.rows.push(rowObj);
-        }
-      }
+      return -1;
     }
-    if (currentWeek && currentWeek.rows.length > 0) weeks.push(currentWeek);
+    var C = {
+      reportDate:   col(['report date']),
+      status:       col(['status']),
+      postedBy:     col(['posted by']),
+      account:      col(['indeed account']),
+      adTitle:      col(['ad title']),
+      location:     col(['location']),
+      datePosted:   col(['date posted']),
+      totalSpend:   col(['total spend']),
+      totalApplies: col(['total applies']),
+      total2nds:    col(['2nd interview', '2nds']),
+      totalHired:   col(['total hired']),
+      lifetimeCpa:  col(['cpa']),
+      costPerHire:  col(['cost per hire']),
+      lifetimeCpns: col(['cpns']),
+      plan:         col(['plan']),
+      planDesc:     col(['plan description']),
+      dailyBudget:  col(['daily budget']),
+      premium:      col(['premium']),
+      spendWeek:    col(['spend this week']),
+      appliesWeek:  col(['applies this week']),
+      cpaWeek:      col(['cpa this week']),
+      pctTo2nd:     col(['% booked to 2nd']),
+      pctToHire:    col(['% booked to new start'])
+    };
 
-    // Merge same-date weeks (e.g. "WEEK 03/16" + "WEEK 03/16 (Phase 2)")
-    var mergedMap = {};
-    var mergedOrder = [];
-    for (var mi = 0; mi < weeks.length; mi++) {
-      var d = weeks[mi].date;
-      if (mergedMap[d]) {
-        mergedMap[d].rows = mergedMap[d].rows.concat(weeks[mi].rows);
-        // Keep the first phase's colHeaders (column structure is the same)
+    // Group rows by report date
+    var weekMap = {};   // dateKey → [adObjects]
+    var weekOrder = []; // insertion-order date keys
+    var allAds = [];    // flat list for adHistory computation
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+
+      // Determine report date
+      var rdRaw = C.reportDate >= 0 ? row[C.reportDate] : '';
+      if (!rdRaw) continue;
+      var dateKey = '';
+      if (rdRaw instanceof Date) {
+        dateKey = (rdRaw.getMonth() + 1) + '/' + rdRaw.getDate() + '/' + rdRaw.getFullYear();
       } else {
-        mergedMap[d] = { date: d, rows: weeks[mi].rows.slice(), colHeaders: weeks[mi].colHeaders };
-        mergedOrder.push(d);
+        dateKey = String(rdRaw).trim();
+        if (!dateKey) continue;
       }
-    }
-    weeks = mergedOrder.map(function(d) { return mergedMap[d]; });
 
-    // Aggregate each week + include individual ad rows for breakdown
+      var adTitle = C.adTitle >= 0 ? String(row[C.adTitle] || '').trim() : '';
+      var wkSpend = C.spendWeek >= 0 ? num(row[C.spendWeek]) : 0;
+      var wkApplies = C.appliesWeek >= 0 ? num(row[C.appliesWeek]) : 0;
+
+      // Skip empty rows
+      if (!adTitle && wkSpend === 0 && wkApplies === 0) continue;
+
+      var adObj = {
+        account:        C.account >= 0 ? String(row[C.account] || '').trim() : '',
+        adTitle:        adTitle,
+        location:       C.location >= 0 ? String(row[C.location] || '').trim() : '',
+        status:         C.status >= 0 ? String(row[C.status] || '').trim() : '',
+        plan:           C.plan >= 0 ? String(row[C.plan] || '').trim() : '',
+        planDescription:C.planDesc >= 0 ? String(row[C.planDesc] || '').trim() : '',
+        datePosted:     C.datePosted >= 0 ? (row[C.datePosted] instanceof Date ? (row[C.datePosted].getMonth()+1)+'/'+row[C.datePosted].getDate()+'/'+row[C.datePosted].getFullYear() : String(row[C.datePosted] || '').trim()) : '',
+        premium:        C.premium >= 0 ? String(row[C.premium] || '').trim().toLowerCase() === 'yes' : false,
+        dailyBudget:    C.dailyBudget >= 0 ? num(row[C.dailyBudget]) : 0,
+        // This-week figures
+        spend:          wkSpend,
+        applies:        wkApplies,
+        cpa:            C.cpaWeek >= 0 ? num(row[C.cpaWeek]) : (wkApplies > 0 ? Math.round(wkSpend / wkApplies * 100) / 100 : 0),
+        pctTo2nd:       C.pctTo2nd >= 0 ? num(row[C.pctTo2nd]) : 0,
+        pctToHire:      C.pctToHire >= 0 ? num(row[C.pctToHire]) : 0,
+        // Lifetime figures (for tooltips)
+        lifetimeSpend:   C.totalSpend >= 0 ? num(row[C.totalSpend]) : 0,
+        lifetimeApplies: C.totalApplies >= 0 ? num(row[C.totalApplies]) : 0,
+        lifetime2nds:    C.total2nds >= 0 ? num(row[C.total2nds]) : 0,
+        lifetimeHired:   C.totalHired >= 0 ? num(row[C.totalHired]) : 0,
+        lifetimeCpa:     C.lifetimeCpa >= 0 ? num(row[C.lifetimeCpa]) : 0,
+        lifetimeCpns:    C.lifetimeCpns >= 0 ? num(row[C.lifetimeCpns]) : 0,
+        costPerHire:     C.costPerHire >= 0 ? num(row[C.costPerHire]) : 0
+      };
+
+      if (!weekMap[dateKey]) {
+        weekMap[dateKey] = [];
+        weekOrder.push(dateKey);
+      }
+      weekMap[dateKey].push(adObj);
+      allAds.push({ dateKey: dateKey, ad: adObj });
+    }
+
+    // Sort weeks chronologically (oldest first)
+    weekOrder.sort(function(a, b) {
+      var da = new Date(a), db = new Date(b);
+      return da - db;
+    });
+
+    // ── Build trend array ──
     var trend = [];
-    for (var w = 0; w < weeks.length; w++) {
-      var wk = weeks[w];
-      var summary = { date: wk.date, numAds: wk.rows.length, ads: [] };
+    for (var wi = 0; wi < weekOrder.length; wi++) {
+      var dk = weekOrder[wi];
+      var ads = weekMap[dk];
+      var wkTotalSpend = 0, wkTotalApplies = 0, wkTotal2nds = 0, wkTotalHired = 0;
+      var liveCount = 0, premiumCount = 0, budgetSum = 0;
+      var pct2ndSum = 0, pct2ndN = 0, pctHireSum = 0, pctHireN = 0;
 
-      // Auto-detect numeric columns from first row (use per-week colHeaders)
-      var wkHeaders = wk.colHeaders || colHeaders;
-      if (wk.rows.length > 0 && wkHeaders) {
-        for (var ci = 0; ci < wkHeaders.length; ci++) {
-          var colName = wkHeaders[ci];
-          if (!colName) continue;
-          var colTotal = 0;
-          var isNumeric = false;
-          for (var ri = 0; ri < wk.rows.length; ri++) {
-            var val = wk.rows[ri][colName];
-            if (typeof val === 'number' || (typeof val === 'string' && !isNaN(Number(val)) && val.trim() !== '')) {
-              colTotal += Number(val) || 0;
-              isNumeric = true;
-            }
-          }
-          if (isNumeric) {
-            var key = colName.replace(/[^a-z0-9]+/g, ' ').trim().replace(/ ([a-z])/g, function(m, c) { return c.toUpperCase(); });
-            summary[key] = Math.round(colTotal * 100) / 100;
-          }
-        }
+      for (var ai = 0; ai < ads.length; ai++) {
+        var a = ads[ai];
+        wkTotalSpend += a.spend;
+        wkTotalApplies += a.applies;
+        wkTotal2nds += a.lifetime2nds;
+        wkTotalHired += a.lifetimeHired;
+        var statusUpper = a.status.toUpperCase();
+        if (statusUpper === 'LIVE' || statusUpper === 'NEW LAUNCH') liveCount++;
+        if (a.premium) premiumCount++;
+        budgetSum += a.dailyBudget;
+        if (a.pctTo2nd > 0) { pct2ndSum += a.pctTo2nd; pct2ndN++; }
+        if (a.pctToHire > 0) { pctHireSum += a.pctToHire; pctHireN++; }
       }
 
-      // Override CPA/CPNS — these are ratios, not sums
-      var wkSpend = summary.totalSpend || 0;
-      var wkApplies = summary.applies || 0;
-      var wkNS = summary.newStarts || 0;
-      summary.cpa = wkApplies > 0 ? Math.round(wkSpend / wkApplies * 100) / 100 : 0;
-      summary.cpns = wkNS > 0 ? Math.round(wkSpend / wkNS * 100) / 100 : 0;
+      wkTotalSpend = Math.round(wkTotalSpend * 100) / 100;
+      var wkCpa = wkTotalApplies > 0 ? Math.round(wkTotalSpend / wkTotalApplies * 100) / 100 : 0;
+      var wkCpns = wkTotalHired > 0 ? Math.round(wkTotalSpend / wkTotalHired * 100) / 100 : 0;
 
-      // Include individual ad rows for the Ad Breakdown table
-      var lastAccount = '';
-      for (var ai = 0; ai < wk.rows.length; ai++) {
-        var r = wk.rows[ai];
-        var adSpend = num(r['total spend']);
-        var adApplies = num(r['applies']);
-        var adNS = num(r['new starts']);
-        var adTitle = String(r['ad title'] || '').trim();
-
-        // Skip rows with no title and no spend (separator/empty rows)
-        if (!adTitle && adSpend === 0 && adApplies === 0) continue;
-
-        // Carry forward account name from merged cells
-        var account = String(r['indeed account'] || '').trim();
-        if (account) { lastAccount = account; } else { account = lastAccount; }
-
-        summary.ads.push({
-          account:   account,
-          adTitle:   adTitle,
-          location:  String(r['current location'] || r['location'] || '').trim(),
-          spend:     adSpend,
-          applies:   adApplies,
-          seconds:   num(r['2nds']),
-          newStarts: adNS,
-          cpa:       adApplies > 0 ? Math.round(adSpend / adApplies * 100) / 100 : 0,
-          cpns:      adNS > 0 ? Math.round(adSpend / adNS * 100) / 100 : 0,
-          plan:      String(r['plan'] || r['action'] || '').trim()
-        });
-      }
-      trend.push(summary);
+      trend.push({
+        date:        dk,
+        totalSpend:  wkTotalSpend,
+        applies:     wkTotalApplies,
+        '2nds':      wkTotal2nds,
+        newStarts:   wkTotalHired,
+        cpa:         wkCpa,
+        cpns:        wkCpns,
+        numAds:      ads.length,
+        liveAds:     liveCount,
+        premiumAds:  premiumCount,
+        totalBudget: Math.round(budgetSum * 7 * 100) / 100,
+        pctTo2nd:    pct2ndN > 0 ? Math.round(pct2ndSum / pct2ndN * 10000) / 10000 : 0,
+        pctToHire:   pctHireN > 0 ? Math.round(pctHireSum / pctHireN * 10000) / 10000 : 0,
+        ads:         ads
+      });
     }
 
-    return { mapped: true, owner: ownerName, trend: trend };
+    // ── Build adHistory: group by (adTitle + location) across all weeks ──
+    var histMap = {};
+    var histOrder = [];
+    for (var hi = 0; hi < allAds.length; hi++) {
+      var ha = allAds[hi].ad;
+      var hKey = (ha.adTitle + '|||' + ha.location).toLowerCase();
+      if (!histMap[hKey]) {
+        histMap[hKey] = {
+          adTitle: ha.adTitle,
+          location: ha.location,
+          weeks: [],
+          totalSpend: 0,
+          totalApplies: 0
+        };
+        histOrder.push(hKey);
+      }
+      var entry = histMap[hKey];
+      entry.weeks.push({
+        date: allAds[hi].dateKey,
+        spend: ha.spend,
+        applies: ha.applies,
+        cpa: ha.cpa,
+        lifetime2nds: ha.lifetime2nds,
+        lifetimeHired: ha.lifetimeHired,
+        pctTo2nd: ha.pctTo2nd,
+        pctToHire: ha.pctToHire,
+        status: ha.status,
+        plan: ha.plan
+      });
+      entry.totalSpend += ha.spend;
+      entry.totalApplies += ha.applies;
+    }
+
+    var adHistory = [];
+    for (var ahi = 0; ahi < histOrder.length; ahi++) {
+      var e = histMap[histOrder[ahi]];
+      var nWeeks = e.weeks.length;
+      var last = e.weeks[nWeeks - 1];
+      adHistory.push({
+        adTitle:        e.adTitle,
+        location:       e.location,
+        weeksRan:       nWeeks,
+        avgWeeklySpend: nWeeks > 0 ? Math.round(e.totalSpend / nWeeks * 100) / 100 : 0,
+        avgWeeklyApplies: nWeeks > 0 ? Math.round(e.totalApplies / nWeeks * 100) / 100 : 0,
+        avgWeeklyCpa:   e.totalApplies > 0 ? Math.round(e.totalSpend / e.totalApplies * 100) / 100 : 0,
+        totalApplies:   e.totalApplies,
+        total2nds:      last.lifetime2nds,
+        totalHired:     last.lifetimeHired,
+        pctTo2nd:       last.pctTo2nd,
+        pctToHire:      last.pctToHire,
+        lastStatus:     last.status,
+        lastPlan:       last.plan
+      });
+    }
+
+    return { mapped: true, owner: ownerName, trend: trend, adHistory: adHistory };
   } catch (err) {
     return { error: 'Failed to read NLR workbook: ' + err.message };
   }
@@ -5073,6 +5138,94 @@ function odGetNlrTabs(sheetId) {
     tabs.push(sheets[i].getName());
   }
   return { success: true, tabs: tabs };
+}
+
+/**
+ * action=odAutoMapNlrTabs
+ * One-time bulk operation: for every row in _OD_Mappings that has an nlrWorkbookId,
+ * open that workbook, find the tab with "*" in its name, and write it to nlrTab.
+ * Rows without nlrWorkbookId or whose workbook has no starred tab are skipped.
+ */
+function odAutoMapNlrTabs() {
+  var ss = SpreadsheetApp.openById(SHEETS.NATIONAL);
+  var mapTab = ss.getSheetByName('_OD_Mappings');
+  if (!mapTab) return { error: '_OD_Mappings not found' };
+
+  var mapData = mapTab.getDataRange().getValues();
+  if (mapData.length < 2) return { error: '_OD_Mappings empty' };
+
+  var headers = mapData[0].map(function(h) { return String(h).toLowerCase().trim(); });
+  var colWorkbookId = findCol(headers, ['nlrworkbookid']);
+  var colNlrTab     = findCol(headers, ['nlrtab']);
+  var colOwnerName  = findCol(headers, ['ownername', 'owner']);
+
+  if (colWorkbookId < 0 || colNlrTab < 0) return { error: 'Missing columns in _OD_Mappings' };
+
+  // Cache workbookId → starred tab name so we only open each workbook once
+  var wbCache = {};
+  var updated = 0, skipped = 0, errors = [];
+  var details = [];
+
+  var totalRows = mapData.length - 1;
+  console.log('Starting NLR auto-map: ' + totalRows + ' rows to process');
+
+  // Phase 1: Resolve starred tabs (the slow part — opening workbooks)
+  for (var i = 1; i < mapData.length; i++) {
+    var wbId = String(mapData[i][colWorkbookId] || '').trim();
+    if (!wbId) { skipped++; continue; }
+
+    var ownerLabel = String(mapData[i][colOwnerName] || '').trim();
+
+    // Check cache first — only open each workbook once
+    if (!(wbId in wbCache)) {
+      console.log('[' + Object.keys(wbCache).length + ' workbooks opened] Opening: ' + wbId + ' (' + ownerLabel + ')');
+      try {
+        var wb = SpreadsheetApp.openById(wbId);
+        var sheets = wb.getSheets();
+        var starredName = '';
+        for (var si = 0; si < sheets.length; si++) {
+          if (sheets[si].getName().indexOf('*') >= 0) {
+            starredName = sheets[si].getName();
+            break;
+          }
+        }
+        wbCache[wbId] = starredName;
+        if (starredName) {
+          console.log('  Found starred tab: ' + starredName);
+        } else {
+          console.log('  No starred tab found');
+        }
+      } catch (err) {
+        wbCache[wbId] = null;
+        errors.push({ owner: ownerLabel, wbId: wbId, error: err.message });
+        console.log('  ERROR: ' + err.message);
+      }
+    }
+
+    var resolved = wbCache[wbId];
+    if (!resolved) { skipped++; continue; }
+
+    // Queue the update — don't write yet
+    var oldTab = String(mapData[i][colNlrTab] || '').trim();
+    mapData[i][colNlrTab] = resolved;
+    updated++;
+    details.push({ owner: ownerLabel, oldTab: oldTab, newTab: resolved });
+  }
+
+  console.log('Phase 1 done: ' + Object.keys(wbCache).length + ' unique workbooks opened, ' + updated + ' rows to update, ' + skipped + ' skipped, ' + errors.length + ' errors');
+
+  // Phase 2: Single bulk write — overwrite the entire nlrTab column at once
+  if (updated > 0) {
+    console.log('Phase 2: Writing nlrTab column...');
+    var colValues = [];
+    for (var r = 0; r < mapData.length; r++) {
+      colValues.push([mapData[r][colNlrTab]]);
+    }
+    mapTab.getRange(1, colNlrTab + 1, colValues.length, 1).setValues(colValues);
+    console.log('Done - ' + updated + ' rows updated');
+  }
+
+  return { success: true, updated: updated, skipped: skipped, errors: errors, details: details };
 }
 
 /**

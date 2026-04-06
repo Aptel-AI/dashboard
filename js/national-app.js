@@ -665,6 +665,7 @@ const NationalApp = {
 
       // Store NLR data on the owner object
       owner.nlrData = result.trend;
+      owner.nlrAdHistory = result.adHistory || [];
 
       // Re-render if this owner is still selected
       if (this.state.selectedOwner === owner) {
@@ -4228,21 +4229,47 @@ const NationalApp = {
         totalSpend: w.totalSpend || 0,
         totalApplies: w.applies || 0,
         total2nds: w['2nds'] || 0,
-        totalNewStarts: w.newStarts || 0,
+        totalHired: w.newStarts || 0,
         cpa: w.cpa || 0,
         cpns: w.cpns || 0,
         numAds: w.numAds || w.ads?.length || 0,
-        ads: w.ads || []
+        liveAds: w.liveAds || 0,
+        premiumAds: w.premiumAds || 0,
+        totalBudget: w.totalBudget || 0,
+        pctTo2nd: w.pctTo2nd || 0,
+        pctToHire: w.pctToHire || 0,
+        ads: (w.ads || []).map(a => ({
+          account: a.account || '',
+          adTitle: a.adTitle || '',
+          location: a.location || '',
+          status: a.status || '',
+          plan: a.plan || '',
+          planDescription: a.planDescription || '',
+          datePosted: a.datePosted || '',
+          premium: !!a.premium,
+          dailyBudget: a.dailyBudget || 0,
+          spend: a.spend || 0,
+          applies: a.applies || 0,
+          cpa: a.cpa || 0,
+          pctTo2nd: a.pctTo2nd || 0,
+          pctToHire: a.pctToHire || 0,
+          lifetimeSpend: a.lifetimeSpend || 0,
+          lifetimeApplies: a.lifetimeApplies || 0,
+          lifetime2nds: a.lifetime2nds || 0,
+          lifetimeHired: a.lifetimeHired || 0,
+          lifetimeCpa: a.lifetimeCpa || 0,
+          lifetimeCpns: a.lifetimeCpns || 0,
+          costPerHire: a.costPerHire || 0
+        }))
       }));
-      // Compute week-over-week deltas (mirrors readIndeedTracking server logic)
+      // Compute week-over-week deltas
       for (let i = 0; i < weeks.length; i++) {
         if (i === 0) { weeks[i].delta = null; continue; }
         const prev = weeks[i - 1], curr = weeks[i];
         weeks[i].delta = {
           spend: +(curr.totalSpend - prev.totalSpend).toFixed(2),
           applies: curr.totalApplies - prev.totalApplies,
-          seconds: curr.total2nds - prev.total2nds,
-          newStarts: curr.totalNewStarts - prev.totalNewStarts,
+          hired: curr.totalHired - prev.totalHired,
           cpa: +(curr.cpa - prev.cpa).toFixed(2),
           cpns: +(curr.cpns - prev.cpns).toFixed(2),
           spendPct: prev.totalSpend > 0 ? +((curr.totalSpend - prev.totalSpend) / prev.totalSpend * 100).toFixed(1) : null,
@@ -4256,7 +4283,7 @@ const NationalApp = {
 
     // Use NLR data already fetched by _fetchOwnerNlrData
     if (owner.nlrData && owner.nlrData.length > 0) {
-      owner.indeedTracking = { weeks: _mapNlrWeeks(owner.nlrData) };
+      owner.indeedTracking = { weeks: _mapNlrWeeks(owner.nlrData), adHistory: owner.nlrAdHistory || [] };
       this._renderIndeedTracking(owner);
       return;
     }
@@ -4272,7 +4299,7 @@ const NationalApp = {
     }
 
     if (owner.nlrData && owner.nlrData.length > 0) {
-      owner.indeedTracking = { weeks: _mapNlrWeeks(owner.nlrData) };
+      owner.indeedTracking = { weeks: _mapNlrWeeks(owner.nlrData), adHistory: owner.nlrAdHistory || [] };
       if (this.state.selectedOwner === owner && this.state.currentTab === 'recruiting') {
         this._renderIndeedTracking(owner);
       }
@@ -4607,42 +4634,51 @@ const NationalApp = {
     }
 
     const weeks = data.weeks; // oldest-first
-    // Default to prior week (current week is still in progress)
     const defaultIdx = weeks.length > 1 ? weeks.length - 2 : weeks.length - 1;
-    const defaultWeek = weeks[defaultIdx];
-    const defaultPrev = defaultIdx > 0 ? weeks[defaultIdx - 1] : null;
+    const w = weeks[defaultIdx];
+    const d = w.delta;
 
     let html = '';
 
-    // ── Part 1: Weekly Totals KPI Cards (show prior week) ──
+    // ── Part 1a: Primary KPI Cards ──
     html += `<div class="coaching-label">Weekly Ad Spend Overview</div>`;
     html += `<div class="it-kpi-row">`;
-    html += this._itKpiCard('Total Spend', this._fmtDollar(defaultWeek.totalSpend),
-      defaultWeek.delta ? defaultWeek.delta.spendPct : null, true);
-    html += this._itKpiCard('Applies', this._fmtNum(defaultWeek.totalApplies),
-      defaultWeek.delta ? defaultWeek.delta.appliesPct : null, false);
-    html += this._itKpiCard('2nds', this._fmtNum(defaultWeek.total2nds), null, false);
-    html += this._itKpiCard('New Starts', this._fmtNum(defaultWeek.totalNewStarts), null, false);
-    html += this._itKpiCard('CPA', this._fmtDollar(defaultWeek.cpa),
-      defaultWeek.delta ? defaultWeek.delta.cpaPct : null, true);
-    html += this._itKpiCard('CPNS', this._fmtDollar(defaultWeek.cpns),
-      defaultWeek.delta ? defaultWeek.delta.cpnsPct : null, true);
+    html += this._itKpiCard('Spend', this._fmtDollar(w.totalSpend), d ? d.spendPct : null, true);
+    html += this._itKpiCard('Applies', this._fmtNum(w.totalApplies), d ? d.appliesPct : null, false);
+    html += this._itKpiCard('2nds Booked', this._fmtNum(w.total2nds), null, false);
+    html += this._itKpiCard('Hires', this._fmtNum(w.totalHired), null, false);
+    html += this._itKpiCard('CPA', this._fmtDollar(w.cpa), d ? d.cpaPct : null, true);
+    html += this._itKpiCard('Cost/Hire', this._fmtDollar(w.cpns), d ? d.cpnsPct : null, true);
     html += `</div>`;
-    html += `<div class="it-kpi-week-label">Week of ${this._esc(defaultWeek.weekOf)} · ${defaultWeek.numAds} ads</div>`;
+
+    // ── Part 1b: Secondary KPI Cards (conversion, budget, ad counts) ──
+    const budgetUtil = w.totalBudget > 0 ? Math.round(w.totalSpend / w.totalBudget * 100) : 0;
+    html += `<div class="it-kpi-row it-kpi-row-secondary">`;
+    html += this._itKpiCard('Apply\u21922nd', this._pct(w.pctTo2nd), null, false);
+    html += this._itKpiCard('Apply\u2192Hire', this._pct(w.pctToHire), null, false);
+    html += this._itKpiCard('Budget Util', budgetUtil ? budgetUtil + '%' : '\u2014', null, false);
+    html += this._itKpiCard('Active Ads', `${w.liveAds}/${w.numAds}`, null, false);
+    html += `</div>`;
+    html += `<div class="it-kpi-week-label">Week of ${this._esc(w.weekOf)} \u00B7 ${w.numAds} ads (${w.premiumAds} premium)</div>`;
 
     // ── Part 2: Week-over-Week Trend Table ──
     html += `<div class="coaching-label it-section-label">Week-over-Week Trends</div>`;
     html += this._buildTrackingTrend(weeks);
 
-    // ── Part 3: Ad Breakdown (defaults to prior week) ──
+    // ── Part 3: Ad Breakdown ──
     html += `<div class="coaching-label it-section-label">Ad Breakdown
       <select class="it-week-select" onchange="NationalApp._switchTrackingWeek(this.value)">
-        ${weeks.map((w, i) => `<option value="${i}"${i === defaultIdx ? ' selected' : ''}>${this._esc(w.weekOf)}</option>`).join('')}
+        ${weeks.map((wk, i) => `<option value="${i}"${i === defaultIdx ? ' selected' : ''}>${this._esc(wk.weekOf)}</option>`).join('')}
       </select>
     </div>`;
     html += `<div id="it-ad-breakdown">`;
-    html += this._buildAdBreakdown(defaultWeek, defaultPrev);
+    html += this._buildAdBreakdown(weeks[defaultIdx], defaultIdx > 0 ? weeks[defaultIdx - 1] : null);
     html += `</div>`;
+
+    // ── Part 4: Historic Ad Performance ──
+    if (data.adHistory && data.adHistory.length > 0) {
+      html += this._buildAdHistory(data.adHistory);
+    }
 
     el.innerHTML = html;
   },
@@ -4653,11 +4689,11 @@ const NationalApp = {
     if (pctChange !== null && pctChange !== undefined) {
       const abs = Math.abs(pctChange);
       if (abs < 0.5) {
-        arrow = `<span class="it-kpi-delta it-flat">—</span>`;
+        arrow = `<span class="it-kpi-delta it-flat">\u2014</span>`;
       } else {
         const isGood = lowerIsBetter ? (pctChange < 0) : (pctChange > 0);
         const cls = isGood ? 'it-good' : 'it-bad';
-        const sym = pctChange > 0 ? '▲' : '▼';
+        const sym = pctChange > 0 ? '\u25B2' : '\u25BC';
         arrow = `<span class="it-kpi-delta ${cls}">${sym} ${abs.toFixed(1)}%</span>`;
       }
     }
@@ -4667,19 +4703,59 @@ const NationalApp = {
     </div>`;
   },
 
+  // ── Status badge helper ──
+  _adStatusBadge(status) {
+    const s = (status || '').toUpperCase();
+    let cls = 'it-status-reserve'; // default gray
+    if (s === 'LIVE') cls = 'it-status-live';
+    else if (s === 'NEW LAUNCH') cls = 'it-status-new';
+    else if (s.includes('PAUSED')) cls = 'it-status-paused';
+    else if (s === 'DISABLED') cls = 'it-status-disabled';
+    else if (s.includes('TRANSPARENCY')) cls = 'it-status-transparency';
+    else if (s === 'IN REVIEW') cls = 'it-status-review';
+    return `<span class="it-status-badge ${cls}">${this._esc(status)}</span>`;
+  },
+
+  // ── Plan styling helper ──
+  _adPlanClass(plan) {
+    const p = (plan || '').toLowerCase();
+    if (p === 'maintain') return 'it-plan-maintain';
+    if (p === 'repost') return 'it-plan-repost';
+    if (p === 'repost w/ edit') return 'it-plan-repost-edit';
+    if (p === 'replace') return 'it-plan-replace';
+    if (p === 'edit') return 'it-plan-edit';
+    if (p === 'manage ad budget') return 'it-plan-budget';
+    if (p === 'close - reserve') return 'it-plan-close';
+    return '';
+  },
+
+  // ── Lifecycle tooltip (shown on ad title hover) ──
+  _adLifecycleTooltip(ad) {
+    return `<div class="it-lifecycle-tooltip">
+      <div class="it-tt-row"><span>Posted</span><strong>${this._esc(ad.datePosted || '\u2014')}</strong></div>
+      <div class="it-tt-row"><span>Lifetime Spend</span><strong>${this._fmtDollar(ad.lifetimeSpend)}</strong></div>
+      <div class="it-tt-row"><span>Lifetime Applies</span><strong>${this._fmtNum(ad.lifetimeApplies)}</strong></div>
+      <div class="it-tt-row"><span>Lifetime CPA</span><strong>${this._fmtDollar(ad.lifetimeCpa)}</strong></div>
+      <div class="it-tt-row"><span>Lifetime 2nds</span><strong>${this._fmtNum(ad.lifetime2nds)}</strong></div>
+      <div class="it-tt-row"><span>Lifetime Hires</span><strong>${this._fmtNum(ad.lifetimeHired)}</strong></div>
+      <div class="it-tt-row"><span>Cost/Hire</span><strong>${this._fmtDollar(ad.costPerHire)}</strong></div>
+    </div>`;
+  },
+
   // ── WoW trend table: weeks as columns, key metrics as rows ──
   _buildTrackingTrend(weeks) {
     const TREND_ROWS = [
-      { label: 'Total Spend',  key: 'totalSpend',     fmt: 'dollar', lowerBetter: true },
-      { label: '# Applies',    key: 'totalApplies',   fmt: 'num',    lowerBetter: false },
-      { label: '# 2nds',       key: 'total2nds',      fmt: 'num',    lowerBetter: false },
-      { label: '# New Starts', key: 'totalNewStarts', fmt: 'num',    lowerBetter: false },
-      { label: 'CPA',          key: 'cpa',            fmt: 'dollar', lowerBetter: true },
-      { label: 'CPNS',         key: 'cpns',           fmt: 'dollar', lowerBetter: true },
-      { label: '# Ads',        key: 'numAds',         fmt: 'num',    lowerBetter: false }
+      { label: 'Spend',        key: 'totalSpend',   fmt: 'dollar', lowerBetter: true },
+      { label: '# Applies',    key: 'totalApplies', fmt: 'num',    lowerBetter: false },
+      { label: '# 2nds',       key: 'total2nds',    fmt: 'num',    lowerBetter: false },
+      { label: '# Hires',      key: 'totalHired',   fmt: 'num',    lowerBetter: false },
+      { label: 'CPA',          key: 'cpa',          fmt: 'dollar', lowerBetter: true },
+      { label: 'Cost/Hire',    key: 'cpns',         fmt: 'dollar', lowerBetter: true },
+      { label: 'Apply\u21922nd', key: 'pctTo2nd',   fmt: 'pct',    lowerBetter: false },
+      { label: 'Apply\u2192Hire', key: 'pctToHire', fmt: 'pct',    lowerBetter: false },
+      { label: '# Active Ads', key: 'liveAds',      fmt: 'num',    lowerBetter: false }
     ];
 
-    // Show last 6 weeks max, newest on left
     const shown = weeks.slice(-6).reverse();
 
     let h = `<div class="it-trend-wrap"><div class="data-table-wrap"><table class="data-table it-trend-table">
@@ -4688,11 +4764,10 @@ const NationalApp = {
       </tr></thead><tbody>`;
 
     for (const r of TREND_ROWS) {
-      const fmt = r.fmt === 'dollar' ? this._fmtDollar : this._fmtNum;
+      const fmt = r.fmt === 'dollar' ? this._fmtDollar : r.fmt === 'pct' ? this._pct : this._fmtNum;
       h += `<tr><td class="rc-label">${r.label}</td>`;
       for (let i = 0; i < shown.length; i++) {
         const val = shown[i][r.key] ?? 0;
-        // Compare against next column (older week) since order is reversed
         const older = i < shown.length - 1 ? (shown[i + 1][r.key] ?? null) : null;
         const arrow = older !== null ? this._costTrendArrow(val, older, r.lowerBetter) : '';
         h += `<td class="num">${fmt(val)} ${arrow}</td>`;
@@ -4715,82 +4790,63 @@ const NationalApp = {
     const accountOrder = [];
     for (const ad of week.ads) {
       const acct = ad.account || 'Unknown';
-      if (!byAccount[acct]) {
-        byAccount[acct] = [];
-        accountOrder.push(acct);
-      }
+      if (!byAccount[acct]) { byAccount[acct] = []; accountOrder.push(acct); }
       byAccount[acct].push(ad);
     }
 
-    // Build prev-week lookup by adTitle for effectiveness comparison
-    const prevByTitle = {};
+    // Prev-week lookup for WoW arrows
+    const prevByKey = {};
     if (prevWeek && prevWeek.ads) {
       for (const ad of prevWeek.ads) {
-        if (ad.adTitle) prevByTitle[ad.adTitle] = ad;
+        if (ad.adTitle) prevByKey[ad.adTitle + '|||' + ad.location] = ad;
       }
     }
 
     let h = `<div class="it-breakdown-wrap"><div class="data-table-wrap"><table class="data-table it-breakdown-table">
       <thead><tr>
-        <th>Indeed Account</th>
+        <th>Status</th>
         <th>Ad Title</th>
         <th>Location</th>
         <th class="num">Spend</th>
         <th class="num">Applies</th>
-        <th class="num">2nds</th>
-        <th class="num">New Starts</th>
         <th class="num">CPA</th>
-        <th class="num">CPNS</th>
         <th>Plan</th>
+        <th class="num">Budget</th>
       </tr></thead><tbody>`;
 
     for (const acct of accountOrder) {
       const ads = byAccount[acct];
-      // Account group header
       const acctSpend = ads.reduce((s, a) => s + a.spend, 0);
       const acctApplies = ads.reduce((s, a) => s + a.applies, 0);
-      const acct2nds = ads.reduce((s, a) => s + a.seconds, 0);
-      const acctNS = ads.reduce((s, a) => s + a.newStarts, 0);
       const acctCPA = acctApplies > 0 ? acctSpend / acctApplies : 0;
-      const acctCPNS = acctNS > 0 ? acctSpend / acctNS : 0;
 
       h += `<tr class="it-acct-row">
         <td colspan="3"><strong>${this._esc(acct)}</strong> <span class="it-ad-count">${ads.length} ad${ads.length !== 1 ? 's' : ''}</span></td>
         <td class="num"><strong>${this._fmtDollar(acctSpend)}</strong></td>
         <td class="num"><strong>${this._fmtNum(acctApplies)}</strong></td>
-        <td class="num"><strong>${this._fmtNum(acct2nds)}</strong></td>
-        <td class="num"><strong>${this._fmtNum(acctNS)}</strong></td>
         <td class="num"><strong>${this._fmtDollar(acctCPA)}</strong></td>
-        <td class="num"><strong>${this._fmtDollar(acctCPNS)}</strong></td>
-        <td></td>
+        <td></td><td></td>
       </tr>`;
 
       for (const ad of ads) {
-        // WoW effectiveness arrow for CPA
-        const prevAd = prevByTitle[ad.adTitle];
+        const prevAd = prevByKey[ad.adTitle + '|||' + ad.location];
         const cpaArrow = prevAd && prevAd.cpa > 0 && ad.cpa > 0
           ? this._costTrendArrow(ad.cpa, prevAd.cpa, true) : '';
-        const cpnsArrow = prevAd && prevAd.cpns > 0 && ad.cpns > 0
-          ? this._costTrendArrow(ad.cpns, prevAd.cpns, true) : '';
-
-        // Plan column styling
-        const planLc = (ad.plan || '').toLowerCase();
-        const planCls = planLc === 'skip' ? 'it-plan-skip'
-          : planLc === 'repost' || planLc === 'repost' ? 'it-plan-repost'
-          : planLc.includes('paused') ? 'it-plan-paused'
-          : '';
+        const premiumStar = ad.premium ? '<span class="it-premium-star" title="Premium Ad">&#9733;</span>' : '';
 
         h += `<tr class="it-ad-row">
-          <td class="it-indent"></td>
-          <td class="it-ad-title">${this._esc(ad.adTitle)}</td>
+          <td>${this._adStatusBadge(ad.status)}</td>
+          <td class="it-ad-title-cell">
+            ${premiumStar}
+            <span class="it-ad-title">${this._esc(ad.adTitle)}</span>
+            ${this._adLifecycleTooltip(ad)}
+          </td>
           <td>${this._esc(ad.location)}</td>
           <td class="num">${this._fmtDollar(ad.spend)}</td>
           <td class="num">${this._fmtNum(ad.applies)}</td>
-          <td class="num">${this._fmtNum(ad.seconds)}</td>
-          <td class="num">${this._fmtNum(ad.newStarts)}</td>
           <td class="num">${this._fmtDollar(ad.cpa)} ${cpaArrow}</td>
-          <td class="num">${this._fmtDollar(ad.cpns)} ${cpnsArrow}</td>
-          <td class="${planCls}">${this._esc(ad.plan)}</td>
+          <td class="${this._adPlanClass(ad.plan)}">${this._esc(ad.plan)}</td>
+          <td class="num">${this._fmtDollar(ad.dailyBudget)}</td>
         </tr>`;
       }
     }
@@ -4800,12 +4856,67 @@ const NationalApp = {
       <td colspan="3"><strong>TOTAL</strong></td>
       <td class="num"><strong>${this._fmtDollar(week.totalSpend)}</strong></td>
       <td class="num"><strong>${this._fmtNum(week.totalApplies)}</strong></td>
-      <td class="num"><strong>${this._fmtNum(week.total2nds)}</strong></td>
-      <td class="num"><strong>${this._fmtNum(week.totalNewStarts)}</strong></td>
       <td class="num"><strong>${this._fmtDollar(week.cpa)}</strong></td>
-      <td class="num"><strong>${this._fmtDollar(week.cpns)}</strong></td>
-      <td></td>
+      <td></td><td></td>
     </tr>`;
+
+    h += `</tbody></table></div></div>`;
+    return h;
+  },
+
+  // ── Historic Ad Performance card ──
+  _buildAdHistory(adHistory) {
+    if (!adHistory || !adHistory.length) return '';
+
+    // Sort by avg CPA ascending (best performing first), ads with 0 CPA go to bottom
+    const sorted = adHistory.slice().sort((a, b) => {
+      if (a.avgWeeklyCpa === 0 && b.avgWeeklyCpa === 0) return 0;
+      if (a.avgWeeklyCpa === 0) return 1;
+      if (b.avgWeeklyCpa === 0) return -1;
+      return a.avgWeeklyCpa - b.avgWeeklyCpa;
+    });
+
+    // Compute CPA quartiles for performance tiers
+    const cpas = sorted.filter(a => a.avgWeeklyCpa > 0).map(a => a.avgWeeklyCpa);
+    const q1 = cpas.length > 0 ? cpas[Math.floor(cpas.length * 0.25)] : 0;
+    const q3 = cpas.length > 0 ? cpas[Math.floor(cpas.length * 0.75)] : 0;
+
+    let h = `<div class="coaching-label it-section-label" style="margin-top:24px">Historic Ad Performance</div>`;
+    h += `<div class="it-history-wrap"><div class="data-table-wrap"><table class="data-table it-history-table">
+      <thead><tr>
+        <th>Ad Title</th>
+        <th>Location</th>
+        <th class="num">Wks</th>
+        <th class="num">Avg Spend/Wk</th>
+        <th class="num">Avg Apps/Wk</th>
+        <th class="num">Avg CPA</th>
+        <th class="num">2nds</th>
+        <th class="num">Hires</th>
+        <th class="num">App\u21922nd</th>
+        <th class="num">App\u2192Hire</th>
+        <th>Status</th>
+        <th>Plan</th>
+      </tr></thead><tbody>`;
+
+    for (const a of sorted) {
+      const perfCls = a.avgWeeklyCpa > 0 && a.avgWeeklyCpa <= q1 ? 'it-perf-good'
+        : a.avgWeeklyCpa >= q3 ? 'it-perf-poor' : 'it-perf-mid';
+
+      h += `<tr class="${a.avgWeeklyCpa > 0 ? perfCls : ''}">
+        <td class="it-ad-title">${this._esc(a.adTitle)}</td>
+        <td>${this._esc(a.location)}</td>
+        <td class="num">${a.weeksRan}</td>
+        <td class="num">${this._fmtDollar(a.avgWeeklySpend)}</td>
+        <td class="num">${this._fmtNum(Math.round(a.avgWeeklyApplies))}</td>
+        <td class="num">${this._fmtDollar(a.avgWeeklyCpa)}</td>
+        <td class="num">${this._fmtNum(a.total2nds)}</td>
+        <td class="num">${this._fmtNum(a.totalHired)}</td>
+        <td class="num">${this._pct(a.pctTo2nd)}</td>
+        <td class="num">${this._pct(a.pctToHire)}</td>
+        <td>${this._adStatusBadge(a.lastStatus)}</td>
+        <td class="${this._adPlanClass(a.lastPlan)}">${this._esc(a.lastPlan)}</td>
+      </tr>`;
+    }
 
     h += `</tbody></table></div></div>`;
     return h;
