@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════
 // Owner Development Dashboard — App Controller
-// Multi-team owner mapping tool: Maddie's, Cam's, NLR
+// Multi-role owner mapping + coaching tool
 // ═══════════════════════════════════════════════════════
 
 const OwnerDev = {
@@ -18,7 +18,7 @@ const OwnerDev = {
     campaignTabsCache: {},  // { campaignKey: ['Tab1', ...] } available tabs per campaign
     activeCampaign: 'all',  // filter key
     searchQuery: '',        // search filter
-    activeTab: 'mapping',   // 'mapping' | 'team'
+    activeTab: 'mapping',   // 'mapping' | 'team' | 'coach' | 'planning' | 'tools'
     sortCol: 'campaign',    // current sort column
     sortAsc: true,          // ascending sort
     _savingCells: new Set(),// tracks cells currently saving (prevents double-submit)
@@ -40,7 +40,6 @@ const OwnerDev = {
   // ══════════════════════════════════════════════════════
 
   async init() {
-    console.log('[OwnerDev] init');
     this.state.session = this._getSession();
 
     if (!this.state.session) {
@@ -483,13 +482,11 @@ const OwnerDev = {
 
     // ── Step 1: If we have cached data, apply it immediately ──
     if (hasCache) {
-      console.log(`[OwnerDev] Rendering from cache (age: ${Math.round((Date.now() - (cache._ts || 0)) / 1000)}s)`);
       this._applyCacheToState(cache);
     }
 
     // ── Step 2: If cache is fresh enough, skip server fetch ──
     if (isFresh) {
-      console.log('[OwnerDev] Cache is fresh, skipping server fetch');
       return;
     }
 
@@ -509,7 +506,6 @@ const OwnerDev = {
    * instead of waiting for all 6 API calls to finish.
    */
   async _refreshFromServer() {
-    console.log('[OwnerDev] Fetching fresh data from server...');
     const isFirstLoad = !Object.values(this.state.campaigns).some(c => c.owners?.length > 0);
 
     // ── Fire all requests in parallel ──
@@ -610,29 +606,15 @@ const OwnerDev = {
       this.state.campaignTabMap = [];
     }
 
-    console.log('[OwnerDev] Data loaded:', {
-      campaigns: Object.keys(this.state.campaigns).length,
-      mappings: this.state.mappings.length,
-      users: this.state.users.length,
-      camCompanies: this.state.camCompanies.length,
-      nlrWorkbooks: this.state.nlrWorkbooks.length,
-      clientToBusinessPairs: this.state.clientToBusinessMap.length,
-      campaignTabMaps: this.state.campaignTabMap.length,
-      campaignTabsCached: Object.keys(this.state.campaignTabsCache).length
-    });
-
-    // Only write cache if we got a reasonably complete dataset.
-    // Partial data (e.g. campaigns loaded but companies/NLR timed out)
-    // should NOT overwrite a previously-complete cache.
-    const cacheComplete = cacheData.campaigns && cacheData.mappings
-      && cacheData.users && (cacheData.camCompanies || cacheData.nlrWorkbooks);
-    if (cacheComplete) {
-      this._writeCache(cacheData);
-    } else if (cacheData.campaigns) {
-      console.warn('[OwnerDev] Skipping cache write — incomplete data (missing:',
-        [!cacheData.mappings && 'mappings', !cacheData.users && 'users',
-         !cacheData.camCompanies && 'camCompanies', !cacheData.nlrWorkbooks && 'nlrWorkbooks']
-          .filter(Boolean).join(', ') + ')');
+    // Merge successful results into existing cache (preserves data from
+    // previous loads when some APIs timeout on this refresh).
+    if (cacheData.campaigns) {
+      const existing = this._readCache() || {};
+      const merged = { ...existing };
+      for (const key of Object.keys(cacheData)) {
+        if (cacheData[key] != null) merged[key] = cacheData[key];
+      }
+      this._writeCache(merged);
     }
 
     // Run auto-mapping
@@ -661,7 +643,6 @@ const OwnerDev = {
         // At minimum update stats (lightweight, doesn't touch the table)
         this._renderFilterPills();
         this._renderStats();
-        console.log('[OwnerDev] Deferred table re-render (user mid-edit)');
         this._pendingRerender = true;
       }
     } else {
@@ -799,7 +780,6 @@ const OwnerDev = {
 
     // Batch-save all auto-mapped values in a single POST
     if (toSave.length > 0) {
-      console.log(`[OwnerDev] Auto-mapped ${toSave.length} owners to Cam companies`);
       this._toast(`Auto-mapped ${toSave.length} owner${toSave.length > 1 ? 's' : ''} to companies`, 'success');
 
       const mappings = toSave.map(item => ({
@@ -809,7 +789,6 @@ const OwnerDev = {
         updatedBy: 'auto-map'
       }));
       this._post('odBatchSaveMappings', { mappings })
-        .then(res => console.log('[OwnerDev] Batch save Cam result:', res))
         .catch(err => console.warn('[OwnerDev] Batch save Cam error:', err.message));
     }
 
@@ -823,13 +802,10 @@ const OwnerDev = {
    */
   async _autoMapNlrFiles() {
     const workbooks = this.state.nlrWorkbooks;
-    if (!workbooks.length) { console.log('[OwnerDev] NLR auto-map: no workbooks loaded'); return 0; }
-
-    console.log('[OwnerDev] NLR auto-map: checking', workbooks.length, 'workbooks:', workbooks.map(w => w.name));
+    if (!workbooks.length) return 0;
 
     // ── Step 1: Match owner names to workbook filenames ──
     const matched = []; // { campaignKey, ownerName, wb }
-    const unmatched = [];
 
     for (const [campaignKey, campaign] of Object.entries(this.state.campaigns)) {
       for (const ownerName of (campaign.owners || [])) {
@@ -856,18 +832,11 @@ const OwnerDev = {
 
         if (matchedWb) {
           matched.push({ campaignKey, ownerName, wb: matchedWb });
-        } else {
-          unmatched.push(ownerName);
         }
       }
     }
 
-    if (unmatched.length > 0) {
-      console.log(`[OwnerDev] NLR unmatched owners (${unmatched.length}):`, unmatched.slice(0, 20));
-    }
-    if (!matched.length) { console.log('[OwnerDev] NLR auto-map: no new file matches'); return 0; }
-
-    console.log(`[OwnerDev] NLR auto-map: ${matched.length} file matches, fetching tabs...`);
+    if (!matched.length) return 0;
 
     // ── Step 2: Fetch tabs only for matched workbooks (in parallel, by unique ID) ──
     const uniqueIds = [...new Set(matched.map(m => m.wb.id))];
@@ -884,7 +853,6 @@ const OwnerDev = {
           this.state.nlrTabsCache[result.value.id] = result.value.tabs;
         }
       }
-      console.log(`[OwnerDev] Fetched tabs for ${tabResults.filter(r => r.status === 'fulfilled').length}/${idsToFetch.length} workbooks`);
     }
 
     // ── Step 3: Build mappings with auto-selected "Indeed Tracking" tab ──
@@ -915,9 +883,7 @@ const OwnerDev = {
 
     // ── Step 4: Batch save to backend ──
     if (toSave.length > 0) {
-      console.log(`[OwnerDev] Auto-mapped ${toSave.length} owners to NLR files (${toSave.filter(s => s.nlrTab).length} with tabs)`);
       this._post('odBatchSaveMappings', { mappings: toSave })
-        .then(res => console.log('[OwnerDev] Batch save NLR result:', res))
         .catch(err => console.warn('[OwnerDev] Batch save NLR error:', err.message));
     }
 
@@ -1125,9 +1091,7 @@ const OwnerDev = {
       this._renderStats();
       this.renderMapping();
 
-      const msg = `${label} refreshed (${result.rows || 0} rows)`;
-      this._toast(msg, 'success');
-      console.log('[OwnerDev] Campaign refresh:', result);
+      this._toast(`${label} refreshed (${result.rows || 0} rows)`, 'success');
     } catch (err) {
       console.error('[OwnerDev] Campaign refresh failed:', err);
       this._toast(`Refresh failed: ${err.message}`, 'error');
@@ -1163,10 +1127,6 @@ const OwnerDev = {
     if (!s) return;
 
     document.getElementById('user-name').textContent = s.name || s.email;
-
-    // Team badge hidden — no longer shown
-    const badge = document.getElementById('user-team-badge');
-    if (badge) badge.style.display = 'none';
   },
 
   // ══════════════════════════════════════════════════════
@@ -1760,9 +1720,7 @@ const OwnerDev = {
 
     // Batch save all auto-mapped tab mappings
     if (toSave.length > 0) {
-      console.log(`[OwnerDev] Auto-mapped ${toSave.length} owners to campaign tabs`);
       this._post('odBatchSaveCampaignTabMap', { mappings: toSave })
-        .then(res => console.log('[OwnerDev] Batch save campaign tab map result:', res))
         .catch(err => console.warn('[OwnerDev] Batch save campaign tab map error:', err.message));
     }
 
@@ -1988,12 +1946,7 @@ const OwnerDev = {
       // Superadmin with View-As: show that team; default: show all
       if (team && OD_CONFIG.teams[team]) {
         const teamCfg = OD_CONFIG.teams[team];
-        if (teamCfg.type === 'functional') {
-          members = this.state.users.filter(u => u.team === team);
-        } else {
-          // National team: show members on that team
-          members = this.state.users.filter(u => u.team === team);
-        }
+        members = this.state.users.filter(u => u.team === team);
         teamLabel = teamCfg.label || team;
       } else {
         members = this.state.users;
@@ -2006,6 +1959,7 @@ const OwnerDev = {
       members = this.state.users;
       teamLabel = 'All Users';
       canManageMembers = false;
+      defaultNewRole = 'admin';
     }
 
     titleEl.textContent = teamLabel + ' Members';
@@ -2610,7 +2564,7 @@ const OwnerDev = {
    * Generate a unique row ID for data attributes
    */
   _rowId(campaign, ownerName) {
-    return btoa(campaign + '|' + ownerName).replace(/[^a-zA-Z0-9]/g, '');
+    return btoa(unescape(encodeURIComponent(campaign + '|' + ownerName))).replace(/[^a-zA-Z0-9]/g, '');
   },
 
   // ══════════════════════════════════════════════════════
@@ -2649,9 +2603,7 @@ const OwnerDev = {
    */
   _esc(str) {
     if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   },
 
   /** Escape a string for safe use inside inline JS single-quoted strings within HTML attributes */
@@ -2668,7 +2620,7 @@ const OwnerDev = {
    * Get the effective team for rendering (view-as or real)
    */
   _getEffectiveTeam() {
-    return this.state.viewAsTeam || this.state.session?.team || 'maddie';
+    return this.state.viewAsTeam || this.state.session?.team || '';
   },
 
   /**

@@ -78,7 +78,6 @@ const NationalApp = {
   // ══════════════════════════════════════════════════
 
   async init() {
-    console.log('[NationalApp] init');
     this.state.session = this._getSession();
     if (!this.state.session) {
       this._showLogin();
@@ -113,7 +112,6 @@ const NationalApp = {
     if (this._coachInitDone && this._coachCampaign === campaign) {
       return;
     }
-    console.log('[NationalApp] initCoachView (embedded in Owner Dev), campaign:', campaign);
     this._embedded = true;
     this._coachCampaign = campaign;
     this.state.session = { email: session.email, name: session.name, loginTime: Date.now() };
@@ -309,17 +307,12 @@ const NationalApp = {
     // not any concurrent loads (using _prefetchKey instead of _prefetchingActive)
     const isPrefetch = this._prefetchKey === campaignKey;
     if (!isPrefetch && this.state.campaign !== campaignKey) {
-      console.log('[NationalApp] Stale load for', campaignKey, '(user now on', this.state.campaign + ') — skipping state update');
       return;
     }
     const sheetData = results.recruiting || null;
-    console.log('[NationalApp] recruiting result for', campaignKey, ':',
-      sheetData ? { owners: sheetData.owners?.length, weeks: sheetData.weeks?.length, products: sheetData.products } : 'null');
     if (sheetData && sheetData.owners && sheetData.owners.length) {
       this._buildOwnersFromSheet(campaignKey, sheetData);
-      console.log('[NationalApp] Built owners for', campaignKey, ':', this.state.owners.length);
     } else {
-      console.log('[NationalApp] No recruiting data for', campaignKey, '— showing empty state');
       this.state.owners = [];
       this.state.campaignTotals = {};
     }
@@ -360,7 +353,6 @@ const NationalApp = {
         if (!result.error && result.weeks && result.weeks.length) {
           owner.indeedTracking = result;
           owner._trackingFetched = true;
-          console.log('[NationalApp] Pre-fetched Indeed Tracking for', owner.name, ':', result.weeks.length, 'weeks');
         }
       } catch (err) {
         console.warn('[NationalApp] Pre-fetch Indeed Tracking for', owner.name, ':', err.message);
@@ -524,7 +516,6 @@ const NationalApp = {
         && this._allCampaignsData[campaignKey].weeks
         && this._allCampaignsData[campaignKey].weeks.length > 0) {
       const cd = this._allCampaignsData[campaignKey];
-      console.log('[NationalApp] Cache HIT for', campaignKey, '— owners:', (cd.owners||[]).length, 'weeks:', (cd.weeks||[]).length);
       return { owners: cd.owners || [], weeks: cd.weeks || [], label: cd.label || '', products: cd.products || ['Total'] };
     }
 
@@ -542,7 +533,6 @@ const NationalApp = {
     if (result.campaigns) {
       if (!this._allCampaignsData) this._allCampaignsData = {};
       Object.assign(this._allCampaignsData, result.campaigns);
-      console.log('[NationalApp] Fetched campaign:', campaignKey, 'total cached:', Object.keys(this._allCampaignsData).length);
       this._populateCampaignSelector(this._allCampaignsData);
     }
     // Cache B2B product totals from Tableau
@@ -582,9 +572,13 @@ const NationalApp = {
           if (key !== loadedKey) this._allCampaignsData[key] = data;
         }
         this._populateCampaignSelector(this._allCampaignsData);
-        console.log('[NationalApp] Background prefetch complete:', Object.keys(result.campaigns).length, 'campaigns');
-        // Update localStorage cache for instant landing page on next visit
-        try { localStorage.setItem('od_data_cache', JSON.stringify({ campaigns: this._allCampaignsData })); } catch (e) {}
+        // Merge campaigns into existing od_data_cache (preserve OwnerDev's other keys)
+        try {
+          const raw = localStorage.getItem('od_data_cache');
+          const existing = raw ? JSON.parse(raw) : {};
+          existing.campaigns = this._allCampaignsData;
+          localStorage.setItem('od_data_cache', JSON.stringify(existing));
+        } catch (e) {}
       }
       this._prefetchingRemaining = false;
     }).catch(err => {
@@ -666,17 +660,10 @@ const NationalApp = {
         console.warn('[NationalApp] NLR data error for', owner.name, ':', result.error);
         return;
       }
-      if (!result.mapped) {
-        console.log('[NationalApp] No NLR mapping for', owner.name);
-        return;
-      }
-      if (!result.trend || result.trend.length === 0) {
-        console.log('[NationalApp] NLR mapped but no data for', owner.name);
-        return;
-      }
+      if (!result.mapped) return;
+      if (!result.trend || result.trend.length === 0) return;
 
       // Store NLR data on the owner object
-      console.log('[NationalApp] NLR data loaded for', owner.name, ':', result.trend.length, 'weeks');
       owner.nlrData = result.trend;
 
       // Re-render if this owner is still selected
@@ -718,9 +705,7 @@ const NationalApp = {
       if (!result.error && (result.summary || result.reps)) {
         owner.sales = { summary: result.summary, reps: result.reps || [] };
         owner._resSalesFetched = true;
-        console.log('[NationalApp] Res sales loaded for', owner.name, ':', result.reps?.length, 'reps, tab:', result.tab);
       } else {
-        console.warn('[NationalApp] Res sales empty for', owner.name, ':', result.error || 'no data');
       }
     } catch (err) {
       console.warn('[NationalApp] Res sales fetch failed for', owner.name, ':', err.message);
@@ -748,9 +733,7 @@ const NationalApp = {
       if (!result.error && (result.summary || result.reps)) {
         owner.sales = { summary: result.summary, reps: result.reps || [] };
         owner._ndsSalesFetched = true;
-        console.log('[NationalApp] NDS sales loaded for', owner.name, ':', result.reps?.length, 'reps, tab:', result.tab);
       } else {
-        console.warn('[NationalApp] NDS sales empty for', owner.name, ':', result.error || 'no data');
       }
     } catch (err) {
       console.warn('[NationalApp] NDS sales fetch failed for', owner.name, ':', err.message);
@@ -776,9 +759,7 @@ const NationalApp = {
       if (!result.error && (result.summary || result.reps)) {
         owner.sales = { summary: result.summary, reps: result.reps || [] };
         owner._fiosSalesFetched = true;
-        console.log('[NationalApp] FIOS sales loaded for', owner.name, ':', result.reps?.length, 'reps');
       } else {
-        console.warn('[NationalApp] FIOS sales empty for', owner.name, ':', result.error || 'no data');
       }
     } catch (err) {
       console.warn('[NationalApp] FIOS sales fetch failed for', owner.name, ':', err.message);
@@ -808,9 +789,7 @@ const NationalApp = {
           mcoeSales: result.mcoeSales || null
         };
         owner._b2bSalesFetched = true;
-        console.log('[NationalApp] B2B sales loaded for', owner.name, ':', result.reps?.length, 'reps,', (result.dailyActivity || []).length, 'daily,', result.marketFulfillment ? result.marketFulfillment.length + ' markets' : 'no MF', result.avgPaychecks ? 'has AP' : 'no AP', result.mcoeSales ? result.mcoeSales.length + ' MCOE rows' : 'no MCOE');
       } else {
-        console.warn('[NationalApp] B2B sales empty for', owner.name, ':', result.error || 'no data');
       }
     } catch (err) {
       console.warn('[NationalApp] B2B sales fetch failed for', owner.name, ':', err.message);
@@ -899,7 +878,6 @@ const NationalApp = {
         matched++;
       }
     }
-    console.log('[NationalApp] D2D Res ranking enrichment: matched', matched, 'of', this.state.owners.length, 'owners');
   },
 
   // ── Fetch Indeed ad cost data from per-owner Drive spreadsheets ──
@@ -936,7 +914,6 @@ const NationalApp = {
       if (!matchKey) continue;
       matched++;
     }
-    console.log('[NationalApp] Indeed costs enrichment: matched', matched, 'of', this.state.owners.length, 'owners');
   },
 
   // ── Map online presence businesses to owners ──
@@ -962,7 +939,6 @@ const NationalApp = {
           companyToOwner[company.toLowerCase().trim()] = owner;
         }
       }
-      console.log('[NationalApp] Cam mapping loaded:', Object.keys(companyToOwner).length, 'companies →', Object.keys(camMapping).length, 'owners');
     }
 
     const hasMapping = Object.keys(companyToOwner).length > 0;
@@ -1512,12 +1488,6 @@ const NationalApp = {
       owner.d2dTotalUnits = entry.prod;
     });
 
-    if (withProd.length) {
-      console.log('[NationalApp] Production ranking: top 3 —',
-        withProd.slice(0, 3).map((e, i) => '#' + (i+1) + ' ' + this.state.owners[e.idx].name + ' (' + e.prod + ')').join(', '));
-    } else {
-      console.log('[NationalApp] Production ranking: no data yet for current week');
-    }
   },
 
   // ── Calculate projected weekly numbers from leader count ──
@@ -1610,9 +1580,6 @@ const NationalApp = {
       if (!cd) return false;
       return (cd.owners || []).length > 0;
     });
-    // Debug: log all campaigns and their owner counts
-    console.log('[NationalApp] _showLandingPage — campaigns:', [...allKeys].map(k => k + ':' + (campaigns[k]?.owners?.length || 0)).join(', '));
-
     // Sort: planning schedule (today first, then tomorrow, etc.) or alphabetical fallback
     const schedule = this._planningSchedule || null;
     let sorted;
@@ -1753,7 +1720,6 @@ const NationalApp = {
       const key = entry.campaignKey;
       // Skip if already cached and fresh
       if (this._readCoachCampaignCache(key)) {
-        console.log('[NationalApp] Prefetch skip (cached):', key);
         continue;
       }
       // Skip if already prefetching
@@ -1761,7 +1727,6 @@ const NationalApp = {
       if (!this._prefetching) this._prefetching = {};
       this._prefetching[key] = true;
 
-      console.log('[NationalApp] Prefetching campaign data:', key);
       try {
         // Prefetch uses a separate "scratch" campaign key so it never
         // touches this.state.campaign — which would break the stale-load
@@ -1798,7 +1763,6 @@ const NationalApp = {
         // Write cache from captured snapshot, never from live state
         this._writeCoachCampaignCacheWith(key, prefetchedOwners, prefetchedTotals, prefetchedWeekDate);
 
-        console.log('[NationalApp] Prefetched + cached:', key);
       } catch (err) {
         console.warn('[NationalApp] Prefetch failed for', key, ':', err.message);
         this._prefetchKey = null;
@@ -1830,7 +1794,6 @@ const NationalApp = {
     // Check per-campaign localStorage cache first
     const cached = this._readCoachCampaignCache(campaignKey);
     if (cached) {
-      console.log('[NationalApp] Rendering campaign from cache:', campaignKey);
       this.state.owners = cached.owners;
       this.state.campaignTotals = cached.campaignTotals || {};
       this._latestWeekDate = cached.latestWeekDate || null;
@@ -1894,14 +1857,12 @@ const NationalApp = {
     this._hideLoading();
     // Guard again after await
     if (this.state.campaign !== campaignKey) return;
-    console.log('[NationalApp] selectCampaign render:', campaignKey, 'owners:', this.state.owners.length);
     try { this.renderCampaignOverview(); } catch (e) { console.error('[NationalApp] renderCampaignOverview error:', e); }
     try { this.renderOwnersList(); } catch (e) { console.error('[NationalApp] renderOwnersList error:', e); }
   },
 
   // ── Back to landing page ──
   backToLanding() {
-    console.log('[NationalApp] backToLanding — _allCampaignsData keys:', Object.keys(this._allCampaignsData || {}));
     this.state.campaign = null;
     this.state.selectedOwner = null;
     this._showLandingPage();
@@ -2029,7 +1990,6 @@ const NationalApp = {
         status.className = 'import-status import-success';
         setTimeout(() => { status.textContent = ''; status.className = 'import-status'; }, 6000);
       }
-      console.log('[NationalApp] Single campaign refresh:', result);
 
     } catch (err) {
       console.error('[NationalApp] Refresh failed:', err);
@@ -2092,7 +2052,6 @@ const NationalApp = {
       await this.loadCampaignData(campaignKey);
       this._showLandingPage();
 
-      console.log('[NationalApp] Single refresh done:', campaignKey);
     } catch (err) {
       console.error('[NationalApp] Single refresh failed:', campaignKey, err);
       alert('Refresh failed for ' + campaignKey + ': ' + err.message);
@@ -2158,7 +2117,13 @@ const NationalApp = {
       if (result.campaigns) {
         this._allCampaignsData = result.campaigns;
         this._populateCampaignSelector(this._allCampaignsData);
-        try { localStorage.setItem('od_data_cache', JSON.stringify({ campaigns: this._allCampaignsData })); } catch (e) {}
+        // Merge campaigns into existing od_data_cache (preserve OwnerDev's other keys)
+        try {
+          const raw = localStorage.getItem('od_data_cache');
+          const existing = raw ? JSON.parse(raw) : {};
+          existing.campaigns = this._allCampaignsData;
+          localStorage.setItem('od_data_cache', JSON.stringify(existing));
+        } catch (e) {}
       }
     } catch (e) {
       console.warn('[NationalApp] Post-refresh reload failed:', e.message);
@@ -2173,7 +2138,6 @@ const NationalApp = {
       setTimeout(() => { status.textContent = ''; status.className = 'import-status'; }, 8000);
     }
 
-    console.log('[NationalApp] Full refresh from landing:', { successCount, totalRows, errors });
 
     if (btn) { btn.disabled = false; btn.textContent = 'Refresh All Data'; }
   },
@@ -2731,7 +2695,6 @@ const NationalApp = {
       });
       const result = await resp.json();
       if (result.error) throw new Error(result.error);
-      console.log('[NationalApp] Headcount saved: sent date=' + newestWeekDate + ' wrote row=' + result.row + ' date=' + result.date + ' tab=' + result.tab, result);
       this._invalidateOdCache();
       this._rewarmCache('recruiting');
       if (note) {
@@ -3160,7 +3123,7 @@ const NationalApp = {
       });
       const result = await resp.json();
       if (result.error) console.warn('[HC Save] Error:', result.error);
-      else { console.log('[HC Save] Saved', owner.name, entry.date, '→', campaignLabel); this._rewarmCache('recruiting'); }
+      else this._rewarmCache('recruiting');
     } catch (err) {
       console.warn('[HC Save] Network error:', err.message);
     }
@@ -3830,7 +3793,7 @@ const NationalApp = {
       })
     }).then(r => r.json()).then(result => {
       if (result.error) console.warn('[Prod Save] Error:', result.error);
-      else { console.log('[Prod Save] Saved', sheetName, entry.date, productKeys.length ? productKeys : 'legacy'); this._rewarmCache('recruiting'); }
+      else this._rewarmCache('recruiting');
     }).catch(err => console.warn('[Prod Save] Network error:', err.message));
   },
 
@@ -3936,7 +3899,6 @@ const NationalApp = {
       })
     }).then(r => r.json()).then(result => {
       if (result.error) console.warn('[Goals] Error:', result.error);
-      else console.log('[Goals] Saved:', result);
     }).catch(err => console.warn('[Goals] Network error:', err.message));
 
     this._invalidateOdCache();
@@ -3986,7 +3948,6 @@ const NationalApp = {
       // Replace temp ID with real ID from backend
       const note = this.state.campaignNotes.find(n => n.noteId === tempId);
       if (note) note.noteId = result.noteId;
-      console.log('[Notes] Saved:', result.noteId);
     }).catch(err => console.warn('[Notes] Save failed:', err.message));
   },
 
@@ -4164,7 +4125,7 @@ const NationalApp = {
       })
     }).then(r => r.json()).then(result => {
       if (result.error) console.warn('[Prod Cards] Error:', result.error);
-      else { console.log('[Prod Cards] Saved:', sheetName, prodDate); this._rewarmCache('recruiting'); }
+      else this._rewarmCache('recruiting');
     }).catch(err => console.warn('[Prod Cards] Network error:', err.message));
   },
 
