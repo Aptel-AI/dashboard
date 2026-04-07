@@ -6949,6 +6949,26 @@ function readConsolidatedRecruiting(weekCount, campaignFilter, bustCache) {
         if (cached) {
           campaigns[key] = JSON.parse(cached);
           Logger.log('readConsolidatedRecruiting cache HIT: ' + key);
+          // Still apply visible-tabs filter on cached data (owner may have been hidden since cache was stored)
+          if (campaign.ownerSource === 'visible-tabs') {
+            try {
+              var cachedSS = SpreadsheetApp.openById(campaign.sheetId);
+              var cachedVisible = getOwnerNamesForCampaign_(campaign, cachedSS);
+              var cachedVisSet = {};
+              for (var cvi = 0; cvi < cachedVisible.length; cvi++) cachedVisSet[cachedVisible[cvi]] = true;
+              campaigns[key].owners = campaigns[key].owners.filter(function(o) { return !!cachedVisSet[o]; });
+              var cachedWeeks = campaigns[key].weeks || [];
+              for (var cwi = 0; cwi < cachedWeeks.length; cwi++) {
+                if (!cachedWeeks[cwi].data) continue;
+                for (var cwOwner in cachedWeeks[cwi].data) {
+                  if (!cachedVisSet[cwOwner]) delete cachedWeeks[cwi].data[cwOwner];
+                }
+              }
+              Logger.log('readConsolidatedRecruiting cache visible-tabs filter applied for ' + key);
+            } catch (e) {
+              Logger.log('readConsolidatedRecruiting cache visible-tabs filter error: ' + e.message);
+            }
+          }
           continue;
         }
       } catch (e) { /* parse error — fall through to fresh read */ }
