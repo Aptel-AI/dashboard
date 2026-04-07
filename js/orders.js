@@ -163,7 +163,7 @@ const Orders = {
     if (mode === 'all') {
       const repSel = document.getElementById('all-orders-filter-rep');
       if (repSel) {
-        const reps = [...new Set((App.state.people || []).map(p => p.name).filter(Boolean))].sort();
+        const reps = [...new Set(this._orders.map(o => o.repName).filter(Boolean))].sort();
         const current = repSel.value;
         repSel.innerHTML = '<option value="">All Reps</option>'
           + reps.map(r => `<option value="${r}">${r}</option>`).join('');
@@ -222,16 +222,17 @@ const Orders = {
           if (orderDate < cutoff) return false;
         }
       }
-      // Hide completed — orders where ALL remapped device statuses are Active, Canceled, or Disconnected
+      // Hide completed — check override first (takes precedence), then Tableau devices
       if (hideCompleted) {
+        if (o.status && o.status !== 'Pending' && COMPLETED_STATUSES.includes(o.status.toLowerCase())) {
+          return false;
+        }
         if (o.tableau && o.tableau.devices && o.tableau.devices.length > 0) {
           const remapped = Orders._remapDeviceStatuses(o.tableau);
           const allCompleted = Object.keys(remapped).every(s =>
             COMPLETED_STATUSES.includes(s.toLowerCase())
           );
           if (allCompleted) return false;
-        } else if (o.status) {
-          if (COMPLETED_STATUSES.includes((o.status || '').toLowerCase())) return false;
         }
       }
       // Hide recently noted — orders with an admin/owner/manager note within the past 3 days

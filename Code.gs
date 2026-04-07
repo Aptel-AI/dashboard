@@ -88,7 +88,8 @@ const OL = {
   PAID_OUT: 28,
   TICKETS: 29,
   ORDER_CHANNEL: 30,
-  CODES_USED_BY: 31
+  CODES_USED_BY: 31,
+  SPE_CACHE: 32
 };
 
 // Legacy Order Log column indices (for migration only — remove after migration)
@@ -237,7 +238,7 @@ function getOrCreateSheet(ss, tabName, baseName) {
           'Fiber Package', 'Install Date', 'VoIP Qty', 'DTV', 'DTV Package',
           'Ooma Package', 'Account Notes', 'Activation Support', 'Team Emoji',
           'Yeses', 'Units', 'Status', 'Notes', 'Paid Out', 'Tickets',
-          'Order Channel', 'Codes Used By'
+          'Order Channel', 'Codes Used By', 'SPE Cache'
         ]);
         break;
       case TAB.ROSTER:
@@ -781,8 +782,16 @@ function readPayrollOrders(ss, officeId, payrollMode) {
       if (rawPaid) paidOut = JSON.parse(rawPaid);
     } catch (e) { paidOut = {}; }
 
+    // Parse cached SPE list from sheet
+    let speCache = [];
+    try {
+      const rawSpe = String(row[OL.SPE_CACHE] || '').trim();
+      if (rawSpe) speCache = JSON.parse(rawSpe);
+    } catch (e) { speCache = []; }
+
     orders.push({
       rowIndex: i + 1,
+      sheetRow: i,
       email: email,
       repName: String(row[OL.REP_NAME] || '').trim(),
       traineeName: String(row[OL.TRAINEE_NAME] || '').trim(),
@@ -797,20 +806,36 @@ function readPayrollOrders(ss, officeId, payrollMode) {
       notes:  String(row[OL.NOTES] || '').trim(),
       paidOut: paidOut,
       orderChannel: String(row[OL.ORDER_CHANNEL] || 'Sara').trim(),
-      codesUsedBy: codesUsedBy
+      codesUsedBy: codesUsedBy,
+      speCache: speCache
     });
   }
 
-  // Enrich payroll orders with Tableau SPE data
+  // Enrich payroll orders with Tableau SPE data, snapshot to sheet when new
   var tableauSummary = getTableauSummaryWithCache(ss, officeId);
   var dsiSummary = tableauSummary.dsiSummary || {};
+  var speCacheWrites = [];  // [[row, col, value], ...]
   orders.forEach(function(order) {
     var ts = dsiSummary[order.dsi];
-    if (ts) {
-      order.speList = ts.speList || [];
+    if (ts && ts.speList && ts.speList.length > 0) {
+      order.speList = ts.speList;
       order.tableauStatusCounts = ts.statusCounts || {};
+      // Snapshot SPEs to sheet if not already cached
+      if (!order.speCache || order.speCache.length === 0) {
+        speCacheWrites.push([order.rowIndex, OL.SPE_CACHE + 1, JSON.stringify(ts.speList)]);
+      }
+    } else if (order.speCache && order.speCache.length > 0) {
+      // Tableau data gone — fall back to cached SPEs
+      order.speList = order.speCache;
     }
   });
+  // Batch-write SPE cache to sheet
+  speCacheWrites.forEach(function(w) {
+    olSheet.getRange(w[0], w[1]).setValue(w[2]);
+  });
+
+  // Strip internal fields before returning
+  orders.forEach(function(o) { delete o.speCache; delete o.sheetRow; });
 
   orders.sort((a, b) => b.dateOfSale.localeCompare(a.dateOfSale));
   return orders;

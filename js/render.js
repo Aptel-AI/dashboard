@@ -174,7 +174,7 @@ const Render = {
     const isEmpty = !d.units && !d.y;
     const showDash = isFutureDay && isEmpty;
 
-    const uc = showDash ? 'c-none' : (isWeek ? this.weeklyClass(d.units) : this.dailyClass(d.units));
+    const uc = showDash ? 'c-none' : (pi === 11 ? 'c-none' : (isWeek ? this.weeklyClass(d.units) : this.dailyClass(d.units)));
     const bc = isWeek ? 'week-start' : 'day-start';
     const wc = isWeek ? ' week-col' : '';
 

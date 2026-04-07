@@ -700,6 +700,7 @@ const App = {
   },
 
   async _loadAndRenderOrders(mode) {
+    const expectedNav = (mode === 'all') ? 'allOrders' : 'myOrders';
     const pageId = (mode === 'all') ? 'all-orders-page' : 'my-orders-page';
     const page = document.getElementById(pageId);
     if (page) page.style.display = 'block';
@@ -708,6 +709,8 @@ const App = {
     if (subtitle) subtitle.textContent = 'Loading orders...';
 
     await Orders.fetchOrders(OFFICE_CONFIG, mode);
+    // User navigated away during fetch — don't render over the current tab
+    if (this.state.currentNav !== expectedNav) return;
     Orders.renderOrdersPage(mode, OFFICE_CONFIG);
   },
 
@@ -831,6 +834,9 @@ const App = {
       console.error('Failed to fetch payroll orders:', err);
       this._payrollOrders = [];
     }
+
+    // User navigated away during fetch — don't render over the current tab
+    if (this.state.currentNav !== 'payroll') return;
 
     // Sync into Orders module so note modal can find orders by rowIndex
     Orders._orders = this._payrollOrders;
