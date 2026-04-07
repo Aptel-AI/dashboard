@@ -2041,20 +2041,22 @@ body.has-role-switcher header { top: 44px; }
 .challenge-tip {
   display: none;
   position: absolute;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + 10px);
   left: 50%;
   transform: translateX(-50%);
-  background: #1a1a2e;
-  color: #fff;
+  background: #FFFFFF;
+  color: var(--white);
   font-size: 11px;
   font-family: 'Cerebri Sans','DM Sans','Inter',sans-serif;
-  font-weight: 600;
-  padding: 6px 10px;
-  border-radius: 6px;
+  font-weight: 500;
+  padding: 10px 14px;
+  border-radius: 8px;
   white-space: nowrap;
   z-index: 100;
   pointer-events: none;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  border: 1px solid rgba(0,0,0,0.1);
+  min-width: 160px;
 }
 .challenge-tip::after {
   content: '';
@@ -2062,13 +2064,14 @@ body.has-role-switcher header { top: 44px; }
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: #1a1a2e;
+  border: 6px solid transparent;
+  border-top-color: #FFFFFF;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.08));
 }
 .challenge-tip-wrap:hover .challenge-tip {
   display: block;
 }
-/* Prevent right-side overflow: last 2 columns align tooltip to the right */
+/* Prevent right-side overflow */
 td:nth-last-child(-n+2) .challenge-tip {
   left: auto;
   right: 0;
@@ -2078,6 +2081,44 @@ td:nth-last-child(-n+2) .challenge-tip::after {
   left: auto;
   right: 12px;
   transform: none;
+}
+/* Receipt rows */
+.rcpt-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--silver-dim);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed rgba(0,0,0,0.12);
+}
+.rcpt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 2px 0;
+  font-size: 11px;
+  color: var(--white);
+}
+.rcpt-row.rcpt-bold {
+  font-weight: 800;
+}
+.rcpt-row.rcpt-red, .rcpt-row.rcpt-red span {
+  color: #E5564A;
+}
+.rcpt-row.rcpt-teal, .rcpt-row.rcpt-teal span {
+  color: var(--sc-teal, #43B3AE);
+}
+.rcpt-divider {
+  border-top: 1px dashed rgba(0,0,0,0.12);
+  margin: 4px 0;
+}
+.rcpt-empty {
+  font-size: 11px;
+  color: var(--silver-dim);
+  font-style: italic;
+  padding: 2px 0;
 }
 
 /* View toggle (Teams / Individual) */

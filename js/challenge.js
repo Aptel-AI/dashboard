@@ -229,60 +229,76 @@ const Challenge = {
       const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
       const isMe = r.email === myEmail;
 
-      // Build tooltip for unit pts
-      const unitTip = r.rawUnitPoints !== r.unitPoints
-        ? `${r.totalUnits} units × ${Number(rules.pointsPerUnit?.points) || 0} pts = ${r.rawUnitPoints} (${r.unitPoints} after penalties)`
-        : `${r.totalUnits} units × ${Number(rules.pointsPerUnit?.points) || 0} pts`;
+      const rc = (label, val, cls) => `<div class="rcpt-row${cls ? ' ' + cls : ''}"><span>${label}</span><span>${val}</span></div>`;
+      const tip = (html, content) => `<span class="challenge-tip-wrap">${content}<span class="challenge-tip">${html}</span></span>`;
+      const ppu = Number(rules.pointsPerUnit?.points) || 0;
 
-      // Build tooltip for goal pts — show tier breakdown
-      const goalParts = [];
+      // Unit Pts receipt
+      let unitReceipt = `<div class="rcpt-title">Unit Points</div>`;
+      unitReceipt += rc(`${r.totalUnits} units x ${ppu}`, r.rawUnitPoints);
+      if (r.penaltyPct > 0) {
+        unitReceipt += rc(`Penalty (-${Math.round(r.penaltyPct)}%)`, '-' + (r.rawUnitPoints - r.unitPoints), 'rcpt-red');
+        unitReceipt += `<div class="rcpt-divider"></div>`;
+        unitReceipt += rc('After penalties', r.unitPoints, 'rcpt-bold');
+      }
+
+      // Goal Pts receipt
+      let goalReceipt = `<div class="rcpt-title">Goal Points</div>`;
+      let hasGoal = false;
       if (r.dailyGoalPts > 0) {
-        const tierDetails = Object.entries(r.dailyTierHits)
-          .sort((a, b) => Number(a[0]) - Number(b[0]))
-          .map(([thresh, h]) => `${h.count}d at ${thresh}+ = ${h.count}×${h.points}`)
-          .join(', ');
-        goalParts.push(`Daily: ${tierDetails} (${r.dailyGoalPts} pts)`);
+        Object.entries(r.dailyTierHits).sort((a, b) => Number(a[0]) - Number(b[0])).forEach(([thresh, h]) => {
+          goalReceipt += rc(`${thresh}+ daily (${h.count}d)`, `${h.count} x ${h.points}`);
+        });
+        hasGoal = true;
       }
       if (r.eventGoalPts > 0 && r.eventTierHit) {
-        goalParts.push(`Event: hit ${r.eventTierHit.threshold}+ units = ${r.eventTierHit.points} pts`);
+        goalReceipt += rc(`${r.eventTierHit.threshold}+ event tier`, r.eventTierHit.points);
+        hasGoal = true;
       }
-      const goalTip = goalParts.length ? goalParts.join(' | ') : 'No goal thresholds reached';
+      if (!hasGoal) goalReceipt += `<div class="rcpt-empty">No thresholds reached</div>`;
+      if (hasGoal) { goalReceipt += `<div class="rcpt-divider"></div>`; goalReceipt += rc('Total', r.goalPoints, 'rcpt-bold'); }
 
-      // Build tooltip for bonus pts
-      const bonusParts = [];
-      if (r.firstBloodWins > 0) bonusParts.push(`First Blood: ${r.firstBloodWins} day${r.firstBloodWins !== 1 ? 's' : ''} × ${Number(rules.firstBlood?.points) || 0} pts`);
-      if (r.lastBloodWins > 0) bonusParts.push(`Last Blood: ${r.lastBloodWins} day${r.lastBloodWins !== 1 ? 's' : ''} × ${Number(rules.lastBlood?.points) || 0} pts`);
-      const bonusTip = bonusParts.length ? bonusParts.join(' + ') : 'No blood wins yet';
+      // Bonus Pts receipt
+      let bonusReceipt = `<div class="rcpt-title">Bonus Points</div>`;
+      let hasBonus = false;
+      if (r.firstBloodWins > 0) { bonusReceipt += rc(`First Blood (${r.firstBloodWins}d)`, `${r.firstBloodWins} x ${Number(rules.firstBlood?.points) || 0}`); hasBonus = true; }
+      if (r.lastBloodWins > 0) { bonusReceipt += rc(`Last Blood (${r.lastBloodWins}d)`, `${r.lastBloodWins} x ${Number(rules.lastBlood?.points) || 0}`); hasBonus = true; }
+      if (!hasBonus) bonusReceipt += `<div class="rcpt-empty">No blood wins yet</div>`;
+      if (hasBonus) { bonusReceipt += `<div class="rcpt-divider"></div>`; bonusReceipt += rc('Total', r.bonusPoints, 'rcpt-bold'); }
 
-      // Penalty display with tooltip breakdown
+      // Penalty receipt
+      let penaltyReceipt = `<div class="rcpt-title">Penalties</div>`;
       const penaltyDeduction = r.rawUnitPoints - r.unitPoints;
-      let penaltyTip = r.penaltyParts.length
-        ? r.penaltyParts.join(' | ') + ` | Total: -${penaltyDeduction} pts`
-        : 'No penalties applied';
+      if (r.penaltyParts.length) {
+        r.penaltyParts.forEach(p => { penaltyReceipt += `<div class="rcpt-row rcpt-red"><span>${p}</span></div>`; });
+        penaltyReceipt += `<div class="rcpt-divider"></div>`;
+        penaltyReceipt += rc('Deducted from unit pts', '-' + penaltyDeduction, 'rcpt-bold rcpt-red');
+      } else {
+        penaltyReceipt += `<div class="rcpt-empty">No penalties active</div>`;
+      }
       const penaltyStr = r.penaltyPct > 0
-        ? tip(this._esc(penaltyTip), `<span class="challenge-penalty">-${penaltyDeduction}</span>`)
+        ? tip(penaltyReceipt, `<span class="challenge-penalty">-${penaltyDeduction}</span>`)
         : '<span style="color:var(--silver-dim)">—</span>';
 
+      // Score receipt
+      let scoreReceipt = `<div class="rcpt-title">Score Breakdown</div>`;
+      if (r.unitPoints > 0) scoreReceipt += rc('Unit Points', r.unitPoints);
+      if (r.goalPoints > 0) scoreReceipt += rc('Goal Points', r.goalPoints);
+      if (r.bonusPoints > 0) scoreReceipt += rc('Bonus Points', r.bonusPoints);
+      scoreReceipt += `<div class="rcpt-divider"></div>`;
+      scoreReceipt += rc('Total Score', r.total, 'rcpt-bold rcpt-teal');
+
       const teamCell = showTeamCol ? `<td class="challenge-pts" style="font-size:12px">${this._esc(teamLookup[r.email] || '—')}</td>` : '';
-
-      // Total tooltip
-      const totalParts = [];
-      if (r.unitPoints > 0) totalParts.push(`Unit: ${r.unitPoints}`);
-      if (r.goalPoints > 0) totalParts.push(`Goals: ${r.goalPoints}`);
-      if (r.bonusPoints > 0) totalParts.push(`Bonus: ${r.bonusPoints}`);
-      const totalTip = totalParts.join(' + ') + ` = ${r.total}`;
-
-      const tip = (text, content) => `<span class="challenge-tip-wrap">${content}<span class="challenge-tip">${text}</span></span>`;
 
       rows += `<tr class="${isMe ? 'challenge-row-me' : ''}">
         <td class="challenge-rank">${medal}</td>
         <td class="challenge-name">${this._esc(r.name)}</td>
         ${teamCell}
-        <td class="challenge-pts">${tip(this._esc(unitTip), r.unitPoints + (r.penaltyPct > 0 ? `<sup class="challenge-penalty-sup">-${Math.round(r.penaltyPct)}%</sup>` : ''))}</td>
-        <td class="challenge-pts">${tip(this._esc(goalTip), r.goalPoints)}</td>
-        <td class="challenge-pts">${tip(this._esc(bonusTip), r.bonusPoints)}</td>
+        <td class="challenge-pts">${tip(unitReceipt, r.unitPoints + (r.penaltyPct > 0 ? `<sup class="challenge-penalty-sup">-${Math.round(r.penaltyPct)}%</sup>` : ''))}</td>
+        <td class="challenge-pts">${tip(goalReceipt, r.goalPoints)}</td>
+        <td class="challenge-pts">${tip(bonusReceipt, r.bonusPoints)}</td>
         <td class="challenge-pts">${penaltyStr}</td>
-        <td class="challenge-pts challenge-total">${tip(this._esc(totalTip), r.total)}</td>
+        <td class="challenge-pts challenge-total">${tip(scoreReceipt, r.total)}</td>
       </tr>`;
     });
 
@@ -322,43 +338,43 @@ const Challenge = {
 
       // Member rows (collapsed by default, toggle with onclick)
       const rules = this._config.rules || {};
-      const tip = (text, content) => `<span class="challenge-tip-wrap">${content}<span class="challenge-tip">${text}</span></span>`;
+      const rc = (label, val, cls) => `<div class="rcpt-row${cls ? ' ' + cls : ''}"><span>${label}</span><span>${val}</span></div>`;
+      const tip = (html, content) => `<span class="challenge-tip-wrap">${content}<span class="challenge-tip">${html}</span></span>`;
+      const ppu = Number(rules.pointsPerUnit?.points) || 0;
       let memberRows = '';
       team.members.sort((a, b) => b.total - a.total).forEach(m => {
         const meClass = m.email === myEmail ? ' challenge-row-me' : '';
 
-        const unitTip = m.rawUnitPoints !== m.unitPoints
-          ? `${m.totalUnits} units × ${Number(rules.pointsPerUnit?.points) || 0} pts = ${m.rawUnitPoints} (${m.unitPoints} after penalties)`
-          : `${m.totalUnits} units × ${Number(rules.pointsPerUnit?.points) || 0} pts`;
-        const goalParts = [];
-        if (m.dailyGoalPts > 0) {
-          const tierDetails = Object.entries(m.dailyTierHits)
-            .sort((a, b) => Number(a[0]) - Number(b[0]))
-            .map(([thresh, h]) => `${h.count}d at ${thresh}+ = ${h.count}×${h.points}`)
-            .join(', ');
-          goalParts.push(`Daily: ${tierDetails} (${m.dailyGoalPts})`);
-        }
-        if (m.eventGoalPts > 0 && m.eventTierHit) {
-          goalParts.push(`Event: hit ${m.eventTierHit.threshold}+ = ${m.eventTierHit.points}`);
-        }
-        const goalTip = goalParts.length ? goalParts.join(' | ') : 'No goals reached';
-        const bonusParts = [];
-        if (m.firstBloodWins > 0) bonusParts.push(`First Blood: ${m.firstBloodWins}×${Number(rules.firstBlood?.points) || 0}`);
-        if (m.lastBloodWins > 0) bonusParts.push(`Last Blood: ${m.lastBloodWins}×${Number(rules.lastBlood?.points) || 0}`);
-        const bonusTip = bonusParts.length ? bonusParts.join(' + ') : 'No blood wins';
-        const totalParts = [];
-        if (m.unitPoints > 0) totalParts.push(`Unit: ${m.unitPoints}`);
-        if (m.goalPoints > 0) totalParts.push(`Goals: ${m.goalPoints}`);
-        if (m.bonusPoints > 0) totalParts.push(`Bonus: ${m.bonusPoints}`);
-        const totalTip = totalParts.join(' + ') + ` = ${m.total}`;
+        let uR = `<div class="rcpt-title">Unit Points</div>` + rc(`${m.totalUnits} x ${ppu}`, m.rawUnitPoints);
+        if (m.penaltyPct > 0) { uR += rc(`Penalty (-${Math.round(m.penaltyPct)}%)`, '-' + (m.rawUnitPoints - m.unitPoints), 'rcpt-red'); uR += `<div class="rcpt-divider"></div>`; uR += rc('After penalties', m.unitPoints, 'rcpt-bold'); }
+
+        let gR = `<div class="rcpt-title">Goal Points</div>`;
+        let hg = false;
+        if (m.dailyGoalPts > 0) { Object.entries(m.dailyTierHits).sort((a,b) => Number(a[0]) - Number(b[0])).forEach(([t, h]) => { gR += rc(`${t}+ daily (${h.count}d)`, `${h.count} x ${h.points}`); }); hg = true; }
+        if (m.eventGoalPts > 0 && m.eventTierHit) { gR += rc(`${m.eventTierHit.threshold}+ event`, m.eventTierHit.points); hg = true; }
+        if (!hg) gR += `<div class="rcpt-empty">No thresholds reached</div>`;
+        if (hg) { gR += `<div class="rcpt-divider"></div>`; gR += rc('Total', m.goalPoints, 'rcpt-bold'); }
+
+        let bR = `<div class="rcpt-title">Bonus Points</div>`;
+        let hb = false;
+        if (m.firstBloodWins > 0) { bR += rc(`First Blood (${m.firstBloodWins}d)`, `${m.firstBloodWins} x ${Number(rules.firstBlood?.points) || 0}`); hb = true; }
+        if (m.lastBloodWins > 0) { bR += rc(`Last Blood (${m.lastBloodWins}d)`, `${m.lastBloodWins} x ${Number(rules.lastBlood?.points) || 0}`); hb = true; }
+        if (!hb) bR += `<div class="rcpt-empty">No blood wins</div>`;
+        if (hb) { bR += `<div class="rcpt-divider"></div>`; bR += rc('Total', m.bonusPoints, 'rcpt-bold'); }
+
+        let sR = `<div class="rcpt-title">Score</div>`;
+        if (m.unitPoints > 0) sR += rc('Unit', m.unitPoints);
+        if (m.goalPoints > 0) sR += rc('Goals', m.goalPoints);
+        if (m.bonusPoints > 0) sR += rc('Bonus', m.bonusPoints);
+        sR += `<div class="rcpt-divider"></div>`; sR += rc('Total', m.total, 'rcpt-bold rcpt-teal');
 
         memberRows += `<tr class="challenge-team-member${meClass}">
           <td></td>
           <td class="challenge-name" style="padding-left:32px;font-size:13px">${this._esc(m.name)}</td>
-          <td class="challenge-pts">${tip(this._esc(unitTip), m.unitPoints + (m.penaltyPct > 0 ? `<sup class="challenge-penalty-sup">-${Math.round(m.penaltyPct)}%</sup>` : ''))}</td>
-          <td class="challenge-pts">${tip(this._esc(goalTip), m.goalPoints)}</td>
-          <td class="challenge-pts">${tip(this._esc(bonusTip), m.bonusPoints)}</td>
-          <td class="challenge-pts challenge-total">${tip(this._esc(totalTip), m.total)}</td>
+          <td class="challenge-pts">${tip(uR, m.unitPoints + (m.penaltyPct > 0 ? `<sup class="challenge-penalty-sup">-${Math.round(m.penaltyPct)}%</sup>` : ''))}</td>
+          <td class="challenge-pts">${tip(gR, m.goalPoints)}</td>
+          <td class="challenge-pts">${tip(bR, m.bonusPoints)}</td>
+          <td class="challenge-pts challenge-total">${tip(sR, m.total)}</td>
         </tr>`;
       });
 
