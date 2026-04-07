@@ -888,6 +888,24 @@ const OwnerDev = {
         .catch(err => console.warn('[OwnerDev] Batch save NLR error:', err.message));
     }
 
+    // ── Step 5: Auto-fill nlrTab='Non-Partner' where nlrWorkbookId='Non-Partner' ──
+    const npToSave = [];
+    for (const [campaignKey, campaign] of Object.entries(this.state.campaigns)) {
+      for (const ownerName of (campaign.owners || [])) {
+        const m = this._findMapping(campaignKey, ownerName);
+        if (m && (m.nlrWorkbookId || '').toLowerCase() === 'non-partner' && (m.nlrTab || '').toLowerCase() !== 'non-partner') {
+          this._upsertMapping(campaignKey, ownerName, { nlrTab: 'Non-Partner' });
+          npToSave.push({ campaign: campaignKey, ownerName, field: 'nlrTab', value: 'Non-Partner', updatedBy: 'auto-map' });
+        }
+      }
+    }
+    if (npToSave.length > 0) {
+      autoMapped += npToSave.length;
+      for (const item of npToSave) {
+        this._post('odSaveMapping', item).catch(err => console.warn('[OwnerDev] NP tab sync error:', err.message));
+      }
+    }
+
     return autoMapped;
   },
 
