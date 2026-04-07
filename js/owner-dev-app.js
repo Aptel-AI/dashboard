@@ -384,13 +384,14 @@ const OwnerDev = {
    * @param {Object} body - Data to send
    * @returns {Promise<Object>} parsed JSON response
    */
-  async _post(action, body = {}) {
+  async _post(action, body = {}, timeout = 30000) {
     const res = await this._fetchWithTimeout(
       fetch(OD_CONFIG.appsScriptUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action, key: OD_CONFIG.apiKey, ...body })
-      }).then(r => r.json())
+      }).then(r => r.json()),
+      timeout
     );
     return res;
   },
@@ -1080,7 +1081,7 @@ const OwnerDev = {
     if (btn) { btn.disabled = true; btn.textContent = `Refreshing ${label}...`; }
 
     try {
-      const result = await this._post('refreshCampaign', { campaign: key });
+      const result = await this._post('refreshCampaign', { campaign: key }, 90000);
       if (result.error) throw new Error(result.error);
       if (!result.ok) throw new Error(result.error || 'Refresh failed');
 
