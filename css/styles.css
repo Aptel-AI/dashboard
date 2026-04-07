@@ -2131,6 +2131,28 @@ td:nth-last-child(-n+2) .challenge-tip::after {
   right: 12px;
   transform: none;
 }
+/* Flip tooltip below for top rows */
+tr:nth-child(-n+3) .challenge-tip {
+  bottom: auto;
+  top: calc(100% + 10px);
+}
+tr:nth-child(-n+3) .challenge-tip::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #FFFFFF;
+}
+/* Also flip inside thead */
+thead .challenge-tip {
+  bottom: auto;
+  top: calc(100% + 10px);
+}
+thead .challenge-tip::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #FFFFFF;
+}
 /* Receipt rows */
 .rcpt-title {
   font-size: 10px;
