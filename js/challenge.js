@@ -111,16 +111,12 @@ const Challenge = {
 
     const status = this._getChallengeStatus();
     const days = this._daysRemaining();
-    if (subtitle) {
-      if (status === 'upcoming') subtitle.textContent = `${this._esc(this._config.name)} — Starts ${this._config.startDate}`;
-      else if (status === 'active') subtitle.textContent = `${this._esc(this._config.name)} — ${days} day${days !== 1 ? 's' : ''} remaining`;
-      else subtitle.textContent = `${this._esc(this._config.name)} — Ended`;
-    }
+    if (subtitle) subtitle.textContent = '';
 
     this._computeLeaderboard();
     if (this._config.mode === 'teams') this._computeTeamLeaderboard();
 
-    let html = '';
+    let html = this._challengeHeaderHTML(status, days);
     if (this._isOwnerOrSuperadmin()) html += this._managementControlsHTML();
 
     const isTeamMode = this._config.mode === 'teams';
@@ -151,6 +147,40 @@ const Challenge = {
         <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:22px;font-weight:700;color:var(--white);margin-bottom:8px">No Active Challenge</div>
         <div style="font-size:14px;color:var(--silver-dim);margin-bottom:24px">${isOwner ? 'Start a challenge to get your team competing.' : 'Check back soon — your owner will announce the next challenge.'}</div>
         ${isOwner ? '<button class="challenge-btn-primary" onclick="Challenge._startWizard()">Start Challenge</button>' : ''}
+      </div>`;
+  },
+
+  // ═════════════════════════════════════════
+  // CHALLENGE HEADER (everyone sees this)
+  // ═════════════════════════════════════════
+
+  _challengeHeaderHTML(status, days) {
+    const c = this._config;
+    const fmtDate = (d) => {
+      const dt = new Date(d + 'T12:00:00');
+      return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    const startStr = fmtDate(c.startDate);
+    const endStr = fmtDate(c.endDate);
+
+    let statusBadge = '';
+    if (status === 'active') statusBadge = `<span class="challenge-status-badge challenge-status-active">${days} day${days !== 1 ? 's' : ''} left</span>`;
+    else if (status === 'upcoming') statusBadge = `<span class="challenge-status-badge challenge-status-upcoming">Starts ${startStr}</span>`;
+    else statusBadge = `<span class="challenge-status-badge challenge-status-ended">Ended</span>`;
+
+    const modeLabel = c.mode === 'teams' ? 'Teams' : 'Free-for-All';
+
+    return `
+      <div class="challenge-header-bar">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:20px;font-weight:700;color:var(--white)">${this._esc(c.name)}</div>
+          ${statusBadge}
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">
+          <div class="challenge-header-detail"><span class="challenge-header-label">Start</span>${startStr}</div>
+          <div class="challenge-header-detail"><span class="challenge-header-label">End</span>${endStr}</div>
+          <div class="challenge-header-detail"><span class="challenge-header-label">Mode</span>${modeLabel}</div>
+        </div>
       </div>`;
   },
 

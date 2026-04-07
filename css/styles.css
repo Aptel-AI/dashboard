@@ -1856,6 +1856,55 @@ body.has-role-switcher header { top: 44px; }
 }
 .challenge-btn-icon:hover { background: rgba(0,0,0,0.08); color: #E5564A; }
 
+/* Challenge header bar */
+.challenge-header-bar {
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+.challenge-header-detail {
+  font-family: 'Cerebri Sans','DM Sans','Inter',sans-serif;
+  font-size: 13px;
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.challenge-header-label {
+  font-family: 'Helvetica Neue','Inter',sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--silver-dim);
+}
+.challenge-status-badge {
+  display: inline-block;
+  font-family: 'Cerebri Sans','DM Sans','Inter',sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+.challenge-status-active {
+  background: rgba(46,139,87,0.12);
+  color: #2E8B57;
+  border: 1px solid rgba(46,139,87,0.25);
+}
+.challenge-status-upcoming {
+  background: rgba(249,115,22,0.12);
+  color: #f97316;
+  border: 1px solid rgba(249,115,22,0.25);
+}
+.challenge-status-ended {
+  background: rgba(0,0,0,0.06);
+  color: var(--silver-dim);
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
 /* Management bar */
 .challenge-mgmt {
   background: #FFFFFF;
