@@ -222,23 +222,54 @@ const Challenge = {
     }
 
     const myEmail = (App.state.currentEmail || '').toLowerCase();
+    const rules = this._config.rules || {};
     let rows = '';
     this._leaderboard.forEach((r, i) => {
       const rank = i + 1;
       const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
       const isMe = r.email === myEmail;
-      const penaltyStr = r.penaltyPct > 0 ? `<span class="challenge-penalty">-${r.penaltyPct.toFixed(1)}%</span>` : '<span style="color:var(--silver-dim)">—</span>';
+
+      // Build tooltip for unit pts
+      const unitTip = r.rawUnitPoints !== r.unitPoints
+        ? `${r.totalUnits} units × ${Number(rules.pointsPerUnit?.points) || 0} pts = ${r.rawUnitPoints} (${r.unitPoints} after penalties)`
+        : `${r.totalUnits} units × ${Number(rules.pointsPerUnit?.points) || 0} pts`;
+
+      // Build tooltip for goal pts
+      const goalParts = [];
+      if (r.dailyGoalPts > 0) goalParts.push(`Daily Goals: ${r.dailyGoalPts} pts`);
+      if (r.eventGoalPts > 0) goalParts.push(`Event Goals: ${r.eventGoalPts} pts`);
+      const goalTip = goalParts.length ? goalParts.join(' + ') : 'No goal thresholds reached';
+
+      // Build tooltip for bonus pts
+      const bonusParts = [];
+      if (r.firstBloodWins > 0) bonusParts.push(`First Blood: ${r.firstBloodWins} day${r.firstBloodWins !== 1 ? 's' : ''} × ${Number(rules.firstBlood?.points) || 0} pts`);
+      if (r.lastBloodWins > 0) bonusParts.push(`Last Blood: ${r.lastBloodWins} day${r.lastBloodWins !== 1 ? 's' : ''} × ${Number(rules.lastBlood?.points) || 0} pts`);
+      const bonusTip = bonusParts.length ? bonusParts.join(' + ') : 'No blood wins yet';
+
+      // Penalty display
+      const penaltyDeduction = r.rawUnitPoints - r.unitPoints;
+      const penaltyStr = r.penaltyPct > 0
+        ? `<span class="challenge-penalty" title="−${penaltyDeduction} pts from ${r.rawUnitPoints} unit pts (${r.penaltyPct.toFixed(1)}% penalty)">-${penaltyDeduction}</span>`
+        : '<span style="color:var(--silver-dim)">—</span>';
+
       const teamCell = showTeamCol ? `<td class="challenge-pts" style="font-size:12px">${this._esc(teamLookup[r.email] || '—')}</td>` : '';
+
+      // Total tooltip
+      const totalParts = [];
+      if (r.unitPoints > 0) totalParts.push(`Unit: ${r.unitPoints}`);
+      if (r.goalPoints > 0) totalParts.push(`Goals: ${r.goalPoints}`);
+      if (r.bonusPoints > 0) totalParts.push(`Bonus: ${r.bonusPoints}`);
+      const totalTip = totalParts.join(' + ') + ` = ${r.total}`;
 
       rows += `<tr class="${isMe ? 'challenge-row-me' : ''}">
         <td class="challenge-rank">${medal}</td>
         <td class="challenge-name">${this._esc(r.name)}</td>
         ${teamCell}
-        <td class="challenge-pts">${r.unitPoints}</td>
-        <td class="challenge-pts">${r.goalPoints}</td>
-        <td class="challenge-pts">${r.bonusPoints}</td>
+        <td class="challenge-pts" title="${this._esc(unitTip)}">${r.unitPoints}</td>
+        <td class="challenge-pts" title="${this._esc(goalTip)}">${r.goalPoints}</td>
+        <td class="challenge-pts" title="${this._esc(bonusTip)}">${r.bonusPoints}</td>
         <td class="challenge-pts">${penaltyStr}</td>
-        <td class="challenge-pts challenge-total">${r.total}</td>
+        <td class="challenge-pts challenge-total" title="${this._esc(totalTip)}">${r.total}</td>
       </tr>`;
     });
 
@@ -254,8 +285,8 @@ const Challenge = {
               <th>Unit Pts</th>
               <th>Goal Pts</th>
               <th>Bonus Pts</th>
-              <th>Penalties</th>
-              <th>Total</th>
+              <th>Penalty</th>
+              <th>Score</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -417,13 +448,27 @@ const Challenge = {
       const goalPoints = dailyGoalPts + eventGoalPts;
       const total = adjustedUnitPts + goalPoints + bloodPts;
 
+      // Count blood wins
+      let firstBloodWins = 0, lastBloodWins = 0;
+      if (this._blood) {
+        Object.values(this._blood).forEach(day => {
+          if (day.firstBlood && day.firstBlood.email === email) firstBloodWins++;
+          if (day.lastBlood && day.lastBlood.email === email) lastBloodWins++;
+        });
+      }
+
       this._leaderboard.push({
         name: p.name,
         email: email,
         unitPoints: adjustedUnitPts,
         rawUnitPoints: rawUnitPts,
+        totalUnits: repSales.totalUnits,
+        dailyGoalPts: dailyGoalPts,
+        eventGoalPts: eventGoalPts,
         goalPoints: goalPoints,
         bonusPoints: bloodPts,
+        firstBloodWins: firstBloodWins,
+        lastBloodWins: lastBloodWins,
         penaltyPct: penaltyPct,
         total: total
       });
