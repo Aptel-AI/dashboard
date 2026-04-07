@@ -252,7 +252,7 @@ const App = {
   },
 
   // ── Complete login after PIN validation/creation ──
-  _completeLogin() {
+  async _completeLogin() {
     const session = Auth.createSession(this._loginEmail, this._loginRosterEntry);
     this.state.currentRole = session.role;
     this.state.realRole = session.role;
@@ -267,7 +267,7 @@ const App = {
 
     if (this._cachedApiData) {
       Auth.showLoading('Loading dashboard...');
-      this._processApiData(this._cachedApiData);
+      await this._processApiData(this._cachedApiData);
       this._cachedApiData = null;
       Auth.hideLoading();
       this.startAutoRefresh();
@@ -288,7 +288,7 @@ const App = {
       try {
         if (attempt > 0) Auth.showLoading(`Retrying (${attempt}/${MAX_RETRIES})...`);
         const apiData = await SheetsAPI.fetchAllData(OFFICE_CONFIG);
-        this._processApiData(apiData);
+        await this._processApiData(apiData);
         Auth.hideLoading();
         this.startAutoRefresh();
         return;
@@ -303,7 +303,7 @@ const App = {
   },
 
   // ── Process API data into app state ──
-  _processApiData(apiData) {
+  async _processApiData(apiData) {
     if (apiData._debug) console.info('🔍 Server debug:', JSON.stringify(apiData._debug, null, 2));
     const result = DataPipeline.buildFromAppsScript(apiData, OFFICE_CONFIG);
     this.state.people = result.people;
@@ -376,6 +376,13 @@ const App = {
       if (headerUserRole) headerUserRole.textContent = roleLabels[this.state.currentRole] || this.state.currentRole;
       headerUserInfo.style.display = '';
     }
+
+    // Fetch challenge config for nav visibility
+    try {
+      const challengeConfig = await SheetsAPI.fetchChallengeConfig(OFFICE_CONFIG);
+      this.state.challengeConfig = challengeConfig;
+      Challenge._config = challengeConfig;
+    } catch (e) { /* ignore — tab just won't show for non-owners */ }
 
     this.updateNav();
     Render.renderAll(this.state.people, this.state.teams);
@@ -500,7 +507,7 @@ const App = {
     this._setRosterLoading(true);
     try {
       const apiData = await SheetsAPI.fetchAllData(OFFICE_CONFIG);
-      this._processApiData(apiData);
+      await this._processApiData(apiData);
     } catch (err) {
       console.error('Auto-refresh failed:', err);
     } finally {
@@ -561,7 +568,8 @@ const App = {
     const curEmail = (this.state.currentEmail || '').toLowerCase();
     const payrollMgr = (OFFICE_CONFIG.payrollManagerEmail || this.state.settings.payrollManager || '').toLowerCase();
     const showPayroll = isSA || (role === 'owner') || (payrollMgr && curEmail === payrollMgr);
-    const showChallenge = true; // visible to all roles
+    const hasChallengeActive = this.state.challengeConfig && this.state.challengeConfig.status !== 'ended';
+    const showChallenge = isSA || ['owner', 'admin'].includes(role) || hasChallengeActive;
 
     // ── Separator visibility ──
     const hasTeamGroup = showTeam || showEdit || showTeamRoster;

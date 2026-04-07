@@ -376,6 +376,8 @@ const Challenge = {
     try {
       await SheetsAPI.post(OFFICE_CONFIG, 'endChallenge', {});
       this._config.status = 'ended';
+      App.state.challengeConfig = this._config;
+      App.updateNav();
       if (App.state.currentNav === 'challenge') this._render();
     } catch (err) {
       alert('Failed to end challenge: ' + err.message);
@@ -667,11 +669,15 @@ const Challenge = {
     try {
       await SheetsAPI.post(OFFICE_CONFIG, 'saveChallengeConfig', { config });
       this._config = config;
+      App.state.challengeConfig = config;
       this._sales = {};
       this._blood = {};
       this._wizardActive = false;
       this._wizardStep = 1;
       this._wizardData = {};
+
+      // Update nav so reps can now see the tab
+      App.updateNav();
 
       // Reload fresh data
       this.open();
