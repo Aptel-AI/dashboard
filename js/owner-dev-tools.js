@@ -732,18 +732,18 @@ const OwnerDevTools = {
       { label: 'Opens', align: 'right' },
       { label: 'AI Bkd', align: 'right' },
       { label: 'Rec Bkd', align: 'right' },
-      { label: '% Call List', align: 'right', pct: true },
+      { label: '% Call List', align: 'right', pct: true, key: 'pctCallList' },
       { label: '1st Cal', align: 'right' },
       { label: '1st Show', align: 'right' },
       { label: '→ 2nd', align: 'right' },
-      { label: 'Ret 1st', align: 'right', pct: true },
-      { label: 'Conv', align: 'right', pct: true },
+      { label: 'Ret 1st', align: 'right', pct: true, key: 'retention1st' },
+      { label: 'Conv', align: 'right', pct: true, key: 'conversion' },
       { label: '2nd Bkd', align: 'right' },
       { label: '2nd Show', align: 'right' },
-      { label: 'Ret 2nd', align: 'right', pct: true },
+      { label: 'Ret 2nd', align: 'right', pct: true, key: 'retention2nd' },
       { label: 'NS Sched', align: 'right' },
       { label: 'NS Show', align: 'right' },
-      { label: 'NS Ret', align: 'right', pct: true }
+      { label: 'NS Ret', align: 'right', pct: true, key: 'newStartsRetention' }
     ];
 
     const rowValues = (r) => [
@@ -753,18 +753,31 @@ const OwnerDevTools = {
       r.retention2nd, r.newStartsScheduled, r.newStartsShowed, r.newStartsRetention
     ];
 
-    const pctColor = (val) => {
+    // Match dashboard recruiting table color thresholds (blue/green/yellow/orange/red)
+    // Thresholds: [blue≥, green≥, yellow≥, orange≥] — below orange = red
+    const PCT_THRESHOLDS = {
+      pctCallList:       [50, 45, 38, 35],   // % Call List (row 5)
+      retention1st:      [60, 50, 45, 35],   // 1st Retention (row 4)
+      conversion:        [60, 50, 40, 35],   // Conversion
+      retention2nd:      [60, 50, 40, 35],   // 2nd Retention (row 8)
+      newStartsRetention:[60, 50, 40, 35],   // NS Retention (row 11)
+    };
+    const COLOR_HEX = { blue: '#22d3ee', green: '#84cc16', yellow: '#ffeb3b', orange: '#f9a825', red: '#e53935' };
+
+    const pctColor = (val, key) => {
       const n = parseFloat(val) || 0;
-      if (n >= 70) return '#1e6f34';
-      if (n >= 50) return '#2ea043';
-      if (n >= 30) return '#9a6500';
-      return '#8b1a1a';
+      const t = PCT_THRESHOLDS[key] || [60, 50, 40, 35];
+      if (n >= t[0]) return COLOR_HEX.blue;
+      if (n >= t[1]) return COLOR_HEX.green;
+      if (n >= t[2]) return COLOR_HEX.yellow;
+      if (n >= t[3]) return COLOR_HEX.orange;
+      return COLOR_HEX.red;
     };
 
     const fmtCell = (val, col) => {
       if (col.pct) {
         const n = parseFloat(val) || 0;
-        return `<span style="color:${pctColor(n)};font-weight:600;">${Math.round(n)}%</span>`;
+        return `<span style="color:${pctColor(n, col.key)};font-weight:600;">${Math.round(n)}%</span>`;
       }
       return val;
     };
