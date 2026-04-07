@@ -4756,7 +4756,9 @@ const NationalApp = {
       { label: '# Active Ads', key: 'liveAds',      fmt: 'num',    lowerBetter: false }
     ];
 
-    const shown = weeks.slice(-6).reverse();
+    // Exclude latest week (still in progress), show up to 6 weeks oldest→newest
+    const pool = weeks.length > 1 ? weeks.slice(0, -1) : weeks;
+    const shown = pool.slice(-6);
 
     let h = `<div class="it-trend-wrap"><div class="data-table-wrap"><table class="data-table it-trend-table">
       <thead><tr><th></th>
@@ -4768,7 +4770,8 @@ const NationalApp = {
       h += `<tr><td class="rc-label">${r.label}</td>`;
       for (let i = 0; i < shown.length; i++) {
         const val = shown[i][r.key] ?? 0;
-        const older = i < shown.length - 1 ? (shown[i + 1][r.key] ?? null) : null;
+        // Compare against previous column (older week, to the left)
+        const older = i > 0 ? (shown[i - 1][r.key] ?? null) : null;
         const arrow = older !== null ? this._costTrendArrow(val, older, r.lowerBetter) : '';
         h += `<td class="num">${fmt(val)} ${arrow}</td>`;
       }
