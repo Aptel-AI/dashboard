@@ -519,6 +519,77 @@ const Render = {
     this.activeCharts.push(chart);
   },
 
+  // ── PATCH NOTES (owner/admin profile) ──
+  _patchNotesHTML() {
+    const s = (t) => `<div style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin:28px 0 12px">${t}</div>`;
+    const h3 = (t) => `<div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:16px;font-weight:700;color:var(--white);margin:20px 0 8px">${t}</div>`;
+    const p = (t) => `<div style="font-size:13px;color:var(--white);line-height:1.7;margin-bottom:8px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif">${t}</div>`;
+    const li = (t) => `<div style="font-size:13px;color:var(--white);line-height:1.7;padding-left:16px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif">&bull; ${t}</div>`;
+
+    return `
+      <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.15);border-radius:12px;padding:28px 24px">
+        <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:22px;font-weight:700;color:var(--white);margin-bottom:4px">What's New</div>
+        <div style="font-size:12px;color:var(--silver-dim);margin-bottom:16px">April 7, 2026</div>
+
+        ${s('NEW FEATURE — BETA')}
+
+        ${h3('Challenge Tab')}
+        ${p('<b style="color:#f97316">This feature is in beta.</b> It\'s fully functional but still being refined — expect bugs. If something breaks or feels off, let us know and we\'ll get it patched.')}
+        ${p('Run gamified, office-wide sales competitions directly from the dashboard. The Challenge tab is visible to all roles when a challenge is active, but only owners and admins can create and manage them.')}
+
+        ${h3('How It Works')}
+        ${p('<b>Starting a Challenge:</b> Navigate to the Challenge tab and click <b>Start Challenge</b>. A 3-step wizard walks you through setup:')}
+        ${li('<b>Step 1 — Basics:</b> Name the challenge, set start/end dates, choose which roles compete (Rep, L1, JD, Manager), and select <b>Free-for-All</b> or <b>Teams</b> mode.')}
+        ${li('<b>Step 2 — Point Rules:</b> Toggle on/off any combination of scoring rules and penalties (details below). Each rule has its own point values you configure.')}
+        ${li('<b>Step 3 — Review:</b> See a summary of everything before launching.')}
+
+        ${h3('Teams Mode')}
+        ${p('If you select <b>Teams</b> mode, you can launch the challenge first and assign teams later — useful if you want to pick teams in a morning meeting after the rules are set. Click <b>Set Up Teams</b> from the management bar to open the team builder.')}
+        ${li('Left panel shows all unassigned competing reps.')}
+        ${li('Right panel has team columns — name each team, pick an emoji, and click + to assign reps.')}
+        ${li('Clicking + on a rep assigns them to the team with the fewest members for quick balancing.')}
+        ${li('You can edit teams at any time during the challenge.')}
+        ${p('Team scores are the <b>sum of all member points</b>. The leaderboard has a <b>Teams / Individual toggle</b> so everyone can see both standings. Click a team card to expand and see each member\'s point breakdown.')}
+
+        ${h3('Scoring Rules')}
+        ${p('Every rule can be toggled on or off independently. You set the point values when creating the challenge.')}
+        ${li('<b>Points per Unit:</b> Flat points awarded for every unit sold (e.g., 100 pts/unit).')}
+        ${li('<b>Daily Goals:</b> Set multiple tiers (e.g., 1 unit = 50 pts, 2 units = 150 pts, 3+ = 300 pts). Only the <b>highest tier reached</b> counts per day — not cumulative.')}
+        ${li('<b>Event Goals:</b> Same concept as daily goals but measured over the <b>entire challenge period</b> instead of per-day. Only the highest tier reached awards points, once.')}
+        ${li('<b>First Blood:</b> The first person to make a sale each day earns bonus points. This is calculated the next day using Tableau order timestamps, since that data arrives overnight.')}
+        ${li('<b>Last Blood:</b> Same concept — the last person to make a sale each day. Also calculated next-day.')}
+
+        ${h3('Penalties')}
+        ${p('Penalties apply <b>only to unit-based points</b> (Points per Unit). Goal points and blood points are never reduced. Multiple penalties stack multiplicatively.')}
+        ${li('<b>Active % Penalty:</b> Straight deduction based on your activation rate. If a rep has 75% of their orders active, they lose 25% of their unit points. 50% active = 50% penalty. This one hits hard — it incentivizes clean activations.')}
+        ${li('<b>0-30 Day Churn Penalty:</b> Squared penalty based on the rep\'s 0-30 day churn rate. A 5% churn rate becomes a 25% penalty. 3% becomes 9%. 10% would be a 100% penalty (all unit points wiped). The squaring makes even small churn rates sting.')}
+        ${li('<b>30 Day Churn Penalty:</b> Same squared formula but using the 30-day churn bucket.')}
+
+        ${h3('During the Challenge')}
+        ${li('The leaderboard updates every time anyone opens the Challenge tab — it pulls live sales data.')}
+        ${li('Blood calculations run automatically for any missing dates when the page loads. You can also click <b>Recalc Blood</b> to force a refresh if Tableau data arrived late.')}
+        ${li('Click <b>End Challenge</b> at any time to freeze the final standings. Once ended, the tab disappears for non-owners.')}
+        ${li('One challenge at a time per office. Starting a new one replaces the old one.')}
+
+        ${s('BUG FIXES & IMPROVEMENTS')}
+
+        ${h3('All Orders — Hide Completed Fix')}
+        ${p('The "Hide Completed" filter now correctly detects orders with a manual status override (Active, Canceled, Disconnected). Previously, if an order had Tableau device data, the override was ignored and the order would still show.')}
+
+        ${h3('All Orders — Rep Filter Includes Deactivated Reps')}
+        ${p('The rep filter dropdown in All Orders now shows every rep who has orders in the past 30 days, including deactivated reps. Previously deactivated reps were missing from the dropdown even though their orders were visible in the table.')}
+
+        ${h3('Payroll — SPE Numbers Persist for 2 Months')}
+        ${p('SPE numbers are now cached to the sales sheet the first time they\'re seen from Tableau. When Tableau data ages out after ~30 days, payroll orders in the 31-60 day window will still show their SPE numbers from the cache.')}
+
+        ${h3('Navigation — Tab Switch Race Condition Fixed')}
+        ${p('If you clicked into All Orders or Payroll and quickly switched to another tab before the data finished loading, the orders page would render on top of whatever tab you switched to. Fixed — the render now checks if you\'re still on the same tab before painting.')}
+
+        ${h3('Leaderboard — 4W Total Column')}
+        ${p('Removed conditional color formatting (red/yellow/green) from the 4-Week Total units column in the week view. Individual week columns still have color coding.')}
+      </div>`;
+  },
+
   // ── PERSON PROFILE ──
   openPersonProfile(name) {
     if (!Roster.canViewMetrics(name, App.state.currentRole, App.state.currentPersona, App.state.people)) {
@@ -534,22 +605,19 @@ const Render = {
     const p = App.state.people.find(x => x.name === name);
     if (!p) return;
 
-    // Owner/Admin profiles — show construction placeholder + Tableau refresh
+    // Owner/Admin profiles — Tableau refresh + patch notes
     if (p._roleKey === 'owner' || p._roleKey === 'admin') {
       this.openProfilePage(`
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:100px 24px;text-align:center">
-          <div style="font-size:64px;margin-bottom:20px;opacity:0.6;filter:sepia(0.3) hue-rotate(170deg) saturate(0.5)">🚧</div>
-          <div style="font-family:'Neue Montreal','Inter',sans-serif;font-size:24px;font-weight:700;color:var(--white);margin-bottom:10px">Profile Under Construction</div>
-          <div style="color:var(--silver-dim);font-size:14px;max-width:400px;line-height:1.6;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;margin-bottom:32px">
-            This profile is being built out. Check back soon for updates.
-          </div>
-          <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:12px;padding:24px;max-width:400px;width:100%;text-align:left">
+        <div style="max-width:680px;margin:0 auto;padding:40px 24px">
+          <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,0.2);border-radius:12px;padding:24px;margin-bottom:24px;text-align:left">
             <div style="font-family:'Helvetica Neue','Inter',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin-bottom:8px">Tableau Data</div>
             <div style="font-size:12px;color:var(--silver-dim);margin-bottom:12px;line-height:1.5">Cached for 6 hours. Force a refresh to pull the latest data.</div>
             <button id="profile-tableau-refresh" onclick="App._bustTableauCache()"
               style="background:var(--blue-core);border:none;border-radius:8px;color:#fff;padding:10px 20px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.5px;cursor:pointer">&#x21bb; Refresh Tableau Data</button>
             <div id="profile-tableau-refreshed" style="display:none;font-size:11px;color:var(--green);margin-top:8px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;font-weight:700;letter-spacing:1px;text-transform:uppercase"></div>
           </div>
+
+          ${this._patchNotesHTML()}
         </div>`, { name: p.name, sub: `${p.role} · Team: ${p.team || 'Unassigned'}` });
       return;
     }
