@@ -2161,7 +2161,7 @@ td.cell-red    { background: #e53935 !important; color: #fff !important; font-we
 }
 
 /* Ad breakdown table — scrollable with sticky header */
-.it-breakdown-wrap { overflow-x: auto; max-height: 520px; overflow-y: auto; }
+.it-breakdown-wrap { }
 .it-breakdown-table { font-size: 12px; }
 .it-breakdown-table th { font-size: 10px; white-space: nowrap; position: sticky; top: 0; z-index: 1; background: var(--card-bg); }
 .it-breakdown-wrap .data-table-wrap { overflow: visible; }
@@ -2311,9 +2311,6 @@ td.cell-red    { background: #e53935 !important; color: #fff !important; font-we
 
 /* ── Historic Ad Performance table ── */
 .it-history-wrap {
-  overflow-x: auto;
-  max-height: 480px;
-  overflow-y: auto;
   margin-top: 8px;
 }
 .it-history-table { font-size: 12px; }
