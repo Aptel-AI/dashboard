@@ -2978,11 +2978,20 @@ const OwnerDev = {
 
   _moveCampaignToDay(campaignKey, day, insertIdx) {
     // Preserve existing ownerOrder if moving within/between days
-    const existing = this.state.planningData.find(p => p.campaignKey === campaignKey);
-    const ownerOrder = existing ? (existing.ownerOrder || []) : [];
+    const existing = this.state.planningData.find(p => p.campaignKey === campaignKey && p.day === day);
+    const fromOther = this.state.planningData.find(p => p.campaignKey === campaignKey && p.day !== day);
+    const ownerOrder = existing ? (existing.ownerOrder || []) : (fromOther ? (fromOther.ownerOrder || []) : []);
 
-    // Remove from current position
-    this.state.planningData = this.state.planningData.filter(p => p.campaignKey !== campaignKey);
+    // Remove from THIS day only (keep other days for multi-day campaigns)
+    this.state.planningData = this.state.planningData.filter(p => !(p.campaignKey === campaignKey && p.day === day));
+
+    // If dragged from pool (not on any day yet) or moved between days, remove from source day
+    // But only remove from source if the campaign isn't already on the target day
+    // To support multi-day: hold existing entries on other days
+    if (!existing && fromOther) {
+      // Moving from another day — remove the source entry
+      this.state.planningData = this.state.planningData.filter(p => !(p.campaignKey === campaignKey && p.day === fromOther.day));
+    }
 
     // Get ordered list of campaigns already in this day
     const dayItems = this.state.planningData
@@ -3005,8 +3014,13 @@ const OwnerDev = {
     this._renderPlanningGrid();
   },
 
-  _removeCampaignFromPlanning(campaignKey) {
-    this.state.planningData = this.state.planningData.filter(p => p.campaignKey !== campaignKey);
+  _removeCampaignFromPlanning(campaignKey, day) {
+    // Remove from specific day if provided, otherwise remove all
+    if (day !== undefined) {
+      this.state.planningData = this.state.planningData.filter(p => !(p.campaignKey === campaignKey && p.day === day));
+    } else {
+      this.state.planningData = this.state.planningData.filter(p => p.campaignKey !== campaignKey);
+    }
     this.state._planningDirty = true;
     this._renderPlanningGrid();
   },

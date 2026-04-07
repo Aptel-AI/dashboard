@@ -411,13 +411,12 @@ const NationalApp = {
   },
 
   /**
-   * Get the scheduled day (0=Mon … 6=Sun) for a campaign from planning data.
-   * Returns -1 if not scheduled.
+   * Get the scheduled days (0=Mon … 6=Sun) for a campaign from planning data.
+   * Returns array of day indices, or empty array if not scheduled.
    */
-  _getCampaignScheduledDay(campaignKey) {
+  _getCampaignScheduledDays(campaignKey) {
     const sched = this._planningSchedule || [];
-    const entry = sched.find(p => p.campaignKey === campaignKey);
-    return entry ? entry.day : -1;
+    return sched.filter(p => p.campaignKey === campaignKey).map(p => p.day);
   },
 
   /**
@@ -428,12 +427,12 @@ const NationalApp = {
     // Owner must have NLR mapping
     if (this._isNonPartner(ownerName, 'nlrWorkbookId') || this._isUnmapped(ownerName, 'nlrTab')) return false;
 
-    const scheduledDay = this._getCampaignScheduledDay(campaign);
-    if (scheduledDay < 0) return false;
+    const scheduledDays = this._getCampaignScheduledDays(campaign);
+    if (!scheduledDays.length) return false;
 
     const now = new Date();
     const todayIdx = (now.getDay() + 6) % 7; // Mon=0
-    if (todayIdx !== scheduledDay) return false;
+    if (!scheduledDays.includes(todayIdx)) return false;
 
     // Check if coach already viewed recruiting tab today
     const viewed = this._getTabViewed(ownerName, campaign);
@@ -452,12 +451,12 @@ const NationalApp = {
     // Owner must have Cam mapping
     if (this._isNonPartner(ownerName, 'camCompany') || this._isUnmapped(ownerName, 'camCompany')) return false;
 
-    const scheduledDay = this._getCampaignScheduledDay(campaign);
-    if (scheduledDay < 0) return false;
+    const scheduledDays = this._getCampaignScheduledDays(campaign);
+    if (!scheduledDays.length) return false;
 
     const now = new Date();
     const todayIdx = (now.getDay() + 6) % 7;
-    if (todayIdx !== scheduledDay) return false;
+    if (!scheduledDays.includes(todayIdx)) return false;
 
     // Is this the FIRST occurrence of scheduledDay in this calendar month?
     const dayOfMonth = now.getDate();
@@ -1587,8 +1586,10 @@ const NationalApp = {
     if (schedule && schedule.length > 0) {
       const todayIdx = (new Date().getDay() + 6) % 7; // Mon=0, Sun=6
       sorted = activeKeys.sort((a, b) => {
-        const aEntry = schedule.find(p => p.campaignKey === a);
-        const bEntry = schedule.find(p => p.campaignKey === b);
+        const aEntries = schedule.filter(p => p.campaignKey === a);
+        const bEntries = schedule.filter(p => p.campaignKey === b);
+        const aEntry = aEntries[0];
+        const bEntry = bEntries[0];
         if (!aEntry && !bEntry) {
           const la = (campaigns[a]?.label || configCampaigns[a]?.label || a).toLowerCase();
           const lb = (campaigns[b]?.label || configCampaigns[b]?.label || b).toLowerCase();
@@ -1632,11 +1633,11 @@ const NationalApp = {
         ? `<div class="campaign-card-variant">${this._esc(variant)}</div>`
         : '';
 
-      // Day pill from planning schedule
+      // Day pill(s) from planning schedule (supports multi-day campaigns)
       const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      const planEntry = (schedule || []).find(p => p.campaignKey === key);
-      const dayPill = planEntry !== undefined
-        ? `<span class="campaign-card-day-pill">${dayNames[planEntry.day] || ''}</span>`
+      const planEntries = (schedule || []).filter(p => p.campaignKey === key);
+      const dayPill = planEntries.length > 0
+        ? planEntries.map(p => `<span class="campaign-card-day-pill">${dayNames[p.day] || ''}</span>`).join(' ')
         : '';
 
       // Production breakdown from cached week data
