@@ -1637,7 +1637,7 @@ const NationalApp = {
       const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       const planEntries = (schedule || []).filter(p => p.campaignKey === key);
       const dayPill = planEntries.length > 0
-        ? planEntries.map(p => `<span class="campaign-card-day-pill">${dayNames[p.day] || ''}</span>`).join(' ')
+        ? `<div class="campaign-card-day-pills">${planEntries.map(p => `<span class="campaign-card-day-pill">${dayNames[p.day] || ''}</span>`).join('')}</div>`
         : '';
 
       // Production breakdown from cached week data
