@@ -966,8 +966,9 @@ function readChallengeSales(ss, officeId, startDate, endDate) {
   var olData = olSheet.getDataRange().getValues();
   if (olData.length < 2) return {};
 
-  var start = new Date(startDate); start.setHours(0, 0, 0, 0);
-  var end = new Date(endDate); end.setHours(23, 59, 59, 999);
+  // Parse dates with T12:00:00 to avoid UTC-midnight-to-local-timezone shift
+  var start = new Date(startDate + 'T12:00:00'); start.setHours(0, 0, 0, 0);
+  var end = new Date(endDate + 'T12:00:00'); end.setHours(23, 59, 59, 999);
   if (isNaN(start.getTime()) || isNaN(end.getTime())) return {};
 
   var sales = {};
