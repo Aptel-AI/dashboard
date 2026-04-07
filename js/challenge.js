@@ -270,11 +270,10 @@ const Challenge = {
       let penaltyMultiplier = 1;
       const m = p.metrics || {};
 
-      // Active % penalty: (1 - activePct/100)^2
+      // Active % penalty: straight deduction — 75% active = 25% penalty
       if (rules.activePenalty && rules.activePenalty.enabled && m.monthTotalSPEs > 0) {
         const activeFrac = (m.activePct || 0) / 100;
-        const inactiveFrac = 1 - activeFrac;
-        penaltyMultiplier *= (1 - inactiveFrac * inactiveFrac);
+        penaltyMultiplier *= activeFrac;
       }
 
       // 0-30 Day Churn penalty: (churnPct)^2 / 100
@@ -514,7 +513,7 @@ const Challenge = {
     // Penalties
     html += '<div style="font-family:\'Helvetica Neue\',\'Inter\',sans-serif;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--silver-dim);margin:24px 0 12px">Penalties (applied to unit points only)</div>';
 
-    html += this._ruleCardHTML('activePenalty', 'Active % Penalty', 'Squared penalty based on inactive rate — 75% active = 6.25% penalty', r.activePenalty, 'toggle');
+    html += this._ruleCardHTML('activePenalty', 'Active % Penalty', 'Straight deduction — 75% active = 25% penalty on unit pts', r.activePenalty, 'toggle');
     html += this._ruleCardHTML('churn030Penalty', '0-30 Day Churn Penalty', 'Squared penalty — 5% churn = 25% penalty on unit pts', r.churn030Penalty, 'toggle');
     html += this._ruleCardHTML('churn30Penalty', '30 Day Churn Penalty', 'Squared penalty — same formula as 0-30 day', r.churn30Penalty, 'toggle');
 
