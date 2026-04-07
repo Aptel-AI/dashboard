@@ -2060,6 +2060,17 @@ body.has-role-switcher header { top: 44px; }
 .challenge-tip-wrap:hover .challenge-tip {
   display: block;
 }
+/* Prevent right-side overflow: last 2 columns align tooltip to the right */
+td:nth-last-child(-n+2) .challenge-tip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+td:nth-last-child(-n+2) .challenge-tip::after {
+  left: auto;
+  right: 12px;
+  transform: none;
+}
 
 /* View toggle (Teams / Individual) */
 .challenge-view-toggle {

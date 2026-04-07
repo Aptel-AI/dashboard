@@ -246,10 +246,13 @@ const Challenge = {
       if (r.lastBloodWins > 0) bonusParts.push(`Last Blood: ${r.lastBloodWins} day${r.lastBloodWins !== 1 ? 's' : ''} × ${Number(rules.lastBlood?.points) || 0} pts`);
       const bonusTip = bonusParts.length ? bonusParts.join(' + ') : 'No blood wins yet';
 
-      // Penalty display
+      // Penalty display with tooltip breakdown
       const penaltyDeduction = r.rawUnitPoints - r.unitPoints;
+      let penaltyTip = r.penaltyParts.length
+        ? r.penaltyParts.join(' | ') + ` | Total: -${penaltyDeduction} pts`
+        : 'No penalties applied';
       const penaltyStr = r.penaltyPct > 0
-        ? `<span class="challenge-penalty" title="−${penaltyDeduction} pts from ${r.rawUnitPoints} unit pts (${r.penaltyPct.toFixed(1)}% penalty)">-${penaltyDeduction}</span>`
+        ? tip(this._esc(penaltyTip), `<span class="challenge-penalty">-${penaltyDeduction}</span>`)
         : '<span style="color:var(--silver-dim)">—</span>';
 
       const teamCell = showTeamCol ? `<td class="challenge-pts" style="font-size:12px">${this._esc(teamLookup[r.email] || '—')}</td>` : '';
@@ -443,10 +446,13 @@ const Challenge = {
       // Penalties (applied to unit points only, stacked multiplicatively)
       let penaltyMultiplier = 1;
       const m = p.metrics || {};
+      const penaltyParts = [];
 
       // Active % penalty: straight deduction — 75% active = 25% penalty
       if (rules.activePenalty && rules.activePenalty.enabled && m.monthTotalSPEs > 0) {
         const activeFrac = num(m.activePct) / 100;
+        const pct = ((1 - activeFrac) * 100).toFixed(1);
+        penaltyParts.push(`Active %: ${num(m.activePct)}% active = ${pct}% penalty`);
         penaltyMultiplier *= activeFrac;
       }
 
@@ -454,6 +460,8 @@ const Challenge = {
       if (rules.churn030Penalty && rules.churn030Penalty.enabled && m.churnBuckets && m.churnBuckets[0]) {
         const churnPct = num(m.churnBuckets[0].pct);
         const penalty = Math.min((churnPct * churnPct) / 100, 1);
+        const pct = (penalty * 100).toFixed(1);
+        penaltyParts.push(`0-30d Churn: ${churnPct}% rate = ${pct}% penalty`);
         penaltyMultiplier *= (1 - penalty);
       }
 
@@ -461,6 +469,8 @@ const Challenge = {
       if (rules.churn30Penalty && rules.churn30Penalty.enabled && m.churnBuckets && m.churnBuckets[1]) {
         const churnPct = num(m.churnBuckets[1].pct);
         const penalty = Math.min((churnPct * churnPct) / 100, 1);
+        const pct = (penalty * 100).toFixed(1);
+        penaltyParts.push(`30d Churn: ${churnPct}% rate = ${pct}% penalty`);
         penaltyMultiplier *= (1 - penalty);
       }
 
@@ -492,6 +502,7 @@ const Challenge = {
         firstBloodWins: firstBloodWins,
         lastBloodWins: lastBloodWins,
         penaltyPct: penaltyPct,
+        penaltyParts: penaltyParts,
         total: total
       });
     });
