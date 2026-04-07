@@ -278,7 +278,7 @@ const Challenge = {
         <td class="challenge-rank">${medal}</td>
         <td class="challenge-name">${this._esc(r.name)}</td>
         ${teamCell}
-        <td class="challenge-pts">${tip(this._esc(unitTip), r.unitPoints)}</td>
+        <td class="challenge-pts">${tip(this._esc(unitTip), r.unitPoints + (r.penaltyPct > 0 ? `<sup class="challenge-penalty-sup">-${Math.round(r.penaltyPct)}%</sup>` : ''))}</td>
         <td class="challenge-pts">${tip(this._esc(goalTip), r.goalPoints)}</td>
         <td class="challenge-pts">${tip(this._esc(bonusTip), r.bonusPoints)}</td>
         <td class="challenge-pts">${penaltyStr}</td>
@@ -355,7 +355,7 @@ const Challenge = {
         memberRows += `<tr class="challenge-team-member${meClass}">
           <td></td>
           <td class="challenge-name" style="padding-left:32px;font-size:13px">${this._esc(m.name)}</td>
-          <td class="challenge-pts">${tip(this._esc(unitTip), m.unitPoints)}</td>
+          <td class="challenge-pts">${tip(this._esc(unitTip), m.unitPoints + (m.penaltyPct > 0 ? `<sup class="challenge-penalty-sup">-${Math.round(m.penaltyPct)}%</sup>` : ''))}</td>
           <td class="challenge-pts">${tip(this._esc(goalTip), m.goalPoints)}</td>
           <td class="challenge-pts">${tip(this._esc(bonusTip), m.bonusPoints)}</td>
           <td class="challenge-pts challenge-total">${tip(this._esc(totalTip), m.total)}</td>

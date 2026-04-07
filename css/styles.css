@@ -1924,6 +1924,14 @@ body.has-role-switcher header { top: 44px; }
   font-size: 12px;
   font-weight: 700;
 }
+.challenge-penalty-sup {
+  color: #E5564A;
+  font-size: 9px;
+  font-weight: 700;
+  vertical-align: super;
+  margin-left: 1px;
+  letter-spacing: -0.3px;
+}
 .challenge-row-me {
   background: rgba(67,179,174,0.08);
 }
