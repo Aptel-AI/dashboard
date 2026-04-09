@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aptel — Slack Channel Auditor</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="references/logos/aptel-symbol-black.png" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" href="references/logos/aptel-symbol-white.png" media="(prefers-color-scheme: dark)">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/slack.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     LOADING SCREEN
+     ═══════════════════════════════════════════════════════ -->
+<div id="loading-screen" style="display:none">
+  <img src="references/logos/aptel-full-black.png" alt="Aptel" style="height:40px;width:auto;opacity:0.85">
+  <div class="loading-spinner"></div>
+  <div id="loading-text" style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#708090">Loading...</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MAIN DASHBOARD
+     ═══════════════════════════════════════════════════════ -->
+<div id="slack-dashboard">
+
+  <!-- HEADER -->
+  <header class="slack-header">
+    <div class="slack-header-left">
+      <img class="slack-header-logo" src="references/logos/aptel-full-black.png" alt="Aptel">
+      <span class="slack-header-title">Slack Channel Auditor</span>
+    </div>
+    <div class="slack-header-right">
+      <span id="status-pill" class="status-pill">
+        <span class="dot"></span>
+        <span id="status-text">No data loaded</span>
+      </span>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="slack-main">
+
+    <!-- Error banner (hidden by default) -->
+    <div id="error-banner" class="error-banner" style="display:none">
+      <span class="icon">⚠️</span>
+      <span class="msg" id="error-msg"></span>
+      <button class="btn btn-sm btn-secondary" onclick="SlackApp.dismissError()">Dismiss</button>
+    </div>
+
+    <!-- Excel info bar (hidden until file uploaded) -->
+    <div id="excel-info" class="excel-info-bar" style="display:none">
+      <span class="icon">📊</span>
+      <span class="info-text" id="excel-info-text"></span>
+      <button class="btn btn-sm btn-secondary" onclick="SlackApp.clearExcelData()">Clear & Re-upload</button>
+      <button class="btn btn-sm btn-primary" onclick="SlackApp.refresh()" id="refresh-btn">↻ Refresh Slack</button>
+    </div>
+
+    <!-- Summary cards (hidden until data loaded) -->
+    <div id="summary-section" class="summary-cards" style="display:none"></div>
+
+    <!-- Toolbar (hidden until data loaded) -->
+    <div id="toolbar" class="slack-toolbar" style="display:none">
+      <div class="slack-toolbar-left">
+        <div class="filter-tabs" id="filter-tabs">
+          <button class="filter-tab active" data-filter="all" onclick="SlackApp.setFilter('all')">
+            All <span class="filter-count" id="count-all">0</span>
+          </button>
+          <button class="filter-tab" data-filter="mismatches" onclick="SlackApp.setFilter('mismatches')">
+            Mismatches <span class="filter-count" id="count-mismatches">0</span>
+          </button>
+          <button class="filter-tab" data-filter="ok" onclick="SlackApp.setFilter('ok')">
+            OK <span class="filter-count" id="count-ok">0</span>
+          </button>
+          <button class="filter-tab" data-filter="not-found" onclick="SlackApp.setFilter('not-found')">
+            Not in Slack <span class="filter-count" id="count-not-found">0</span>
+          </button>
+        </div>
+      </div>
+      <div class="slack-toolbar-right">
+        <input type="text" class="search-input" id="search-input" placeholder="Search people..." oninput="SlackApp.setSearch(this.value)">
+      </div>
+    </div>
+
+    <!-- Table container -->
+    <div id="table-container"></div>
+
+    <!-- Empty state (shown by default) -->
+    <div id="empty-state" class="empty-state">
+      <div class="empty-state-icon">📋</div>
+      <div class="empty-state-title">Upload your Excel file to get started</div>
+      <div class="empty-state-text">
+        Your file should have two sheets:<br>
+        <strong>People</strong> — Name, Email, SlackEmail (optional), Role<br>
+        <strong>Roles</strong> — Role, Channel
+      </div>
+
+      <div class="upload-zone" id="upload-zone"
+           onclick="document.getElementById('file-input').click()"
+           ondragover="event.preventDefault(); this.classList.add('dragover')"
+           ondragleave="this.classList.remove('dragover')"
+           ondrop="event.preventDefault(); this.classList.remove('dragover'); SlackApp.handleFileDrop(event)">
+        <span class="icon">📤</span>
+        <span class="label">Drop .xlsx here or click to upload</span>
+        <span class="hint">Supports .xlsx and .xls files</span>
+      </div>
+
+      <input type="file" id="file-input" class="file-input-hidden"
+             accept=".xlsx,.xls"
+             onchange="SlackApp.handleFileSelect(event)">
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCRIPTS
+     ═══════════════════════════════════════════════════════ -->
+<!-- SheetJS — client-side Excel parsing -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+<!-- App modules -->
+<script src="js/slack-config.js"></script>
+<script src="js/slack-render.js"></script>
+<script src="js/slack-app.js"></script>
+
+</body>
+</html>

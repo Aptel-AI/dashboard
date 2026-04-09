@@ -1,0 +1,569 @@
+/* ═══════════════════════════════════════════════════════
+   Aptel Slack Channel Auditor — Styles
+   Brand: Cream bg, Inter font, Dark Teal accents
+   Mirrors admin.css design system, no sidebar layout
+   ═══════════════════════════════════════════════════════ */
+
+/* ── RESET & BASE ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --cream: #FEFAF3;
+  --white: #FFFFFF;
+  --black: #242124;
+  --gray-50: #F5F2EE;
+  --gray-100: #E8E4DF;
+  --gray-200: #D1CCC6;
+  --gray-400: #9AA5B1;
+  --gray-500: #708090;
+  --gray-700: #4A5568;
+  --teal: #2C6E6A;
+  --teal-hover: #1E4F46;
+  --teal-light: rgba(44,110,106,0.08);
+  --verdigris: #43B3AE;
+  --sea-green: #2E8B57;
+  --tomato: #E5564A;
+  --periwinkle: #B8B8E8;
+  --amber: #F0B429;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.08);
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--cream);
+  color: var(--black);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── LOADING SCREEN ── */
+#loading-screen {
+  position: fixed; inset: 0; z-index: 9998;
+  background: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.loading-spinner {
+  width: 40px; height: 40px;
+  border: 3px solid rgba(44,110,106,0.15);
+  border-top-color: var(--teal);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── TOP HEADER ── */
+.slack-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 40px;
+  background: var(--white);
+  border-bottom: 1px solid var(--gray-100);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.slack-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.slack-header-logo {
+  height: 28px;
+  width: auto;
+}
+
+.slack-header-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--black);
+}
+
+.slack-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: var(--gray-50);
+  color: var(--gray-500);
+}
+.status-pill.connected {
+  background: rgba(46,139,87,0.1);
+  color: var(--sea-green);
+}
+.status-pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ── MAIN CONTENT ── */
+.slack-main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 40px;
+}
+
+/* ── TOOLBAR ── */
+.slack-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.slack-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slack-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: none;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--teal);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--teal-hover); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-secondary {
+  background: var(--gray-50);
+  color: var(--gray-700);
+  border: 1px solid var(--gray-100);
+}
+.btn-secondary:hover { background: var(--gray-100); }
+
+.btn-danger {
+  background: rgba(229,86,74,0.1);
+  color: var(--tomato);
+}
+.btn-danger:hover { background: rgba(229,86,74,0.2); }
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.btn-icon {
+  padding: 8px;
+  min-width: 36px;
+  justify-content: center;
+}
+
+/* ── FILTER TABS ── */
+.filter-tabs {
+  display: inline-flex;
+  background: var(--gray-50);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 2px;
+}
+
+.filter-tab {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-500);
+  cursor: pointer;
+  border: none;
+  background: none;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.filter-tab:hover { color: var(--black); }
+.filter-tab.active {
+  background: var(--white);
+  color: var(--teal);
+  box-shadow: var(--shadow-sm);
+}
+
+.filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 4px;
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+.filter-tab.active .filter-count {
+  background: var(--teal-light);
+  color: var(--teal);
+}
+
+/* ── SEARCH ── */
+.search-input {
+  background: var(--white);
+  border: 1px solid var(--gray-100);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px 8px 36px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--black);
+  outline: none;
+  width: 240px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%239AA5B1' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.656a5 5 0 1 1 0-10 5 5 0 0 1 0 10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 12px center;
+}
+.search-input::placeholder { color: var(--gray-400); }
+.search-input:focus {
+  border-color: var(--verdigris);
+  box-shadow: 0 0 0 3px rgba(67,179,174,0.12);
+}
+
+/* ── SUMMARY CARDS ── */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--white);
+  border: 1px solid var(--gray-100);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  text-align: center;
+}
+
+.stat-card-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--black);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.stat-card-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--gray-500);
+}
+
+.stat-card.ok .stat-card-value { color: var(--sea-green); }
+.stat-card.warning .stat-card-value { color: var(--amber); }
+.stat-card.danger .stat-card-value { color: var(--tomato); }
+
+/* ── EXCEL INFO BAR ── */
+.excel-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--teal-light);
+  border: 1px solid rgba(44,110,106,0.15);
+  border-radius: var(--radius-sm);
+  margin-bottom: 24px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--teal);
+}
+
+.excel-info-bar .icon { font-size: 16px; }
+
+.excel-info-bar .info-text { flex: 1; }
+
+/* ── COMPARISON TABLE ── */
+.slack-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--white);
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--gray-100);
+}
+
+.slack-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--gray-500);
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-100);
+  white-space: nowrap;
+}
+
+.slack-table td {
+  padding: 12px 16px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--gray-100);
+  vertical-align: top;
+}
+
+.slack-table tr:last-child td { border-bottom: none; }
+.slack-table tr:hover td { background: rgba(44,110,106,0.02); }
+
+.slack-table .name-cell {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.slack-table .email-cell {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.slack-table .role-cell {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--gray-700);
+}
+
+/* ── CHANNEL PILLS ── */
+.channel-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.channel-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  letter-spacing: -0.2px;
+}
+
+.channel-pill.pill-ok {
+  background: rgba(46,139,87,0.1);
+  color: var(--sea-green);
+}
+
+.channel-pill.pill-missing {
+  background: rgba(229,86,74,0.1);
+  color: var(--tomato);
+}
+
+.channel-pill.pill-extra {
+  background: rgba(240,180,41,0.12);
+  color: #b8860b;
+}
+
+.channel-pill .pill-icon {
+  font-size: 10px;
+}
+
+/* ── STATUS BADGE ── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.status-badge.ok {
+  background: rgba(46,139,87,0.1);
+  color: var(--sea-green);
+}
+.status-badge.missing {
+  background: rgba(229,86,74,0.1);
+  color: var(--tomato);
+}
+.status-badge.extra {
+  background: rgba(240,180,41,0.1);
+  color: var(--amber);
+}
+.status-badge.not-found {
+  background: var(--gray-50);
+  color: var(--gray-500);
+}
+.status-badge.no-role {
+  background: rgba(184,184,232,0.15);
+  color: #6B6BA8;
+}
+.status-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 40px;
+  text-align: center;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+  opacity: 0.6;
+}
+
+.empty-state-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--black);
+  margin-bottom: 8px;
+}
+
+.empty-state-text {
+  font-size: 14px;
+  color: var(--gray-500);
+  max-width: 420px;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone {
+  background: transparent;
+  border: 2px dashed var(--gray-200);
+  border-radius: var(--radius);
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--gray-400);
+  max-width: 480px;
+  margin: 0 auto;
+}
+.upload-zone:hover,
+.upload-zone.dragover {
+  border-color: var(--verdigris);
+  color: var(--verdigris);
+  background: var(--teal-light);
+}
+.upload-zone .icon { font-size: 32px; }
+.upload-zone .label { font-size: 15px; font-weight: 600; }
+.upload-zone .hint { font-size: 12px; color: var(--gray-400); }
+
+/* ── ERROR BANNER ── */
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: rgba(229,86,74,0.08);
+  border: 1px solid rgba(229,86,74,0.2);
+  border-radius: var(--radius-sm);
+  margin-bottom: 24px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tomato);
+}
+
+.error-banner .icon { font-size: 16px; }
+.error-banner .msg { flex: 1; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  .slack-header { padding: 16px 20px; }
+  .slack-main { padding: 20px; }
+  .slack-toolbar { flex-direction: column; align-items: stretch; }
+  .slack-toolbar-right { margin-left: 0; }
+  .search-input { width: 100%; }
+  .summary-cards { grid-template-columns: repeat(2, 1fr); }
+  .slack-table { font-size: 12px; }
+  .slack-table th, .slack-table td { padding: 8px 10px; }
+}
+
+@media (max-width: 480px) {
+  .summary-cards { grid-template-columns: 1fr; }
+  .slack-header-title { font-size: 15px; }
+}
+
+/* ── HIDDEN FILE INPUT ── */
+.file-input-hidden {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── SKELETON LOADING ── */
+.skeleton {
+  background: linear-gradient(90deg, var(--gray-50) 25%, var(--gray-100) 50%, var(--gray-50) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.skeleton-row {
+  display: flex;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--gray-100);
+}
+.skeleton-cell {
+  height: 16px;
+  border-radius: 4px;
+}
