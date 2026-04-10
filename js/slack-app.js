@@ -23,6 +23,7 @@ const SlackApp = {
     // }
     slackChannels: [],
     slackUsers: [],
+    slackUserGroups: [],      // [{ id, name, handle, users: [userId] }]
     slackUserMap: {},
     slackChannelMemberMap: {},
     comparisonResults: [],
@@ -205,7 +206,7 @@ const SlackApp = {
     if (refreshBtn) refreshBtn.disabled = true;
 
     try {
-      const [channelsRes, usersRes] = await Promise.all([
+      const [channelsRes, usersRes, ugRes] = await Promise.all([
         fetch(`${url}/channels`).then(r => {
           if (!r.ok) throw new Error(`Channels: ${r.status} ${r.statusText}`);
           return r.json();
@@ -214,6 +215,10 @@ const SlackApp = {
           if (!r.ok) throw new Error(`Users: ${r.status} ${r.statusText}`);
           return r.json();
         }),
+        fetch(`${url}/usergroups`).then(r => {
+          if (!r.ok) throw new Error(`User Groups: ${r.status} ${r.statusText}`);
+          return r.json();
+        }).catch(() => ({ usergroups: [] })), // graceful fallback if scope missing
       ]);
 
       if (channelsRes.error) throw new Error(channelsRes.error);
@@ -221,10 +226,12 @@ const SlackApp = {
 
       this.state.slackChannels = channelsRes.channels || [];
       this.state.slackUsers = usersRes.users || [];
+      this.state.slackUserGroups = ugRes.usergroups || [];
       this.state.lastRefresh = new Date();
 
       this._buildLookups();
-      console.log(`[SlackApp] Loaded: ${this.state.slackChannels.length} channels, ${this.state.slackUsers.length} users`);
+      this._autoDetectDepartments();
+      console.log(`[SlackApp] Loaded: ${this.state.slackChannels.length} channels, ${this.state.slackUsers.length} users, ${this.state.slackUserGroups.length} user groups`);
 
       this.computeComparison();
       SlackRender.hideError();
@@ -251,6 +258,73 @@ const SlackApp = {
     this.state.slackChannelMemberMap = {};
     for (const ch of this.state.slackChannels) {
       this.state.slackChannelMemberMap[ch.name.toLowerCase()] = new Set(ch.members || []);
+    }
+  },
+
+  // Auto-detect departments from Slack User Group membership
+  // Matches user group name/handle (case-insensitive) to department names in deptMappings
+  _autoDetectDepartments() {
+    const { excelData, slackUserGroups, slackUserMap } = this.state;
+    if (!excelData || !slackUserGroups.length) return;
+
+    // Build lookup: lowercase dept name -> actual dept name
+    const deptNames = Object.keys(excelData.deptMappings);
+    const deptLookup = {};
+    for (const d of deptNames) {
+      deptLookup[d.toLowerCase()] = d;
+    }
+    // Also check roleMappings for dept names not in deptMappings
+    for (const key of Object.keys(excelData.roleMappings)) {
+      const dept = key.split('|')[0];
+      if (!deptLookup[dept.toLowerCase()]) deptLookup[dept.toLowerCase()] = dept;
+    }
+
+    // Map user group -> department (match by name or handle)
+    const groupToDept = {};
+    for (const ug of slackUserGroups) {
+      const nameMatch = deptLookup[ug.name.toLowerCase()];
+      const handleMatch = deptLookup[ug.handle.toLowerCase()];
+      if (nameMatch) groupToDept[ug.id] = nameMatch;
+      else if (handleMatch) groupToDept[ug.id] = handleMatch;
+    }
+
+    if (!Object.keys(groupToDept).length) {
+      console.log('[SlackApp] No user group → department matches found');
+      return;
+    }
+
+    console.log('[SlackApp] User group → department mappings:', groupToDept);
+
+    // Build userId -> [departments] from user group membership
+    const userDepts = {};
+    for (const ug of slackUserGroups) {
+      const dept = groupToDept[ug.id];
+      if (!dept) continue;
+      for (const userId of ug.users) {
+        if (!userDepts[userId]) userDepts[userId] = [];
+        if (!userDepts[userId].includes(dept)) userDepts[userId].push(dept);
+      }
+    }
+
+    // Auto-fill departments for people who have empty/blank department
+    let autoFilled = 0;
+    for (const person of excelData.people) {
+      if (person.departments.length > 0) continue; // manual override takes priority
+
+      const lookupEmail = person.slackEmail || person.email;
+      const slackUser = slackUserMap[lookupEmail];
+      if (!slackUser) continue;
+
+      const detected = userDepts[slackUser.id];
+      if (detected && detected.length) {
+        person.departments = detected;
+        person.displayDept = detected.join(', ');
+        autoFilled++;
+      }
+    }
+
+    if (autoFilled) {
+      console.log(`[SlackApp] Auto-detected departments for ${autoFilled} people from user groups`);
     }
   },
 
