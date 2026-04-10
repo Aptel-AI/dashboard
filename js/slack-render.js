@@ -42,10 +42,14 @@ const SlackRender = {
   renderExcelInfo(excelData) {
     if (!excelData) { this.hide('excel-info'); return; }
     const p = excelData.people.length;
-    const r = Object.keys(excelData.roleMappings).length;
-    const c = new Set(Object.values(excelData.roleMappings).flat()).size;
+    const d = Object.keys(excelData.deptMappings || {}).length;
+    const l = Object.keys(excelData.levelMappings || {}).length;
+    const allChannels = new Set([
+      ...Object.values(excelData.deptMappings || {}).flat(),
+      ...Object.values(excelData.levelMappings || {}).flat(),
+    ]);
     document.getElementById('excel-info-text').textContent =
-      `Loaded: ${p} ${p === 1 ? 'person' : 'people'}, ${r} ${r === 1 ? 'role' : 'roles'}, ${c} channel ${c === 1 ? 'mapping' : 'mappings'}`;
+      `Loaded: ${p} people, ${d} departments, ${l} levels, ${allChannels.size} unique channels`;
     this.show('excel-info');
     this.hide('empty-state');
   },
@@ -58,7 +62,7 @@ const SlackRender = {
     const ok = results.filter(r => r.status === 'match').length;
     const mismatches = results.filter(r => r.status === 'missing' || r.status === 'extra').length;
     const notFound = results.filter(r => r.status === 'notFound').length;
-    const noRole = results.filter(r => r.status === 'noRole').length;
+    const noRole = results.filter(r => r.status === 'noMapping').length;
 
     const el = document.getElementById('summary-section');
     el.innerHTML = `
@@ -93,7 +97,7 @@ const SlackRender = {
     const all = results.length;
     const ok = results.filter(r => r.status === 'match').length;
     const mismatches = results.filter(r => r.status === 'missing' || r.status === 'extra').length;
-    const notFound = results.filter(r => r.status === 'notFound' || r.status === 'noRole').length;
+    const notFound = results.filter(r => r.status === 'notFound' || r.status === 'noMapping').length;
 
     document.getElementById('count-all').textContent = all;
     document.getElementById('count-mismatches').textContent = mismatches;
@@ -123,7 +127,7 @@ const SlackRender = {
     } else if (filterMode === 'ok') {
       rows = rows.filter(r => r.status === 'match');
     } else if (filterMode === 'not-found') {
-      rows = rows.filter(r => r.status === 'notFound' || r.status === 'noRole');
+      rows = rows.filter(r => r.status === 'notFound' || r.status === 'noMapping');
     }
 
     // Search
@@ -132,7 +136,8 @@ const SlackRender = {
       rows = rows.filter(r =>
         r.name.toLowerCase().includes(q) ||
         r.email.toLowerCase().includes(q) ||
-        r.role.toLowerCase().includes(q)
+        (r.department || '').toLowerCase().includes(q) ||
+        (r.level || '').toLowerCase().includes(q)
       );
     }
 
@@ -151,7 +156,8 @@ const SlackRender = {
           <tr>
             <th>Name</th>
             <th>Email</th>
-            <th>Role</th>
+            <th>Department</th>
+            <th>Level</th>
             <th>Expected Channels</th>
             <th>Actual Channels</th>
             <th>Status</th>
@@ -183,7 +189,8 @@ const SlackRender = {
       <tr>
         <td class="name-cell">${this._esc(r.name)}</td>
         <td class="email-cell">${this._esc(r.email)}</td>
-        <td class="role-cell">${this._esc(r.role)}</td>
+        <td class="role-cell">${this._esc(r.department || '')}</td>
+        <td class="role-cell">${this._esc(r.level || '')}</td>
         <td><div class="channel-pills">${expectedPills}</div></td>
         <td><div class="channel-pills">${actualPills}</div></td>
         <td>

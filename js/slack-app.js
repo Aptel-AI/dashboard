@@ -2,18 +2,30 @@
 // Aptel Slack Channel Auditor — App Controller
 // State management, Excel parsing, Slack fetching,
 // comparison logic
+//
+// Excel schema:
+//   People sheet:      Name | Email | SlackEmail | Department | Level
+//   Departments sheet: Department | Channel  (one row per pair)
+//   Levels sheet:      Level | Channel       (one row per pair)
+//
+// Expected channels = union(dept channels) + level channels
 // ═══════════════════════════════════════════════════════
 
 const SlackApp = {
 
   // ── State ──
   state: {
-    excelData: null,          // { people: [...], roleMappings: { role: [channels] } }
-    slackChannels: [],        // [{ id, name, isPrivate, memberCount, members }]
-    slackUsers: [],           // [{ id, name, realName, email, image }]
-    slackUserMap: {},          // lowercased email -> user object
-    slackChannelMemberMap: {}, // channelName -> Set of userIds
-    comparisonResults: [],    // computed mismatch rows
+    excelData: null,
+    // excelData shape: {
+    //   people: [{ name, email, slackEmail, departments: [], level, displayDept, displayLevel }],
+    //   deptMappings: { 'Sales': ['ch1','ch2'], 'QC': ['ch3'] },
+    //   levelMappings: { 'Manager': ['ch4'], 'Member': [] },
+    // }
+    slackChannels: [],
+    slackUsers: [],
+    slackUserMap: {},
+    slackChannelMemberMap: {},
+    comparisonResults: [],
     isLoading: false,
     lastRefresh: null,
     searchQuery: '',
@@ -27,8 +39,6 @@ const SlackApp = {
 
   init() {
     console.log('[SlackApp] Initializing...');
-
-    // Check for previously saved Excel data in localStorage
     const saved = localStorage.getItem(SLACK_CONFIG.excelStorageKey);
     if (saved) {
       try {
@@ -41,18 +51,17 @@ const SlackApp = {
         localStorage.removeItem(SLACK_CONFIG.excelStorageKey);
       }
     }
-    // Otherwise, empty state is already visible via HTML
   },
 
 
   // ═══════════════════════════════════════════
-  // File Upload Handlers
+  // File Upload
   // ═══════════════════════════════════════════
 
   handleFileSelect(event) {
     const file = event.target.files?.[0];
     if (file) this.handleFileUpload(file);
-    event.target.value = ''; // allow re-selecting same file
+    event.target.value = '';
   },
 
   handleFileDrop(event) {
@@ -62,7 +71,6 @@ const SlackApp = {
 
   async handleFileUpload(file) {
     if (!file) return;
-
     const ext = file.name.split('.').pop().toLowerCase();
     if (!['xlsx', 'xls'].includes(ext)) {
       SlackRender.showError('Please upload an .xlsx or .xls file');
@@ -78,23 +86,23 @@ const SlackApp = {
       const excelData = this.parseExcel(workbook);
 
       if (!excelData.people.length) {
-        SlackRender.showError('No people found in the People sheet. Check column headers: Name, Email, Role');
+        SlackRender.showError('No people found in the People sheet. Check column headers: Name, Email, Department, Level');
         return;
       }
 
-      if (!Object.keys(excelData.roleMappings).length) {
-        SlackRender.showError('No role mappings found in the Roles sheet. Check column headers: Role, Channel');
+      const hasMappings = Object.keys(excelData.deptMappings).length || Object.keys(excelData.levelMappings).length;
+      if (!hasMappings) {
+        SlackRender.showError('No channel mappings found. Check Departments and/or Levels sheets (columns: Department/Level, Channel)');
         return;
       }
 
-      // Save to state and localStorage
       this.state.excelData = excelData;
       localStorage.setItem(SLACK_CONFIG.excelStorageKey, JSON.stringify(excelData));
 
-      console.log(`[SlackApp] Parsed: ${excelData.people.length} people, ${Object.keys(excelData.roleMappings).length} roles`);
+      const depts = Object.keys(excelData.deptMappings).length;
+      const levels = Object.keys(excelData.levelMappings).length;
+      console.log(`[SlackApp] Parsed: ${excelData.people.length} people, ${depts} departments, ${levels} levels`);
       SlackRender.renderExcelInfo(excelData);
-
-      // Auto-fetch Slack data
       this.loadSlackData();
 
     } catch (err) {
@@ -110,78 +118,70 @@ const SlackApp = {
 
   parseExcel(workbook) {
     const cfg = SLACK_CONFIG;
-    const result = { people: [], roleMappings: {} };
+    const result = { people: [], deptMappings: {}, levelMappings: {} };
 
-    // ── Parse People sheet ──
+    // ── People sheet ──
     const peopleSheet = workbook.Sheets[cfg.expectedSheets.people];
     if (peopleSheet) {
       const rows = XLSX.utils.sheet_to_json(peopleSheet, { defval: '' });
       result.people = rows
-        .map(row => ({
-          name: String(row[cfg.peopleColumns.name] || '').trim(),
-          email: String(row[cfg.peopleColumns.email] || '').trim().toLowerCase(),
-          slackEmail: String(row[cfg.peopleColumns.slackEmail] || '').trim().toLowerCase(),
-          role: String(row[cfg.peopleColumns.role] || '').trim(),
-        }))
+        .map(row => {
+          const deptRaw = String(row[cfg.peopleColumns.department] || '').trim();
+          const levelRaw = String(row[cfg.peopleColumns.level] || '').trim();
+          return {
+            name: String(row[cfg.peopleColumns.name] || '').trim(),
+            email: String(row[cfg.peopleColumns.email] || '').trim().toLowerCase(),
+            slackEmail: String(row[cfg.peopleColumns.slackEmail] || '').trim().toLowerCase(),
+            departments: deptRaw.split(',').map(d => d.trim()).filter(Boolean),
+            level: levelRaw,
+            displayDept: deptRaw,
+            displayLevel: levelRaw,
+          };
+        })
         .filter(p => p.name && p.email);
     } else {
       console.warn(`[SlackApp] Sheet "${cfg.expectedSheets.people}" not found. Available: ${workbook.SheetNames.join(', ')}`);
     }
 
-    // ── Parse Roles sheet ──
-    const rolesSheet = workbook.Sheets[cfg.expectedSheets.roles];
-    if (rolesSheet) {
-      const rows = XLSX.utils.sheet_to_json(rolesSheet, { defval: '' });
-
-      if (rows.length > 0) {
-        const cols = Object.keys(rows[0]);
-
-        // Auto-detect format:
-        // Format A: 2 columns (Role, Channel) — one row per role-channel pair
-        // Format B: 3+ columns (Role, Channel1, Channel2, ...) — one row per role
-        const isWideFormat = cols.length > 2;
-
-        if (isWideFormat) {
-          // Wide format: Role | Channel1 | Channel2 | ...
-          const roleCol = cols[0]; // First column is the role
-          const channelCols = cols.slice(1);
-
-          for (const row of rows) {
-            const role = String(row[roleCol] || '').trim();
-            if (!role) continue;
-
-            if (!result.roleMappings[role]) result.roleMappings[role] = [];
-
-            for (const col of channelCols) {
-              const ch = this._normalizeChannel(String(row[col] || ''));
-              if (ch) result.roleMappings[role].push(ch);
-            }
-          }
-        } else {
-          // Narrow format: Role | Channel — one row per pair
-          for (const row of rows) {
-            const role = String(row[cfg.rolesColumns.role] || '').trim();
-            const ch = this._normalizeChannel(String(row[cfg.rolesColumns.channel] || ''));
-            if (!role || !ch) continue;
-
-            if (!result.roleMappings[role]) result.roleMappings[role] = [];
-            result.roleMappings[role].push(ch);
-          }
-        }
-      }
-
-      // Deduplicate channel lists
-      for (const role of Object.keys(result.roleMappings)) {
-        result.roleMappings[role] = [...new Set(result.roleMappings[role])];
-      }
+    // ── Departments sheet ──
+    const deptSheet = workbook.Sheets[cfg.expectedSheets.departments];
+    if (deptSheet) {
+      result.deptMappings = this._parseMappingSheet(deptSheet, cfg.deptColumns.department, cfg.deptColumns.channel);
     } else {
-      console.warn(`[SlackApp] Sheet "${cfg.expectedSheets.roles}" not found. Available: ${workbook.SheetNames.join(', ')}`);
+      console.warn(`[SlackApp] Sheet "${cfg.expectedSheets.departments}" not found`);
+    }
+
+    // ── Levels sheet ──
+    const levelSheet = workbook.Sheets[cfg.expectedSheets.levels];
+    if (levelSheet) {
+      result.levelMappings = this._parseMappingSheet(levelSheet, cfg.levelColumns.level, cfg.levelColumns.channel);
+    } else {
+      console.warn(`[SlackApp] Sheet "${cfg.expectedSheets.levels}" not found`);
     }
 
     return result;
   },
 
-  // Normalize channel name: strip #, lowercase, trim
+  // Parse a 2-column mapping sheet (key | channel) into { key: [channels] }
+  _parseMappingSheet(sheet, keyCol, channelCol) {
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    const map = {};
+
+    for (const row of rows) {
+      const key = String(row[keyCol] || '').trim();
+      const ch = this._normalizeChannel(String(row[channelCol] || ''));
+      if (!key || !ch) continue;
+      if (!map[key]) map[key] = [];
+      map[key].push(ch);
+    }
+
+    // Deduplicate
+    for (const k of Object.keys(map)) {
+      map[k] = [...new Set(map[k])];
+    }
+    return map;
+  },
+
   _normalizeChannel(ch) {
     return ch.replace(/^#/, '').toLowerCase().trim();
   },
@@ -202,7 +202,6 @@ const SlackApp = {
     if (refreshBtn) refreshBtn.disabled = true;
 
     try {
-      // Parallel fetch channels + users
       const [channelsRes, usersRes] = await Promise.all([
         fetch(`${url}/channels`).then(r => {
           if (!r.ok) throw new Error(`Channels: ${r.status} ${r.statusText}`);
@@ -221,14 +220,10 @@ const SlackApp = {
       this.state.slackUsers = usersRes.users || [];
       this.state.lastRefresh = new Date();
 
-      // Build lookup maps
       this._buildLookups();
-
       console.log(`[SlackApp] Loaded: ${this.state.slackChannels.length} channels, ${this.state.slackUsers.length} users`);
 
-      // Run comparison
       this.computeComparison();
-
       SlackRender.hideError();
       const time = this.state.lastRefresh.toLocaleTimeString();
       SlackRender.setStatus(`Updated ${time}`, true);
@@ -245,15 +240,11 @@ const SlackApp = {
   },
 
   _buildLookups() {
-    // Email -> Slack user
     this.state.slackUserMap = {};
     for (const u of this.state.slackUsers) {
-      if (u.email) {
-        this.state.slackUserMap[u.email] = u;
-      }
+      if (u.email) this.state.slackUserMap[u.email] = u;
     }
 
-    // Channel name -> Set of member user IDs
     this.state.slackChannelMemberMap = {};
     for (const ch of this.state.slackChannels) {
       this.state.slackChannelMemberMap[ch.name.toLowerCase()] = new Set(ch.members || []);
@@ -266,25 +257,29 @@ const SlackApp = {
   // ═══════════════════════════════════════════
 
   computeComparison() {
-    const { excelData, slackUserMap, slackChannelMemberMap } = this.state;
+    const { excelData, slackUserMap } = this.state;
     if (!excelData) return;
 
     const results = [];
 
     for (const person of excelData.people) {
-      // Find their Slack user (try slackEmail first, then email)
       const lookupEmail = person.slackEmail || person.email;
       const slackUser = slackUserMap[lookupEmail];
 
-      // Get expected channels from role
-      const expectedChannels = excelData.roleMappings[person.role] || [];
+      // Expected = union of all department channels + level channels
+      const deptChannels = person.departments.flatMap(d => excelData.deptMappings[d] || []);
+      const levelChannels = excelData.levelMappings[person.level] || [];
+      const expectedChannels = [...new Set([...deptChannels, ...levelChannels])].sort();
+
+      const roleDisplay = [person.displayDept, person.displayLevel].filter(Boolean).join(' | ');
 
       if (!slackUser) {
-        // Person not found in Slack
         results.push({
           name: person.name,
           email: person.email,
-          role: person.role,
+          department: person.displayDept,
+          level: person.displayLevel,
+          role: roleDisplay,
           slackUser: null,
           expectedChannels,
           actualChannels: [],
@@ -297,27 +292,25 @@ const SlackApp = {
       }
 
       if (!expectedChannels.length) {
-        // No role mapping defined — gather actual channels for info
         const actual = this._getUserChannels(slackUser.id);
         results.push({
           name: person.name,
           email: person.email,
-          role: person.role || '(none)',
+          department: person.displayDept || '(none)',
+          level: person.displayLevel || '(none)',
+          role: roleDisplay || '(none)',
           slackUser,
           expectedChannels: [],
           actualChannels: actual,
           matched: [],
           missing: [],
           extra: actual.slice(),
-          status: 'noRole',
+          status: 'noMapping',
         });
         continue;
       }
 
-      // Get actual channels this user is in
       const actualChannels = this._getUserChannels(slackUser.id);
-
-      // Compare
       const expectedSet = new Set(expectedChannels);
       const actualSet = new Set(actualChannels);
 
@@ -326,14 +319,16 @@ const SlackApp = {
       const extra = actualChannels.filter(ch => !expectedSet.has(ch));
 
       let status = 'match';
-      if (missing.length && extra.length) status = 'extra'; // both issues — show as mismatch
+      if (missing.length && extra.length) status = 'extra';
       else if (missing.length) status = 'missing';
       else if (extra.length) status = 'extra';
 
       results.push({
         name: person.name,
         email: person.email,
-        role: person.role,
+        department: person.displayDept,
+        level: person.displayLevel,
+        role: roleDisplay,
         slackUser,
         expectedChannels,
         actualChannels,
@@ -344,19 +339,16 @@ const SlackApp = {
       });
     }
 
-    // Sort: mismatches first, then not found, then OK
-    const statusOrder = { missing: 0, extra: 1, noRole: 2, notFound: 3, match: 4 };
+    const statusOrder = { missing: 0, extra: 1, noMapping: 2, notFound: 3, match: 4 };
     results.sort((a, b) => (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5));
 
     this.state.comparisonResults = results;
 
-    // Render
     SlackRender.renderSummary(results);
     SlackRender.updateFilterCounts(results);
     SlackRender.renderTable(results, this.state.filterMode, this.state.searchQuery);
   },
 
-  // Get all channel names a user ID is a member of
   _getUserChannels(userId) {
     const channels = [];
     for (const ch of this.state.slackChannels) {
@@ -406,7 +398,6 @@ const SlackApp = {
     SlackRender.hideError();
   },
 };
-
 
 // ── Boot ──
 document.addEventListener('DOMContentLoaded', () => SlackApp.init());

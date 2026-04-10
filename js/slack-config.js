@@ -1,20 +1,19 @@
 // ═══════════════════════════════════════════════════════
 // Aptel Slack Channel Auditor — Configuration
 // ═══════════════════════════════════════════════════════
-// Update workerUrl after deploying the Cloudflare Worker.
 
 const SLACK_CONFIG = {
-  // Cloudflare Worker proxy URL (set after deploy)
+  // Cloudflare Worker proxy URL
   workerUrl: 'https://aptel-slack-proxy.aprindle.workers.dev',
 
   // localStorage keys
   excelStorageKey: 'aptel_slack_excel_data',
-  sessionKey: 'aptel_slack_session',
 
-  // Excel sheet names to look for
+  // Excel sheet names
   expectedSheets: {
     people: 'People',
-    roles: 'Roles',
+    departments: 'Departments',
+    levels: 'Levels',
   },
 
   // Column header mappings — People sheet
@@ -22,30 +21,37 @@ const SLACK_CONFIG = {
     name: 'Name',
     email: 'Email',
     slackEmail: 'SlackEmail',
-    role: 'Role',
+    department: 'Department',   // comma-separated if multiple
+    level: 'Level',             // single value: SWAT, Manager, Lead, Member
   },
 
-  // Column header mappings — Roles sheet
-  rolesColumns: {
-    role: 'Role',
+  // Column header mappings — Departments sheet
+  deptColumns: {
+    department: 'Department',
     channel: 'Channel',
   },
 
-  // Status labels for comparison results
+  // Column header mappings — Levels sheet
+  levelColumns: {
+    level: 'Level',
+    channel: 'Channel',
+  },
+
+  // Status labels
   statusLabels: {
     match: 'OK',
     missing: 'Missing',
     extra: 'Extra',
     notFound: 'Not in Slack',
-    noRole: 'No Role Mapping',
+    noMapping: 'No Mapping',
   },
 
-  // Comparison result styling
+  // Status badge CSS classes
   statusColors: {
     match: 'ok',
     missing: 'missing',
     extra: 'extra',
     notFound: 'not-found',
-    noRole: 'no-role',
+    noMapping: 'no-role',
   },
 };
