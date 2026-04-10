@@ -15,15 +15,11 @@ const SlackApp = {
 
   // ── State ──
   state: {
+    currentPage: 'audit',
     excelData: null,
-    // excelData shape: {
-    //   people: [{ name, email, slackEmail, departments: [], level, displayDept, displayLevel }],
-    //   deptMappings: { 'Sales': ['ch1','ch2'], 'QC': ['ch3'] },
-    //   roleMappings: { 'QC|Lead': ['qc-managers'], 'Sales|SWAT': ['all-swat'] },
-    // }
     slackChannels: [],
     slackUsers: [],
-    slackUserGroups: [],      // [{ id, name, handle, users: [userId] }]
+    slackUserGroups: [],
     slackUserMap: {},
     slackChannelMemberMap: {},
     comparisonResults: [],
@@ -31,6 +27,8 @@ const SlackApp = {
     lastRefresh: null,
     searchQuery: '',
     filterMode: 'all',
+    peopleSearchQuery: '',
+    pendingPeopleUpdates: new Map(), // email → { level }
   },
 
 
@@ -534,6 +532,228 @@ const SlackApp = {
       }
     }
     return channels.sort();
+  },
+
+
+  // ═══════════════════════════════════════════
+  // Navigation
+  // ═══════════════════════════════════════════
+
+  navTo(page) {
+    const pages = ['audit', 'people', 'channels'];
+    for (const p of pages) {
+      const el = document.getElementById(`page-${p}`);
+      if (el) el.style.display = p === page ? '' : 'none';
+    }
+    document.querySelectorAll('.sidebar-link').forEach(link => {
+      link.classList.toggle('active', link.dataset.page === page);
+    });
+    this.state.currentPage = page;
+
+    // Render the page content
+    if (page === 'people') {
+      this._renderPeoplePage();
+    } else if (page === 'channels') {
+      this._renderChannelsPage();
+    }
+  },
+
+
+  // ═══════════════════════════════════════════
+  // People Management
+  // ═══════════════════════════════════════════
+
+  _renderPeoplePage() {
+    const people = this.state.excelData?.people || [];
+    SlackRender.renderPeopleTable(people, this.state.peopleSearchQuery, this.state.pendingPeopleUpdates);
+    SlackRender.renderPeopleSaveBar(this.state.pendingPeopleUpdates.size);
+  },
+
+  setPeopleSearch(query) {
+    this.state.peopleSearchQuery = query;
+    this._renderPeoplePage();
+  },
+
+  setPeopleLevel(email, newLevel) {
+    const person = (this.state.excelData?.people || []).find(p => p.email === email);
+    if (!person) return;
+
+    person.level = newLevel;
+    person.displayLevel = newLevel;
+
+    this.state.pendingPeopleUpdates.set(email, { level: newLevel });
+    SlackRender.renderPeopleSaveBar(this.state.pendingPeopleUpdates.size);
+
+    // Highlight the changed select
+    const selects = document.querySelectorAll('.level-select');
+    selects.forEach(sel => {
+      const row = sel.closest('tr');
+      const emailCell = row?.querySelector('.email-cell');
+      if (emailCell && emailCell.textContent.trim() === email) {
+        sel.classList.add('changed');
+        row.classList.add('row-dirty');
+      }
+    });
+  },
+
+  async savePeopleChanges() {
+    const updates = [];
+    for (const [email, data] of this.state.pendingPeopleUpdates) {
+      updates.push({ email, ...data });
+    }
+
+    if (!updates.length) return;
+
+    try {
+      const res = await fetch(`${SLACK_CONFIG.workerUrl}/sheet/write`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'writePeople', updates }),
+      });
+      const data = await res.json();
+      console.log('[SlackApp] People save result:', data);
+
+      this.state.pendingPeopleUpdates.clear();
+      this._renderPeoplePage();
+      SlackRender.showToast(`Saved ${updates.length} change${updates.length !== 1 ? 's' : ''}`);
+    } catch (err) {
+      console.error('[SlackApp] People save error:', err);
+      SlackRender.showToast('Failed to save: ' + err.message, true);
+    }
+  },
+
+
+  // ═══════════════════════════════════════════
+  // Channel Mapping Management
+  // ═══════════════════════════════════════════
+
+  _renderChannelsPage() {
+    const data = this.state.excelData;
+    if (!data) return;
+    SlackRender.renderDeptMappings(data.deptMappings);
+    SlackRender.renderRoleMappings(data.roleMappings);
+    SlackRender.populateChannelsFormData(data.deptMappings, data.roleMappings, this.state.slackChannels);
+  },
+
+  async addDeptMapping() {
+    const deptInput = document.getElementById('add-dept-name');
+    const chInput = document.getElementById('add-dept-channel');
+    const dept = (deptInput.value || '').trim();
+    const ch = this._normalizeChannel(chInput.value || '');
+
+    if (!dept || !ch) {
+      SlackRender.showToast('Enter both a department and channel name', true);
+      return;
+    }
+
+    if (!this.state.excelData.deptMappings[dept]) {
+      this.state.excelData.deptMappings[dept] = [];
+    }
+    if (this.state.excelData.deptMappings[dept].includes(ch)) {
+      SlackRender.showToast(`#${ch} is already mapped to ${dept}`, true);
+      return;
+    }
+
+    this.state.excelData.deptMappings[dept].push(ch);
+    deptInput.value = '';
+    chInput.value = '';
+    this._renderChannelsPage();
+
+    await this._writeDeptMappingsToSheet();
+    SlackRender.showToast(`Added #${ch} to ${dept}`);
+  },
+
+  async removeDeptMapping(dept, channel) {
+    const arr = this.state.excelData.deptMappings[dept];
+    if (!arr) return;
+    const idx = arr.indexOf(channel);
+    if (idx === -1) return;
+
+    arr.splice(idx, 1);
+    if (!arr.length) delete this.state.excelData.deptMappings[dept];
+    this._renderChannelsPage();
+
+    await this._writeDeptMappingsToSheet();
+    SlackRender.showToast(`Removed #${channel} from ${dept}`);
+  },
+
+  async addRoleMapping() {
+    const deptInput = document.getElementById('add-role-dept');
+    const levelSelect = document.getElementById('add-role-level');
+    const chInput = document.getElementById('add-role-channel');
+    const dept = (deptInput.value || '').trim();
+    const level = levelSelect.value;
+    const ch = this._normalizeChannel(chInput.value || '');
+
+    if (!dept || !level || !ch) {
+      SlackRender.showToast('Enter department, level, and channel', true);
+      return;
+    }
+
+    const key = `${dept}|${level}`;
+    if (!this.state.excelData.roleMappings[key]) {
+      this.state.excelData.roleMappings[key] = [];
+    }
+    if (this.state.excelData.roleMappings[key].includes(ch)) {
+      SlackRender.showToast(`#${ch} is already mapped to ${key}`, true);
+      return;
+    }
+
+    this.state.excelData.roleMappings[key].push(ch);
+    deptInput.value = '';
+    levelSelect.value = '';
+    chInput.value = '';
+    this._renderChannelsPage();
+
+    await this._writeRoleMappingsToSheet();
+    SlackRender.showToast(`Added #${ch} to ${dept} | ${level}`);
+  },
+
+  async removeRoleMapping(dept, level, channel) {
+    const key = `${dept}|${level}`;
+    const arr = this.state.excelData.roleMappings[key];
+    if (!arr) return;
+    const idx = arr.indexOf(channel);
+    if (idx === -1) return;
+
+    arr.splice(idx, 1);
+    if (!arr.length) delete this.state.excelData.roleMappings[key];
+    this._renderChannelsPage();
+
+    await this._writeRoleMappingsToSheet();
+    SlackRender.showToast(`Removed #${channel} from ${dept} | ${level}`);
+  },
+
+  async _writeDeptMappingsToSheet() {
+    try {
+      await fetch(`${SLACK_CONFIG.workerUrl}/sheet/write`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'writeDepartments',
+          mappings: this.state.excelData.deptMappings,
+        }),
+      });
+    } catch (err) {
+      console.error('[SlackApp] Failed to write dept mappings:', err);
+      SlackRender.showToast('Failed to save to sheet', true);
+    }
+  },
+
+  async _writeRoleMappingsToSheet() {
+    try {
+      await fetch(`${SLACK_CONFIG.workerUrl}/sheet/write`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'writeRoles',
+          mappings: this.state.excelData.roleMappings,
+        }),
+      });
+    } catch (err) {
+      console.error('[SlackApp] Failed to write role mappings:', err);
+      SlackRender.showToast('Failed to save to sheet', true);
+    }
   },
 
 

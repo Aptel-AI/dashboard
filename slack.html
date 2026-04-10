@@ -15,6 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Styles -->
+  <link rel="stylesheet" href="css/admin.css">
   <link rel="stylesheet" href="css/slack.css">
 </head>
 <body>
@@ -29,26 +30,39 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
-     MAIN DASHBOARD
+     LAYOUT
      ═══════════════════════════════════════════════════════ -->
-<div id="slack-dashboard">
+<div class="admin-layout">
 
-  <!-- HEADER -->
-  <header class="slack-header">
-    <div class="slack-header-left">
-      <img class="slack-header-logo" src="references/logos/aptel-full-black.png" alt="Aptel">
-      <span class="slack-header-title">Slack Channel Auditor</span>
+  <!-- SIDEBAR -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <img src="references/logos/aptel-full-black.png" alt="Aptel">
     </div>
-    <div class="slack-header-right">
+
+    <nav class="sidebar-nav">
+      <button class="sidebar-link active" data-page="audit" onclick="SlackApp.navTo('audit')">
+        <span class="icon">📊</span> Audit
+      </button>
+      <button class="sidebar-link" data-page="people" onclick="SlackApp.navTo('people')">
+        <span class="icon">👥</span> People
+      </button>
+      <button class="sidebar-link" data-page="channels" onclick="SlackApp.navTo('channels')">
+        <span class="icon">📡</span> Channels
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
       <span id="status-pill" class="status-pill">
         <span class="dot"></span>
         <span id="status-text">No data loaded</span>
       </span>
+      <button class="btn btn-sm btn-secondary" style="margin-top:10px;width:100%" onclick="SlackApp.refresh()" id="refresh-btn">↻ Refresh</button>
     </div>
-  </header>
+  </aside>
 
-  <!-- MAIN -->
-  <main class="slack-main">
+  <!-- MAIN CONTENT -->
+  <main class="admin-main">
 
     <!-- Error banner (hidden by default) -->
     <div id="error-banner" class="error-banner" style="display:none">
@@ -57,59 +71,150 @@
       <button class="btn btn-sm btn-secondary" onclick="SlackApp.dismissError()">Dismiss</button>
     </div>
 
-    <!-- Excel info bar -->
-    <div id="excel-info" class="excel-info-bar" style="display:none">
-      <span class="icon">📊</span>
-      <span class="info-text" id="excel-info-text"></span>
-      <button class="btn btn-sm btn-primary" onclick="SlackApp.refresh()" id="refresh-btn">↻ Refresh</button>
-    </div>
+    <!-- ═══════════════════════════════════════════
+         PAGE: AUDIT
+         ═══════════════════════════════════════════ -->
+    <div id="page-audit">
 
-    <!-- Summary cards (hidden until data loaded) -->
-    <div id="summary-section" class="summary-cards" style="display:none"></div>
+      <!-- Excel info bar -->
+      <div id="excel-info" class="excel-info-bar" style="display:none">
+        <span class="icon">📊</span>
+        <span class="info-text" id="excel-info-text"></span>
+      </div>
 
-    <!-- Toolbar (hidden until data loaded) -->
-    <div id="toolbar" class="slack-toolbar" style="display:none">
-      <div class="slack-toolbar-left">
-        <div class="filter-tabs" id="filter-tabs">
-          <button class="filter-tab active" data-filter="all" onclick="SlackApp.setFilter('all')">
-            All <span class="filter-count" id="count-all">0</span>
-          </button>
-          <button class="filter-tab" data-filter="mismatches" onclick="SlackApp.setFilter('mismatches')">
-            Mismatches <span class="filter-count" id="count-mismatches">0</span>
-          </button>
-          <button class="filter-tab" data-filter="ok" onclick="SlackApp.setFilter('ok')">
-            OK <span class="filter-count" id="count-ok">0</span>
-          </button>
-          <button class="filter-tab" data-filter="not-found" onclick="SlackApp.setFilter('not-found')">
-            Not in Slack <span class="filter-count" id="count-not-found">0</span>
-          </button>
+      <!-- Summary cards -->
+      <div id="summary-section" class="summary-cards" style="display:none"></div>
+
+      <!-- Toolbar -->
+      <div id="toolbar" class="slack-toolbar" style="display:none">
+        <div class="slack-toolbar-left">
+          <div class="filter-tabs" id="filter-tabs">
+            <button class="filter-tab active" data-filter="all" onclick="SlackApp.setFilter('all')">
+              All <span class="filter-count" id="count-all">0</span>
+            </button>
+            <button class="filter-tab" data-filter="mismatches" onclick="SlackApp.setFilter('mismatches')">
+              Mismatches <span class="filter-count" id="count-mismatches">0</span>
+            </button>
+            <button class="filter-tab" data-filter="ok" onclick="SlackApp.setFilter('ok')">
+              OK <span class="filter-count" id="count-ok">0</span>
+            </button>
+            <button class="filter-tab" data-filter="not-found" onclick="SlackApp.setFilter('not-found')">
+              Not in Slack <span class="filter-count" id="count-not-found">0</span>
+            </button>
+          </div>
+        </div>
+        <div class="slack-toolbar-right">
+          <input type="text" class="search-input" id="search-input" placeholder="Search people..." oninput="SlackApp.setSearch(this.value)">
         </div>
       </div>
-      <div class="slack-toolbar-right">
-        <input type="text" class="search-input" id="search-input" placeholder="Search people..." oninput="SlackApp.setSearch(this.value)">
+
+      <!-- Table container -->
+      <div id="table-container"></div>
+
+      <!-- Empty state -->
+      <div id="empty-state" class="empty-state" style="display:none">
+        <div class="empty-state-icon">⚠️</div>
+        <div class="empty-state-title">Could not load configuration</div>
+        <div class="empty-state-text">
+          The Google Sheet data could not be loaded. Make sure the Apps Script is deployed and the Worker has the correct URL.
+        </div>
       </div>
+
     </div>
 
-    <!-- Table container -->
-    <div id="table-container"></div>
+    <!-- ═══════════════════════════════════════════
+         PAGE: PEOPLE
+         ═══════════════════════════════════════════ -->
+    <div id="page-people" style="display:none">
 
-    <!-- Empty state (shown only if Excel fails to load) -->
-    <div id="empty-state" class="empty-state" style="display:none">
-      <div class="empty-state-icon">⚠️</div>
-      <div class="empty-state-title">Could not load configuration</div>
-      <div class="empty-state-text">
-        The Excel file at <code>references/slack-template.xlsx</code> could not be loaded.
-        Make sure it exists in the repository and has been pushed.
+      <div class="page-header">
+        <h1>People</h1>
+        <p id="people-subtitle">Manage team members and assign levels</p>
       </div>
+
+      <div class="slack-toolbar">
+        <div class="slack-toolbar-left">
+          <input type="text" class="search-input" id="people-search" placeholder="Search people..." oninput="SlackApp.setPeopleSearch(this.value)">
+        </div>
+      </div>
+
+      <div id="people-table-container"></div>
+
+      <!-- Save bar (sticky bottom, hidden until changes) -->
+      <div id="people-save-bar" class="save-bar" style="display:none">
+        <span id="save-bar-text" class="save-bar-text">0 unsaved changes</span>
+        <button class="btn btn-primary" onclick="SlackApp.savePeopleChanges()">Save Changes</button>
+      </div>
+
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         PAGE: CHANNELS
+         ═══════════════════════════════════════════ -->
+    <div id="page-channels" style="display:none">
+
+      <div class="page-header">
+        <h1>Channel Mappings</h1>
+        <p>Define which channels each department and level should have access to</p>
+      </div>
+
+      <!-- Department → Channels -->
+      <div class="settings-section">
+        <div class="settings-section-title">Department Channels</div>
+        <div class="settings-section-desc">Base channels everyone in a department gets added to automatically.</div>
+        <div id="dept-mappings-container"></div>
+        <div class="add-mapping-row" id="add-dept-row">
+          <input type="text" class="mapping-input" id="add-dept-name" placeholder="Department name" list="dept-datalist">
+          <datalist id="dept-datalist"></datalist>
+          <input type="text" class="mapping-input" id="add-dept-channel" placeholder="channel-name" list="channel-datalist">
+          <datalist id="channel-datalist"></datalist>
+          <button class="btn btn-sm btn-primary" onclick="SlackApp.addDeptMapping()">+ Add</button>
+        </div>
+      </div>
+
+      <!-- Department|Level → Channels -->
+      <div class="settings-section">
+        <div class="settings-section-title">Role Channels</div>
+        <div class="settings-section-desc">Additional channels based on department + level combination (e.g., QC Managers get manager-specific channels).</div>
+        <div id="role-mappings-container"></div>
+        <div class="add-mapping-row" id="add-role-row">
+          <input type="text" class="mapping-input" id="add-role-dept" placeholder="Department" list="dept-datalist">
+          <select class="mapping-input" id="add-role-level">
+            <option value="">Select level...</option>
+          </select>
+          <input type="text" class="mapping-input" id="add-role-channel" placeholder="channel-name" list="channel-datalist">
+          <button class="btn btn-sm btn-primary" onclick="SlackApp.addRoleMapping()">+ Add</button>
+        </div>
+      </div>
+
+      <!-- Setup Guide -->
+      <div class="settings-section">
+        <div class="settings-section-title">Adding a New Automated Channel</div>
+        <div class="setup-instructions">
+          <strong>How to set up a new channel for automatic management:</strong>
+          <ol>
+            <li>Create the channel in Slack (public or private)</li>
+            <li>Invite the bot: type <code>/invite @Aptel Channel Auditor</code> in the channel</li>
+            <li>Come back here and add the mapping above (Department or Role)</li>
+            <li>The system will automatically add/remove people when their user group changes</li>
+          </ol>
+          <p style="margin-top:12px;color:var(--gray-500);font-size:12px;">
+            <strong>Note:</strong> The bot can only manage channels it has been invited to. For private channels, you must manually invite the bot first.
+          </p>
+        </div>
+      </div>
+
     </div>
 
   </main>
 </div>
 
+<!-- Toast notification -->
+<div id="toast" class="toast" style="display:none"></div>
+
 <!-- ═══════════════════════════════════════════════════════
      SCRIPTS
      ═══════════════════════════════════════════════════════ -->
-<!-- App modules -->
 <script src="js/slack-config.js"></script>
 <script src="js/slack-render.js"></script>
 <script src="js/slack-app.js"></script>

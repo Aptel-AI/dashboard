@@ -13,8 +13,8 @@ const SlackRender = {
   },
 
   // ── Show / hide helpers ──
-  show(id) { document.getElementById(id).style.display = ''; },
-  hide(id) { document.getElementById(id).style.display = 'none'; },
+  show(id) { const el = document.getElementById(id); if (el) el.style.display = ''; },
+  hide(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; },
 
   // ── Loading screen ──
   showLoading(msg) {
@@ -29,6 +29,17 @@ const SlackRender = {
     this.show('error-banner');
   },
   hideError() { this.hide('error-banner'); },
+
+  // ── Toast notification ──
+  showToast(msg, isError) {
+    const el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = isError ? 'toast toast-error' : 'toast';
+    el.style.display = '';
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => { el.style.display = 'none'; }, 3000);
+  },
 
   // ── Status pill ──
   setStatus(text, connected) {
@@ -49,10 +60,15 @@ const SlackRender = {
       ...Object.values(excelData.roleMappings || {}).flat(),
     ]);
     document.getElementById('excel-info-text').textContent =
-      `Loaded: ${p} people, ${d} departments, ${r} role combos, ${allChannels.size} unique channels`;
+      `${p} people, ${d} departments, ${r} role combos, ${allChannels.size} unique channels`;
     this.show('excel-info');
     this.hide('empty-state');
   },
+
+
+  // ═══════════════════════════════════════════
+  // AUDIT PAGE
+  // ═══════════════════════════════════════════
 
   // ── Summary cards ──
   renderSummary(results) {
@@ -120,7 +136,6 @@ const SlackRender = {
       return;
     }
 
-    // Filter
     let rows = results;
     if (filterMode === 'mismatches') {
       rows = rows.filter(r => r.status === 'missing' || r.status === 'extra');
@@ -130,7 +145,6 @@ const SlackRender = {
       rows = rows.filter(r => r.status === 'notFound' || r.status === 'noMapping');
     }
 
-    // Search
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       rows = rows.filter(r =>
@@ -175,12 +189,9 @@ const SlackRender = {
   _renderRow(r) {
     const statusClass = SLACK_CONFIG.statusColors[r.status] || '';
     const statusLabel = SLACK_CONFIG.statusLabels[r.status] || r.status;
-
-    // Build channel pills
     const expectedPills = this._channelPills(r.expectedChannels, r.matched, r.missing, 'expected');
     const actualPills = this._channelPills(r.actualChannels, r.matched, r.extra, 'actual');
 
-    // Detail summary
     let detail = '';
     if (r.missing.length) detail += `<span style="color:var(--tomato);font-size:12px;font-weight:600;">+${r.missing.length} missing</span> `;
     if (r.extra.length) detail += `<span style="color:var(--amber);font-size:12px;font-weight:600;">-${r.extra.length} extra</span>`;
@@ -214,11 +225,9 @@ const SlackRender = {
       let icon = '✓';
 
       if (mode === 'expected' && highlighted.includes(ch)) {
-        // Channel is in expected but missing from actual
         cls = 'pill-missing';
         icon = '✗';
       } else if (mode === 'actual' && highlighted.includes(ch)) {
-        // Channel is in actual but not in expected
         cls = 'pill-extra';
         icon = '?';
       } else if (matched.includes(ch)) {
@@ -229,6 +238,217 @@ const SlackRender = {
       return `<span class="channel-pill ${cls}"><span class="pill-icon">${icon}</span>#${this._esc(ch)}</span>`;
     }).join('');
   },
+
+
+  // ═══════════════════════════════════════════
+  // PEOPLE PAGE
+  // ═══════════════════════════════════════════
+
+  renderPeopleTable(people, searchQuery, pendingUpdates) {
+    const container = document.getElementById('people-table-container');
+    if (!people || !people.length) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:60px 20px;color:var(--gray-500);">
+          <div style="font-size:24px;margin-bottom:8px;">👥</div>
+          <div style="font-weight:600;">No people loaded yet</div>
+          <div style="font-size:13px;margin-top:4px;">People are auto-populated from Slack on first load.</div>
+        </div>`;
+      return;
+    }
+
+    let rows = people;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      rows = rows.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.email.toLowerCase().includes(q) ||
+        (p.displayDept || '').toLowerCase().includes(q) ||
+        (p.level || '').toLowerCase().includes(q)
+      );
+    }
+
+    // Sort: people with no level first, then alpha
+    rows = [...rows].sort((a, b) => {
+      if (!a.level && b.level) return -1;
+      if (a.level && !b.level) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    const levelOptions = SLACK_CONFIG.levels.map(l =>
+      `<option value="${this._esc(l)}">${this._esc(l)}</option>`
+    ).join('');
+
+    container.innerHTML = `
+      <table class="slack-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Department</th>
+            <th>Level</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(p => {
+            const isDirty = pendingUpdates && pendingUpdates.has(p.email);
+            const dirtyClass = isDirty ? ' row-dirty' : '';
+            return `
+              <tr class="${dirtyClass}">
+                <td class="name-cell">${this._esc(p.name)}</td>
+                <td class="email-cell">${this._esc(p.email)}</td>
+                <td class="role-cell">${this._esc(p.displayDept || '—')}</td>
+                <td>
+                  <select class="level-select${isDirty ? ' changed' : ''}"
+                          onchange="SlackApp.setPeopleLevel('${this._esc(p.email)}', this.value)">
+                    <option value="">—</option>
+                    ${levelOptions}
+                  </select>
+                  <script>
+                    document.currentScript.previousElementSibling.value = ${JSON.stringify(p.level || '')};
+                  </script>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    // Update subtitle
+    const sub = document.getElementById('people-subtitle');
+    if (sub) sub.textContent = `${people.length} team members`;
+  },
+
+  renderPeopleSaveBar(count) {
+    const bar = document.getElementById('people-save-bar');
+    const text = document.getElementById('save-bar-text');
+    if (!bar) return;
+    if (count > 0) {
+      text.textContent = `${count} unsaved change${count !== 1 ? 's' : ''}`;
+      bar.style.display = '';
+    } else {
+      bar.style.display = 'none';
+    }
+  },
+
+
+  // ═══════════════════════════════════════════
+  // CHANNELS PAGE
+  // ═══════════════════════════════════════════
+
+  renderDeptMappings(deptMappings) {
+    const container = document.getElementById('dept-mappings-container');
+    if (!container) return;
+
+    const depts = Object.keys(deptMappings || {}).sort();
+    if (!depts.length) {
+      container.innerHTML = `<p style="color:var(--gray-400);font-size:13px;padding:12px 0;">No department mappings yet. Add one below.</p>`;
+      return;
+    }
+
+    let html = `
+      <table class="mapping-table">
+        <thead><tr><th>Department</th><th>Channels</th></tr></thead>
+        <tbody>
+    `;
+
+    for (const dept of depts) {
+      const channels = deptMappings[dept] || [];
+      const pills = channels.map(ch => `
+        <span class="mapping-pill">
+          #${this._esc(ch)}
+          <button class="remove-btn" onclick="SlackApp.removeDeptMapping('${this._esc(dept)}','${this._esc(ch)}')" title="Remove">✕</button>
+        </span>
+      `).join('');
+
+      html += `
+        <tr>
+          <td class="dept-name">${this._esc(dept)}</td>
+          <td>${pills}</td>
+        </tr>
+      `;
+    }
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  },
+
+  renderRoleMappings(roleMappings) {
+    const container = document.getElementById('role-mappings-container');
+    if (!container) return;
+
+    const keys = Object.keys(roleMappings || {}).sort();
+    if (!keys.length) {
+      container.innerHTML = `<p style="color:var(--gray-400);font-size:13px;padding:12px 0;">No role mappings yet. Add one below.</p>`;
+      return;
+    }
+
+    let html = `
+      <table class="mapping-table">
+        <thead><tr><th>Department</th><th>Level</th><th>Channels</th></tr></thead>
+        <tbody>
+    `;
+
+    for (const key of keys) {
+      const [dept, level] = key.split('|');
+      const channels = roleMappings[key] || [];
+      const pills = channels.map(ch => `
+        <span class="mapping-pill">
+          #${this._esc(ch)}
+          <button class="remove-btn" onclick="SlackApp.removeRoleMapping('${this._esc(dept)}','${this._esc(level)}','${this._esc(ch)}')" title="Remove">✕</button>
+        </span>
+      `).join('');
+
+      html += `
+        <tr>
+          <td class="dept-name">${this._esc(dept)}</td>
+          <td class="level-name">${this._esc(level)}</td>
+          <td>${pills}</td>
+        </tr>
+      `;
+    }
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  },
+
+  // Populate datalists and level select for the Channels page add forms
+  populateChannelsFormData(deptMappings, roleMappings, slackChannels) {
+    // Department datalist
+    const deptList = document.getElementById('dept-datalist');
+    if (deptList) {
+      const allDepts = new Set([
+        ...Object.keys(deptMappings || {}),
+        ...Object.keys(roleMappings || {}).map(k => k.split('|')[0]),
+      ]);
+      deptList.innerHTML = [...allDepts].sort().map(d =>
+        `<option value="${this._esc(d)}">`
+      ).join('');
+    }
+
+    // Channel datalist
+    const chList = document.getElementById('channel-datalist');
+    if (chList) {
+      const names = (slackChannels || []).map(ch => ch.name.toLowerCase()).sort();
+      chList.innerHTML = names.map(n => `<option value="${this._esc(n)}">`).join('');
+    }
+
+    // Role level select
+    const levelSelect = document.getElementById('add-role-level');
+    if (levelSelect && levelSelect.options.length <= 1) {
+      for (const l of SLACK_CONFIG.levels) {
+        const opt = document.createElement('option');
+        opt.value = l;
+        opt.textContent = l;
+        levelSelect.appendChild(opt);
+      }
+    }
+  },
+
+
+  // ═══════════════════════════════════════════
+  // SHARED
+  // ═══════════════════════════════════════════
 
   // ── Skeleton loading rows ──
   renderSkeletonTable() {

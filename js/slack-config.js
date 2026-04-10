@@ -6,6 +6,9 @@ const SLACK_CONFIG = {
   // Cloudflare Worker proxy URL
   workerUrl: 'https://aptel-slack-proxy.aprindle.workers.dev',
 
+  // Valid level values for dropdowns
+  levels: ['Lead', 'Manager'],
+
   // Column keys (match Google Sheet headers)
   columns: {
     name: 'Name',
