@@ -9,6 +9,9 @@ const SLACK_CONFIG = {
   // Valid level values for dropdowns
   levels: ['Lead', 'Manager'],
 
+  // Channels every person gets automatically (regardless of department/level)
+  globalChannels: ['all-aptel', 'announcements'],
+
   // Column keys (match Google Sheet headers)
   columns: {
     name: 'Name',

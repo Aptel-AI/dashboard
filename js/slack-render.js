@@ -274,10 +274,6 @@ const SlackRender = {
       return a.name.localeCompare(b.name);
     });
 
-    const levelOptions = SLACK_CONFIG.levels.map(l =>
-      `<option value="${this._esc(l)}">${this._esc(l)}</option>`
-    ).join('');
-
     container.innerHTML = `
       <table class="slack-table">
         <thead>
@@ -292,6 +288,10 @@ const SlackRender = {
           ${rows.map(p => {
             const isDirty = pendingUpdates && pendingUpdates.has(p.email);
             const dirtyClass = isDirty ? ' row-dirty' : '';
+            const currentLevel = (p.level || '').trim();
+            const opts = SLACK_CONFIG.levels.map(l =>
+              `<option value="${this._esc(l)}"${l === currentLevel ? ' selected' : ''}>${this._esc(l)}</option>`
+            ).join('');
             return `
               <tr class="${dirtyClass}">
                 <td class="name-cell">${this._esc(p.name)}</td>
@@ -300,12 +300,9 @@ const SlackRender = {
                 <td>
                   <select class="level-select${isDirty ? ' changed' : ''}"
                           onchange="SlackApp.setPeopleLevel('${this._esc(p.email)}', this.value)">
-                    <option value="">—</option>
-                    ${levelOptions}
+                    <option value=""${!currentLevel ? ' selected' : ''}>—</option>
+                    ${opts}
                   </select>
-                  <script>
-                    document.currentScript.previousElementSibling.value = ${JSON.stringify(p.level || '')};
-                  </script>
                 </td>
               </tr>
             `;

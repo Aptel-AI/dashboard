@@ -440,13 +440,14 @@ const SlackApp = {
       const lookupEmail = person.slackEmail || person.email;
       const slackUser = slackUserMap[lookupEmail];
 
-      // Expected = dept base channels + dept-specific level channels for each department
+      // Expected = global channels + dept base channels + dept-specific level channels
+      const globalChannels = SLACK_CONFIG.globalChannels || [];
       const deptChannels = person.departments.flatMap(d => excelData.deptMappings[d] || []);
       const roleChannels = person.departments.flatMap(d => {
         const key = `${d}|${person.level}`;
         return excelData.roleMappings[key] || [];
       });
-      const expectedChannels = [...new Set([...deptChannels, ...roleChannels])].sort();
+      const expectedChannels = [...new Set([...globalChannels, ...deptChannels, ...roleChannels])].sort();
 
       const roleDisplay = [person.displayDept, person.displayLevel].filter(Boolean).join(' | ');
 
