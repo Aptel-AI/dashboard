@@ -6,8 +6,8 @@ const SLACK_CONFIG = {
   // Cloudflare Worker proxy URL
   workerUrl: 'https://aptel-slack-proxy.aprindle.workers.dev',
 
-  // localStorage keys
-  excelStorageKey: 'aptel_slack_excel_data',
+  // Path to the source-of-truth Excel file (relative to site root)
+  excelUrl: 'references/slack-template.xlsx',
 
   // Excel sheet names
   expectedSheets: {

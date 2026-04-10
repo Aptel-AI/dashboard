@@ -57,12 +57,11 @@
       <button class="btn btn-sm btn-secondary" onclick="SlackApp.dismissError()">Dismiss</button>
     </div>
 
-    <!-- Excel info bar (hidden until file uploaded) -->
+    <!-- Excel info bar -->
     <div id="excel-info" class="excel-info-bar" style="display:none">
       <span class="icon">📊</span>
       <span class="info-text" id="excel-info-text"></span>
-      <button class="btn btn-sm btn-secondary" onclick="SlackApp.clearExcelData()">Clear & Re-upload</button>
-      <button class="btn btn-sm btn-primary" onclick="SlackApp.refresh()" id="refresh-btn">↻ Refresh Slack</button>
+      <button class="btn btn-sm btn-primary" onclick="SlackApp.refresh()" id="refresh-btn">↻ Refresh</button>
     </div>
 
     <!-- Summary cards (hidden until data loaded) -->
@@ -94,30 +93,14 @@
     <!-- Table container -->
     <div id="table-container"></div>
 
-    <!-- Empty state (shown by default) -->
-    <div id="empty-state" class="empty-state">
-      <div class="empty-state-icon">📋</div>
-      <div class="empty-state-title">Upload your Excel file to get started</div>
+    <!-- Empty state (shown only if Excel fails to load) -->
+    <div id="empty-state" class="empty-state" style="display:none">
+      <div class="empty-state-icon">⚠️</div>
+      <div class="empty-state-title">Could not load configuration</div>
       <div class="empty-state-text">
-        Your file should have three sheets:<br>
-        <strong>People</strong> — Name, Email, SlackEmail (optional), Department, Level<br>
-        <strong>Departments</strong> — Department, Channel (base channels for everyone in dept)<br>
-        <strong>Roles</strong> — Department, Level, Channel (dept-specific level channels)
+        The Excel file at <code>references/slack-template.xlsx</code> could not be loaded.
+        Make sure it exists in the repository and has been pushed.
       </div>
-
-      <div class="upload-zone" id="upload-zone"
-           onclick="document.getElementById('file-input').click()"
-           ondragover="event.preventDefault(); this.classList.add('dragover')"
-           ondragleave="this.classList.remove('dragover')"
-           ondrop="event.preventDefault(); this.classList.remove('dragover'); SlackApp.handleFileDrop(event)">
-        <span class="icon">📤</span>
-        <span class="label">Drop .xlsx here or click to upload</span>
-        <span class="hint">Supports .xlsx and .xls files</span>
-      </div>
-
-      <input type="file" id="file-input" class="file-input-hidden"
-             accept=".xlsx,.xls"
-             onchange="SlackApp.handleFileSelect(event)">
     </div>
 
   </main>

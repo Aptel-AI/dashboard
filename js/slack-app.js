@@ -40,76 +40,51 @@ const SlackApp = {
 
   init() {
     console.log('[SlackApp] Initializing...');
-    const saved = localStorage.getItem(SLACK_CONFIG.excelStorageKey);
-    if (saved) {
-      try {
-        this.state.excelData = JSON.parse(saved);
-        console.log('[SlackApp] Restored Excel data from localStorage');
-        SlackRender.renderExcelInfo(this.state.excelData);
-        this.loadSlackData();
-      } catch (e) {
-        console.warn('[SlackApp] Corrupt localStorage data, clearing');
-        localStorage.removeItem(SLACK_CONFIG.excelStorageKey);
-      }
-    }
+    this.loadAll();
   },
 
-
-  // ═══════════════════════════════════════════
-  // File Upload
-  // ═══════════════════════════════════════════
-
-  handleFileSelect(event) {
-    const file = event.target.files?.[0];
-    if (file) this.handleFileUpload(file);
-    event.target.value = '';
-  },
-
-  handleFileDrop(event) {
-    const file = event.dataTransfer?.files?.[0];
-    if (file) this.handleFileUpload(file);
-  },
-
-  async handleFileUpload(file) {
-    if (!file) return;
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (!['xlsx', 'xls'].includes(ext)) {
-      SlackRender.showError('Please upload an .xlsx or .xls file');
-      return;
-    }
-
-    console.log(`[SlackApp] Parsing file: ${file.name}`);
+  // Fetch the Excel source-of-truth + Slack data, then compare
+  async loadAll() {
     SlackRender.hideError();
+    SlackRender.showLoading('Loading configuration...');
 
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array' });
-      const excelData = this.parseExcel(workbook);
-
-      if (!excelData.people.length) {
-        SlackRender.showError('No people found in the People sheet. Check column headers: Name, Email, Department, Level');
-        return;
-      }
-
-      const hasMappings = Object.keys(excelData.deptMappings).length || Object.keys(excelData.roleMappings).length;
-      if (!hasMappings) {
-        SlackRender.showError('No channel mappings found. Check Departments sheet (Department, Channel) and/or Roles sheet (Department, Level, Channel)');
-        return;
-      }
-
-      this.state.excelData = excelData;
-      localStorage.setItem(SLACK_CONFIG.excelStorageKey, JSON.stringify(excelData));
-
-      const depts = Object.keys(excelData.deptMappings).length;
-      const roles = Object.keys(excelData.roleMappings).length;
-      console.log(`[SlackApp] Parsed: ${excelData.people.length} people, ${depts} departments, ${roles} role combos`);
-      SlackRender.renderExcelInfo(excelData);
-      this.loadSlackData();
-
+      await this.loadExcelData();
+      SlackRender.renderExcelInfo(this.state.excelData);
+      await this.loadSlackData();
     } catch (err) {
-      console.error('[SlackApp] Excel parse error:', err);
-      SlackRender.showError(`Failed to parse Excel file: ${err.message}`);
+      console.error('[SlackApp] Init error:', err);
+      SlackRender.showError(`Failed to load: ${err.message}`);
+    } finally {
+      SlackRender.hideLoading();
     }
+  },
+
+  // Fetch and parse the .xlsx from the repo
+  async loadExcelData() {
+    const url = SLACK_CONFIG.excelUrl;
+    console.log(`[SlackApp] Fetching Excel from: ${url}`);
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Excel file not found (${res.status})`);
+
+    const data = await res.arrayBuffer();
+    const workbook = XLSX.read(data, { type: 'array' });
+    const excelData = this.parseExcel(workbook);
+
+    if (!excelData.people.length) {
+      throw new Error('No people found in the People sheet. Check column headers: Name, Email, Department, Level');
+    }
+
+    const hasMappings = Object.keys(excelData.deptMappings).length || Object.keys(excelData.roleMappings).length;
+    if (!hasMappings) {
+      throw new Error('No channel mappings found. Check Departments and/or Roles sheets.');
+    }
+
+    this.state.excelData = excelData;
+    const depts = Object.keys(excelData.deptMappings).length;
+    const roles = Object.keys(excelData.roleMappings).length;
+    console.log(`[SlackApp] Parsed: ${excelData.people.length} people, ${depts} departments, ${roles} role combos`);
   },
 
 
@@ -446,8 +421,7 @@ const SlackApp = {
   // ═══════════════════════════════════════════
 
   refresh() {
-    if (!this.state.excelData) return;
-    this.loadSlackData();
+    this.loadAll();
   },
 
   setFilter(mode) {
@@ -459,19 +433,6 @@ const SlackApp = {
   setSearch(query) {
     this.state.searchQuery = query;
     SlackRender.renderTable(this.state.comparisonResults, this.state.filterMode, query);
-  },
-
-  clearExcelData() {
-    localStorage.removeItem(SLACK_CONFIG.excelStorageKey);
-    this.state.excelData = null;
-    this.state.comparisonResults = [];
-    this.state.slackChannels = [];
-    this.state.slackUsers = [];
-    this.state.slackUserMap = {};
-    this.state.slackChannelMemberMap = {};
-    this.state.filterMode = 'all';
-    this.state.searchQuery = '';
-    SlackRender.resetToEmpty();
   },
 
   dismissError() {

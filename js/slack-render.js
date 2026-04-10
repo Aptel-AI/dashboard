@@ -259,14 +259,13 @@ const SlackRender = {
     `;
   },
 
-  // ── Reset to empty state ──
-  resetToEmpty() {
+  // ── Show error empty state ──
+  showEmptyError() {
     this.hide('excel-info');
     this.hide('summary-section');
     this.hide('toolbar');
     document.getElementById('table-container').innerHTML = '';
-    document.getElementById('search-input').value = '';
     this.show('empty-state');
-    this.setStatus('No data loaded', false);
+    this.setStatus('Error', false);
   },
 };
