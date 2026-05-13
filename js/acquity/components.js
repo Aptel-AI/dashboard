@@ -97,8 +97,65 @@
     trash:    function () { return svg(['M3 6h18', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2', 'M10 11v6', 'M14 11v6']); },
     eye:      function () { return svg(['M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z']); },
     inbox:    function () { return svg(['M22 12h-6l-2 3h-4l-2-3H2', 'M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z']); },
-    pulse:    function () { return svg('M22 12h-4l-3 9L9 3l-3 9H2'); }
+    pulse:    function () { return svg('M22 12h-4l-3 9L9 3l-3 9H2'); },
+    star:     function () { return svg('M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z', { stroke: 2.5 }); },
+    crown:    function () { return svg(['M2 6l5 5 5-7 5 7 5-5v12H2z']); },
+    sparkle:  function () { return svg(['M12 2v6', 'M12 16v6', 'M2 12h6', 'M16 12h6', 'M5 5l4 4', 'M15 15l4 4', 'M5 19l4-4', 'M15 9l4-4']); },
+    check:    function () { return svg('M5 12l5 5L20 7'); }
   };
+
+  // ── Accolade badge ─────────────────────────────────────
+  // Tier mapping: rare/elite accolades get the medallion treatment,
+  // mid-tier get the ribbon, everyday recognitions stay quiet.
+  // Add new accolades here (or accept { name, tier } object form).
+  var ACCOLADE_TIERS = {
+    // Elite — once-a-year-or-rarer recognition
+    'Rookie of the Year':   'medallion',
+    'Employee of the Year': 'medallion',
+    'President\'s Club':    'medallion',
+    'Hall of Fame':         'medallion',
+
+    // Notable — earned through repeated performance
+    '100 Club':             'ribbon',
+    'Top Closer':           'ribbon',
+    'Employee of the Quarter': 'ribbon',
+    'Belize Lead':          'ribbon',
+    'Streak Master':        'ribbon',
+
+    // Token — onboarding / participation
+    'Onboarded':            'token',
+    'First 30 Days':        'token',
+    'Welcome Aboard':       'token',
+    'Employee of the Month':'token'
+  };
+
+  function accoladeTier(name) {
+    if (ACCOLADE_TIERS[name]) return ACCOLADE_TIERS[name];
+    // Heuristic fallback for unmapped names
+    var lower = name.toLowerCase();
+    if (lower.indexOf('year') !== -1 || lower.indexOf('president') !== -1) return 'medallion';
+    if (lower.indexOf('quarter') !== -1 || lower.indexOf('top') !== -1) return 'ribbon';
+    return 'token';
+  }
+
+  function accoladeBadge(input) {
+    var name = typeof input === 'string' ? input : input.name;
+    var tier = typeof input === 'string' ? accoladeTier(name) : (input.tier || accoladeTier(name));
+    var iconName = tier === 'medallion' ? 'crown' : tier === 'ribbon' ? 'star' : 'check';
+
+    var children = [
+      el('span', { class: 'acq-accolade-icon' }, [icons[iconName]()]),
+      name
+    ];
+    if (tier === 'medallion') {
+      children.push(el('span', { class: 'acq-accolade-medallion-star', 'aria-hidden': 'true', text: '★' }));
+    }
+    return el('span', {
+      class: 'acq-accolade acq-accolade--' + tier,
+      role: 'img',
+      'aria-label': 'Accolade: ' + name
+    }, children);
+  }
 
   // ── Avatar ─────────────────────────────────────────────
   function avatar(name, opts) {
@@ -217,6 +274,8 @@
     pageHead: pageHead,
     card: card,
     button: button,
-    pill: pill
+    pill: pill,
+    accoladeBadge: accoladeBadge,
+    accoladeTier: accoladeTier
   };
 })(window);

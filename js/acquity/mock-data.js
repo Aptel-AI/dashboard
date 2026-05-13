@@ -113,7 +113,7 @@
       startDate: '2025-08-12',
       role: 'recruiter',
       officeIds: ['off-22989','off-22962'],
-      accolades: ['Rookie of the Year','100 Club']
+      accolades: ['Rookie of the Year', '100 Club', 'Onboarded']
     },
     admin: {
       id: 'adm-001',
@@ -125,7 +125,7 @@
       startDate: '2024-01-15',
       role: 'admin',
       officeIds: [],
-      accolades: ['Belize Lead']
+      accolades: ['President\'s Club', 'Belize Lead', 'First 30 Days']
     }
   };
 

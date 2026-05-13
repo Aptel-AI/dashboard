@@ -21,10 +21,7 @@
     rows.push(row('Start Date', UI.formatDate(user.startDate)));
 
     var accolades = (user.accolades || []).length
-      ? el('div', { class: 'acq-accolades' }, user.accolades.map(function (a, i) {
-          var variants = ['', 'acq-chip-violet', 'acq-chip-amber', 'acq-chip-green'];
-          return el('span', { class: 'acq-chip ' + variants[i % variants.length], text: a });
-        }))
+      ? el('div', { class: 'acq-accolades' }, user.accolades.map(UI.accoladeBadge))
       : null;
 
     return el('div', { class: 'acq-card acq-aboutme' }, [
