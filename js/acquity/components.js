@@ -142,6 +142,18 @@
   // SVGRepo assets (#167423 beaded oval, #172227 ornate mirror with
   // internal highlight lines stripped). Rendered as currentColor so
   // CSS controls tint (teal for Tier 2, gold for Tier 3).
+  // Inner ellipse fill is added behind the path so the oval interior
+  // has a parchment/tint backdrop instead of showing the card bg.
+  // KNOWN ISSUE: preserveAspectRatio="none" stretches the SVG to fill
+  // the badge width — beads and scrollwork get horizontally elongated.
+  // To revisit by picking a wide-aspect source SVG or using meet+padding.
+  var FRAME_INNER = {
+    // beaded oval viewBox 293.666 x 293.666 — center ~146.833
+    beaded: { cx: 146.833, cy: 146.833, rx: 122, ry: 122, fill: '#e2f1f7' },
+    // ornate Victorian viewBox 31.372 x 31.372 — center ~15.686
+    ornate: { cx: 15.686,  cy: 15.686,  rx: 11.5, ry: 12.5, fill: '#fef3c7' }
+  };
+
   function buildFrameSVG(kind) {
     var ns = 'http://www.w3.org/2000/svg';
     var paths = global.AcquityFramePaths && global.AcquityFramePaths[kind];
@@ -150,10 +162,25 @@
     s.setAttribute('viewBox', paths.viewBox);
     s.setAttribute('preserveAspectRatio', 'none');
     s.setAttribute('aria-hidden', 'true');
+
+    // Inner fill ellipse (behind the frame path)
+    var fill = FRAME_INNER[kind];
+    if (fill) {
+      var e = document.createElementNS(ns, 'ellipse');
+      e.setAttribute('cx', fill.cx);
+      e.setAttribute('cy', fill.cy);
+      e.setAttribute('rx', fill.rx);
+      e.setAttribute('ry', fill.ry);
+      e.setAttribute('fill', fill.fill);
+      s.appendChild(e);
+    }
+
+    // Frame outline path on top
     var p = document.createElementNS(ns, 'path');
     p.setAttribute('d', paths.d);
     p.setAttribute('fill', 'currentColor');
     s.appendChild(p);
+
     return s;
   }
 
