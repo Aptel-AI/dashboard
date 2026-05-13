@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<!--
+  ═══════════════════════════════════════════════════════════════
+  Acquity Dashboard — SPA prototype entry point.
+
+  Renders the shell HTML; all view rendering and routing is
+  handled client-side by /js/acquity/*.js via the History API.
+
+  ─── Local demo ────────────────────────────────────────────────
+    python3 scripts/acquity-dev.py
+    open http://localhost:8000/dashboard/acquity.html
+    (or any direct route: /dashboard/acquity/admin/recruiters)
+
+  ─── Deployed to GitHub Pages ──────────────────────────────────
+    Project: Aptel-AI/dashboard
+    URL:     https://aptel-ai.github.io/dashboard/acquity.html
+    Direct routes (/dashboard/acquity/*) work because 404.html
+    catches them and bounces back here with the path preserved.
+
+  ─── RETROFIT into live PHP site ───────────────────────────────
+    1. Rename this file to /dashboard/acquity/index.php
+    2. Strip the <base href="/dashboard/"> tag (live site is at root)
+    3. Update asset paths from "css/..." / "js/..." to live site
+       conventions ("/assets/css/...", "/assets/js/...") if needed
+    4. Add at the top of the new index.php:
+         <?php
+         require_once '../../php/auth/session.php';
+         requireLogin();
+         // Optional role gate: requireRole(['admin', 'cc_manager']);
+         $user = getCurrentUser();
+         ?>
+    5. Add to /.htaccess ABOVE the generic dashboard catchall
+       (the existing `^dashboard/([a-z0-9-]+)/?$` rule):
+         RewriteRule ^dashboard/acquity(/.*)?$ /dashboard/acquity/index.php [L]
+    6. Replace /js/acquity/mock-data.js with fetch() calls to
+       PHP API endpoints (sibling *-api.php files per the
+       existing site convention).
+    7. Delete /404.html (its job is replaced by the .htaccess rule).
+  ═══════════════════════════════════════════════════════════════
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aptel — Acquity Dashboard</title>
+
+  <!--
+    Base href: project-page hosting at aptel-ai.github.io/dashboard/.
+    All relative URLs below resolve against /dashboard/.
+    REMOVE this line during the retrofit (live site serves at /).
+  -->
+  <base href="/dashboard/">
+
+  <link rel="icon" type="image/png" href="references/logos/aptel-symbol-black.png" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" href="references/logos/aptel-symbol-white.png" media="(prefers-color-scheme: dark)">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/acquity.css?v=2">
+
+  <script>
+    // GH-Pages SPA fallback: 404.html stashed the original URL in
+    // sessionStorage before redirecting here. Restore it before the
+    // router boots so location.pathname matches the user's URL bar.
+    (function () {
+      try {
+        var saved = sessionStorage.getItem('acq:redirect');
+        if (saved) {
+          sessionStorage.removeItem('acq:redirect');
+          history.replaceState(null, '', saved);
+        }
+      } catch (e) { /* sessionStorage unavailable — ignore */ }
+    })();
+  </script>
+</head>
+<body>
+
+<div id="acq-app" class="acq-app">
+
+  <header class="acq-header">
+    <div class="acq-header-inner">
+      <a class="acq-header-logo" href="/dashboard/acquity/recruiter/profile" data-route>
+        <img src="references/logos/aptel-full-white.png" alt="Aptel">
+      </a>
+
+      <div class="acq-header-right">
+        <div class="acq-role-toggle" role="tablist" aria-label="Demo role switcher">
+          <button class="acq-role-btn" data-role="recruiter" role="tab">Recruiter</button>
+          <button class="acq-role-btn" data-role="admin" role="tab">Acquity Admin</button>
+        </div>
+        <div class="acq-header-user">
+          <span class="acq-header-welcome">Welcome, <span data-bind="currentUserName">—</span></span>
+          <div class="acq-header-avatar" data-bind="currentUserInitials">—</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="acq-tabs" role="tablist" aria-label="Dashboard sections" id="acq-tabs"></nav>
+  </header>
+
+  <main class="acq-main" id="acq-view"></main>
+</div>
+
+<div id="acq-toast-region" class="acq-toast-region" aria-live="polite" aria-atomic="true"></div>
+
+<script src="js/acquity/mock-data.js?v=2"></script>
+<script src="js/acquity/state.js?v=2"></script>
+<script src="js/acquity/components.js?v=2"></script>
+<script src="js/acquity/router.js?v=2"></script>
+<script src="js/acquity/views-recruiter.js?v=2"></script>
+<script src="js/acquity/views-admin.js?v=2"></script>
+<script src="js/acquity/app.js?v=2"></script>
+</body>
+</html>

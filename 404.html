@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<!--
+  ═══════════════════════════════════════════════════════════════
+  GitHub Pages SPA fallback for /dashboard/acquity/* routes.
+
+  GH Pages can't rewrite URLs, so any direct URL like
+  /dashboard/acquity/recruiter/profile 404s. This file is served
+  in that case; it stashes the original path and redirects to
+  acquity.html, which restores the URL via history.replaceState
+  before the SPA router boots.
+
+  Non-SPA 404s (e.g. /typo) fall through and show the inline
+  404 message below.
+
+  ─── RETROFIT ──────────────────────────────────────────────────
+  Delete this file when the live site has the .htaccess rewrite
+  in place — the rewrite makes this fallback unnecessary.
+  ═══════════════════════════════════════════════════════════════
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Aptel — Loading…</title>
+  <meta name="robots" content="noindex">
+  <script>
+    (function () {
+      var path = location.pathname;
+      // Match /dashboard/acquity, /dashboard/acquity/, or any sub-path
+      if (/^\/dashboard\/acquity(\/|$)/.test(path)) {
+        try {
+          sessionStorage.setItem('acq:redirect', path + location.search + location.hash);
+        } catch (e) { /* sessionStorage unavailable — proceed without */ }
+        location.replace('/dashboard/acquity.html');
+      }
+      // Otherwise: real 404, fall through and render the message below.
+    })();
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #eef4f8;
+      color: #102a37;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      text-align: center;
+      padding: 24px;
+    }
+    .wrap { max-width: 480px; }
+    h1 {
+      font-size: 64px;
+      letter-spacing: -2px;
+      margin: 0 0 8px;
+      color: #2596be;
+    }
+    h2 { font-size: 20px; margin: 0 0 12px; }
+    p  { font-size: 14px; color: #5d7585; line-height: 1.5; margin: 0 0 20px; }
+    a  {
+      display: inline-block;
+      background: #2596be;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    a:hover { background: #1e7a9e; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>404</h1>
+    <h2>Page not found</h2>
+    <p>The page you're looking for doesn't exist on this site.</p>
+    <a href="/dashboard/acquity.html">Go to Acquity Dashboard</a>
+  </div>
+</body>
+</html>
