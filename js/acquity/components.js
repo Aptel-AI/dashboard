@@ -137,132 +137,26 @@
     return 'token';
   }
 
-  // ── Scrollwork flourish (Tier 2 cartouche, single side) ─
-  // Used twice: once left, once right (right is mirrored via CSS).
-  // Stylized antique cartouche scrolls — three lobes top/middle/bottom
-  // tapering outward to a curl tip.
-  function flourishSVG() {
+  // ── Frame SVG (Tier 2 and Tier 3) ─────────────────────
+  // Path data comes from /js/acquity/frame-paths.js, extracted from
+  // SVGRepo assets (#167423 beaded oval, #172227 ornate mirror with
+  // internal highlight lines stripped). Rendered as currentColor so
+  // CSS controls tint (teal for Tier 2, gold for Tier 3).
+  function buildFrameSVG(kind) {
     var ns = 'http://www.w3.org/2000/svg';
+    var paths = global.AcquityFramePaths && global.AcquityFramePaths[kind];
+    if (!paths) return null;
     var s = document.createElementNS(ns, 'svg');
-    s.setAttribute('viewBox', '0 0 34 38');
-    s.setAttribute('aria-hidden', 'true');
-    s.innerHTML =
-      // Top lobe — leaf curl
-      '<path d="M 6 18 C 8 8, 14 4, 20 6 C 24 7, 24 12, 20 13 C 16 14, 11 15, 6 18 Z" fill="currentColor"/>' +
-      // Center horizontal scroll — pointed leaf
-      '<path d="M 0 19 C 4 17, 10 16, 16 17 C 22 18, 28 19, 32 21 C 28 21, 22 21, 16 20 C 10 20, 4 20, 0 19 Z" fill="currentColor"/>' +
-      // Bottom lobe — leaf curl (mirror of top)
-      '<path d="M 6 20 C 8 30, 14 34, 20 32 C 24 31, 24 26, 20 25 C 16 24, 11 23, 6 20 Z" fill="currentColor"/>' +
-      // Outer tip — small curl drop
-      '<circle cx="32.5" cy="19" r="1.6" fill="currentColor"/>' +
-      // Accent dots flanking the tip
-      '<circle cx="28" cy="13" r="1.1" fill="currentColor" opacity="0.85"/>' +
-      '<circle cx="28" cy="25" r="1.1" fill="currentColor" opacity="0.85"/>';
-    return s;
-  }
-
-  // ── Ornate horizontal frame (Tier 3) ─────────────────────
-  // Stylized Victorian picture frame: outer scalloped oval,
-  // inner double-line, top/bottom cartouches, side flourishes,
-  // 4 corner scrolls. Gold gradient fill.
-  function frameSVG() {
-    var ns = 'http://www.w3.org/2000/svg';
-    var s = document.createElementNS(ns, 'svg');
-    s.setAttribute('viewBox', '0 0 320 110');
+    s.setAttribute('viewBox', paths.viewBox);
     s.setAttribute('preserveAspectRatio', 'none');
     s.setAttribute('aria-hidden', 'true');
-    s.innerHTML = [
-      // Gradients
-      '<defs>',
-      '  <linearGradient id="acq-frame-gold" x1="0%" y1="0%" x2="100%" y2="100%">',
-      '    <stop offset="0%"  stop-color="#fde68a"/>',
-      '    <stop offset="35%" stop-color="#f59e0b"/>',
-      '    <stop offset="70%" stop-color="#b45309"/>',
-      '    <stop offset="100%" stop-color="#7c2d12"/>',
-      '  </linearGradient>',
-      '  <linearGradient id="acq-frame-gold-hl" x1="0%" y1="0%" x2="0%" y2="100%">',
-      '    <stop offset="0%"  stop-color="#fef3c7"/>',
-      '    <stop offset="100%" stop-color="#d97706"/>',
-      '  </linearGradient>',
-      '</defs>',
-
-      // Drop shadow (soft)
-      '<ellipse cx="160" cy="58" rx="148" ry="42" fill="#7c2d12" opacity="0.15"/>',
-
-      // ── OUTER frame band (oval ring with double-stroke) ──
-      // Use even-odd fill rule to carve out the inner oval
-      '<path fill="url(#acq-frame-gold)" fill-rule="evenodd" stroke="#7c2d12" stroke-width="0.5" d="',
-      '  M 160 6 ',
-      '  C 240 6, 312 24, 312 55 ',
-      '  C 312 86, 240 104, 160 104 ',
-      '  C 80 104, 8 86, 8 55 ',
-      '  C 8 24, 80 6, 160 6 Z ',
-      // Inner cutout (smaller oval — text area)
-      '  M 160 22 ',
-      '  C 230 22, 296 36, 296 55 ',
-      '  C 296 74, 230 88, 160 88 ',
-      '  C 90 88, 24 74, 24 55 ',
-      '  C 24 36, 90 22, 160 22 Z',
-      '"/>',
-
-      // Inner thin line border (decorative inset)
-      '<ellipse cx="160" cy="55" rx="132" ry="31" fill="none" stroke="#7c2d12" stroke-width="0.8" opacity="0.7"/>',
-      '<ellipse cx="160" cy="55" rx="129" ry="29" fill="none" stroke="#fef3c7" stroke-width="0.6" opacity="0.5"/>',
-
-      // ── TOP CENTER CARTOUCHE (12 o'clock) ──
-      '<g fill="url(#acq-frame-gold-hl)" stroke="#7c2d12" stroke-width="0.5">',
-      '  <path d="M 160 0 C 156 2, 154 4, 152 6 C 150 4, 146 4, 144 6 C 142 8, 144 10, 146 10 C 150 10, 154 9, 156 8 C 158 9, 162 9, 164 8 C 166 9, 170 10, 174 10 C 176 10, 178 8, 176 6 C 174 4, 170 4, 168 6 C 166 4, 164 2, 160 0 Z"/>',
-      '  <circle cx="160" cy="7" r="2"/>',
-      '</g>',
-
-      // ── BOTTOM CENTER CARTOUCHE (6 o'clock) ──
-      '<g fill="url(#acq-frame-gold-hl)" stroke="#7c2d12" stroke-width="0.5">',
-      '  <path d="M 160 110 C 156 108, 154 106, 152 104 C 150 106, 146 106, 144 104 C 142 102, 144 100, 146 100 C 150 100, 154 101, 156 102 C 158 101, 162 101, 164 102 C 166 101, 170 100, 174 100 C 176 100, 178 102, 176 104 C 174 106, 170 106, 168 104 C 166 106, 164 108, 160 110 Z"/>',
-      '  <circle cx="160" cy="103" r="2"/>',
-      '</g>',
-
-      // ── LEFT SIDE FLOURISH (9 o'clock) ──
-      '<g fill="url(#acq-frame-gold-hl)" stroke="#7c2d12" stroke-width="0.5">',
-      '  <path d="M 8 55 C 2 53, 0 55, 2 58 C 4 60, 7 59, 8 57 Z"/>',
-      '  <path d="M 8 50 C 4 48, 2 50, 4 53 C 6 54, 8 53, 8 51 Z"/>',
-      '  <path d="M 8 60 C 4 62, 2 60, 4 57 C 6 56, 8 57, 8 59 Z"/>',
-      '</g>',
-
-      // ── RIGHT SIDE FLOURISH (3 o'clock) ──
-      '<g fill="url(#acq-frame-gold-hl)" stroke="#7c2d12" stroke-width="0.5">',
-      '  <path d="M 312 55 C 318 53, 320 55, 318 58 C 316 60, 313 59, 312 57 Z"/>',
-      '  <path d="M 312 50 C 316 48, 318 50, 316 53 C 314 54, 312 53, 312 51 Z"/>',
-      '  <path d="M 312 60 C 316 62, 318 60, 316 57 C 314 56, 312 57, 312 59 Z"/>',
-      '</g>',
-
-      // ── 4 CORNER SCROLLS ──
-      // Top-left
-      '<g fill="url(#acq-frame-gold-hl)" stroke="#7c2d12" stroke-width="0.5">',
-      '  <path d="M 50 14 C 44 10, 38 14, 42 20 C 46 18, 50 17, 52 16 Z"/>',
-      '  <circle cx="44" cy="16" r="1.4"/>',
-      '</g>',
-      // Top-right
-      '<g fill="url(#acq-frame-gold-hl)" stroke="#7c2d12" stroke-width="0.5">',
-      '  <path d="M 270 14 C 276 10, 282 14, 278 20 C 274 18, 270 17, 268 16 Z"/>',
-      '  <circle cx="276" cy="16" r="1.4"/>',
-      '</g>',
-      // Bottom-left
-      '<g fill="url(#acq-frame-gold-hl)" stroke="#7c2d12" stroke-width="0.5">',
-      '  <path d="M 50 96 C 44 100, 38 96, 42 90 C 46 92, 50 93, 52 94 Z"/>',
-      '  <circle cx="44" cy="94" r="1.4"/>',
-      '</g>',
-      // Bottom-right
-      '<g fill="url(#acq-frame-gold-hl)" stroke="#7c2d12" stroke-width="0.5">',
-      '  <path d="M 270 96 C 276 100, 282 96, 278 90 C 274 92, 270 93, 268 94 Z"/>',
-      '  <circle cx="276" cy="94" r="1.4"/>',
-      '</g>',
-
-      // ── Inner "matte" parchment area ──
-      '<ellipse cx="160" cy="55" rx="125" ry="26" fill="#fef3c7" opacity="0.85"/>',
-      '<ellipse cx="160" cy="55" rx="125" ry="26" fill="none" stroke="#d97706" stroke-width="0.4"/>'
-    ].join('');
+    var p = document.createElementNS(ns, 'path');
+    p.setAttribute('d', paths.d);
+    p.setAttribute('fill', 'currentColor');
+    s.appendChild(p);
     return s;
   }
+
 
   function accoladeBadge(input) {
     var name = typeof input === 'string' ? input : input.name;
@@ -277,13 +171,12 @@
     var children;
     if (tier === 'scroll') {
       children = [
-        el('span', { class: 'acq-flourish acq-flourish--left' }, [flourishSVG()]),
-        body,
-        el('span', { class: 'acq-flourish acq-flourish--right' }, [flourishSVG()])
+        el('span', { class: 'acq-frame-bg' }, [buildFrameSVG('beaded')]),
+        body
       ];
     } else if (tier === 'frame') {
       children = [
-        el('span', { class: 'acq-frame-bg' }, [frameSVG()]),
+        el('span', { class: 'acq-frame-bg' }, [buildFrameSVG('ornate')]),
         body
       ];
     } else {

@@ -329,14 +329,13 @@ a { color: inherit; text-decoration: none; }
   text-align: right;
 }
 .acq-accolades {
-  margin-top: 18px;
+  margin-top: 20px;
   display: flex;
   flex-wrap: wrap;
-  gap: 14px 16px;
+  gap: 14px 12px;
   justify-content: center;
   align-items: center;
-  /* Extra padding so ribbon tails and medallions don't get clipped */
-  padding: 4px 10px;
+  padding: 4px 6px;
 }
 
 /* ════════════════════════════════════════════════════════
@@ -380,65 +379,75 @@ a { color: inherit; text-decoration: none; }
 }
 .acq-accolade--token .acq-accolade-icon { color: var(--acq-teal-deep); }
 
-/* ── Tier 2: Scroll Cartouche (notable) ─────────────────── */
+/* ── Tier 2: Beaded Oval Frame (notable) ────────────────── */
+/* SVGRepo #167423 — single-path beaded oval, brand-teal tinted */
 .acq-accolade--scroll {
-  padding: 0 4px;   /* room for flourishes */
+  padding: 12px 38px;
+  min-width: 150px;
+  justify-content: center;
 }
 .acq-accolade--scroll .acq-accolade-body {
-  background: linear-gradient(135deg, #2596be 0%, #1a5a72 100%);
-  color: #ffffff;
-  padding: 6px 16px;
-  box-shadow:
-    0 2px 6px rgba(13, 90, 114, 0.28),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  text-shadow: 0 1px 1px rgba(13, 47, 61, 0.3);
-}
-.acq-accolade--scroll .acq-accolade-icon { color: #fef3c7; }
-
-/* Flourish flanks (left + right) */
-.acq-flourish {
-  display: inline-block;
-  width: 34px;
-  height: 38px;
-  color: #1a5a72;
-  flex-shrink: 0;
-  filter: drop-shadow(0 1px 1px rgba(13, 47, 61, 0.18));
-}
-.acq-flourish svg { width: 100%; height: 100%; display: block; }
-.acq-flourish--left  { margin-right: -10px; }
-.acq-flourish--right { margin-left:  -10px; transform: scaleX(-1); }
-
-/* ── Tier 3: Ornate Frame (elite) ───────────────────────── */
-.acq-accolade--frame {
-  padding: 16px 28px;     /* breathing room for the frame */
-  margin: 0 4px;
-}
-.acq-accolade--frame .acq-accolade-body {
   background: transparent;
-  color: #5b2810;
-  font-weight: 800;
-  letter-spacing: 0.6px;
-  font-size: 11.5px;
-  padding: 4px 10px;
-  text-shadow: 0 1px 0 rgba(255, 251, 235, 0.6);
+  color: var(--acq-teal-deep);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  font-size: 11px;
+  padding: 2px 6px;
+  position: relative;
+  z-index: 2;
 }
-.acq-accolade--frame .acq-accolade-icon { color: #92400e; }
+.acq-accolade--scroll .acq-accolade-icon { color: var(--acq-teal); }
 
-/* The frame SVG sits absolutely behind the text */
-.acq-frame-bg {
+/* Beaded oval SVG behind the text — teal */
+.acq-accolade--scroll .acq-frame-bg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
   z-index: 1;
-  filter: drop-shadow(0 4px 10px rgba(120, 53, 15, 0.25));
+  color: var(--acq-teal-deep);
+  filter: drop-shadow(0 2px 4px rgba(13, 90, 114, 0.22));
 }
-.acq-frame-bg svg {
+.acq-accolade--scroll .acq-frame-bg svg {
+  width: 100%; height: 100%; display: block;
+}
+
+/* ── Tier 3: Ornate Victorian Frame (elite) ─────────────── */
+/* SVGRepo #172227 (highlight lines stripped) — gold tinted */
+.acq-accolade--frame {
+  padding: 18px 52px;
+  min-width: 220px;
+  justify-content: center;
+}
+.acq-accolade--frame .acq-accolade-body {
+  background: transparent;
+  color: #5b2810;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  font-size: 11.5px;
+  padding: 2px 6px;
+  text-shadow: 0 1px 0 rgba(255, 251, 235, 0.7);
+  position: relative;
+  z-index: 2;
+}
+.acq-accolade--frame .acq-accolade-icon { color: #92400e; }
+
+/* Ornate frame SVG behind the text — gold */
+.acq-accolade--frame .acq-frame-bg {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  display: block;
+  pointer-events: none;
+  z-index: 1;
+  color: #b45309;
+  filter:
+    drop-shadow(0 1px 0 #fef3c7)
+    drop-shadow(0 4px 10px rgba(120, 53, 15, 0.32));
+}
+.acq-accolade--frame .acq-frame-bg svg {
+  width: 100%; height: 100%; display: block;
 }
 
 /* Subtle hover lift on tier 2 & 3 */
@@ -451,7 +460,9 @@ a { color: inherit; text-decoration: none; }
   transform: translateY(-1px);
 }
 .acq-accolade--frame:hover .acq-frame-bg {
-  filter: drop-shadow(0 6px 14px rgba(120, 53, 15, 0.35));
+  filter:
+    drop-shadow(0 1px 0 #fef3c7)
+    drop-shadow(0 6px 14px rgba(120, 53, 15, 0.42));
 }
 .acq-chip {
   display: inline-flex;
