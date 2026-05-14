@@ -447,6 +447,10 @@ a { color: inherit; text-decoration: none; }
     auto 100%,
     auto 100%,
     auto 100%;
+  /* Align background positioning to the badge edge, not the padding
+     edge — otherwise caps sit inset by the 78px horizontal padding */
+  background-origin: border-box;
+  background-clip: border-box;
 }
 .acq-accolade--frame .acq-accolade-body {
   background: transparent;
