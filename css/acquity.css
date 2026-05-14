@@ -425,11 +425,13 @@ a { color: inherit; text-decoration: none; }
   min-height: 64px;
   min-width: 280px;
   justify-content: center;
+  /* CSS-relative paths resolve from /dashboard/css/, so ../images/
+     works on GH Pages (project path) AND on the live site at root */
   background-image:
-    url('/images/tier3/left.png'),
-    url('/images/tier3/right.png'),
-    url('/images/tier3/center.png'),
-    url('/images/tier3/rail.png');
+    url('../images/tier3/left.png'),
+    url('../images/tier3/right.png'),
+    url('../images/tier3/center.png'),
+    url('../images/tier3/rail.png');
   background-repeat:
     no-repeat,
     no-repeat,
