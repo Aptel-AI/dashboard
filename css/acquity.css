@@ -413,42 +413,56 @@ a { color: inherit; text-decoration: none; }
   width: 100%; height: 100%; display: block;
 }
 
-/* ── Tier 3: Ornate Victorian Frame (elite) ─────────────── */
-/* SVGRepo #172227 (highlight lines stripped) — gold tinted */
+/* ── Tier 3: Ornate Achievement Plaque (elite) ──────────── */
+/* Sliced from /images/tier3/{left,right,center,rail}.png — caps and
+   center cartouche are fixed-position, the rail tile repeats between
+   them so the plaque can extend without distorting the ornaments.
+   Source: AI-generated reference (flag for legal before production). */
 .acq-accolade--frame {
-  padding: 18px 52px;
-  min-width: 220px;
+  /* Aspect ratio of source frame is ~1.5:1; padding tuned so a typical
+     "Rookie of the Year" sits nicely inside the visible interior */
+  padding: 22px 78px;
+  min-height: 64px;
+  min-width: 280px;
   justify-content: center;
+  background-image:
+    url('/images/tier3/left.png'),
+    url('/images/tier3/right.png'),
+    url('/images/tier3/center.png'),
+    url('/images/tier3/rail.png');
+  background-repeat:
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    repeat-x;
+  background-position:
+    left center,
+    right center,
+    center center,
+    left center;
+  background-size:
+    auto 100%,
+    auto 100%,
+    auto 100%,
+    auto 100%;
 }
 .acq-accolade--frame .acq-accolade-body {
   background: transparent;
-  color: #5b2810;
+  color: #fbbf24;
   font-weight: 800;
-  letter-spacing: 0.5px;
-  font-size: 11.5px;
+  letter-spacing: 0.6px;
+  font-size: 12px;
   padding: 2px 6px;
-  text-shadow: 0 1px 0 rgba(255, 251, 235, 0.7);
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.7),
+    0 0 8px rgba(251, 191, 36, 0.4);
   position: relative;
   z-index: 2;
 }
-.acq-accolade--frame .acq-accolade-icon { color: #92400e; }
-
-/* Ornate frame SVG behind the text — gold */
-.acq-accolade--frame .acq-frame-bg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 1;
-  color: #b45309;
-  filter:
-    drop-shadow(0 1px 0 #fef3c7)
-    drop-shadow(0 4px 10px rgba(120, 53, 15, 0.32));
-}
-.acq-accolade--frame .acq-frame-bg svg {
-  width: 100%; height: 100%; display: block;
-}
+.acq-accolade--frame .acq-accolade-icon { color: #fde68a; }
+/* No longer use the SVG inner-fill bg for Tier 3 — the PNG slices have
+   their own dark interior. Hide the inner fill ellipse if it renders. */
+.acq-accolade--frame .acq-frame-bg { display: none; }
 
 /* Subtle hover lift on tier 2 & 3 */
 .acq-accolade--scroll,
