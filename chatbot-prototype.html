@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ownerville — Chatbot Prototype</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* ───────────────────────────────────────────────
+       BASE
+       ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f1f3f5;
+      color: #2a2f36;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ───────────────────────────────────────────────
+       LAYOUT
+       ─────────────────────────────────────────────── */
+    .app {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: 100vh;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      background: #fff;
+      border-right: 1px solid #e6e9ec;
+      display: flex;
+      flex-direction: column;
+      padding: 18px 0 0;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 22px 18px;
+    }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid #1a2a45;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1a2a45;
+      font-size: 18px;
+    }
+    .brand-name {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1a2a45;
+      letter-spacing: -0.3px;
+    }
+    .nav { display: flex; flex-direction: column; flex: 1; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 22px;
+      color: #6b7280;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      position: relative;
+      transition: background .15s, color .15s;
+    }
+    .nav-item:hover { background: #f6f7f9; color: #1a2a45; }
+    .nav-item.active { color: #1a2a45; font-weight: 700; }
+    .nav-item .nav-arrow { margin-left: auto; color: #c7ccd1; font-size: 11px; }
+    .nav-item .nav-badge {
+      margin-left: auto;
+      background: #16a34a;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+    .nav-item .nav-badge.red { background: #f97316; }
+    .profile-completion {
+      padding: 16px 22px;
+      border-top: 1px solid #eef0f2;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .pc-ring {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      border: 2px solid #d1d5db;
+    }
+
+    /* MAIN */
+    .main { display: flex; flex-direction: column; }
+
+    .topbar {
+      background: #3c4a63;
+      color: #fff;
+      padding: 14px 22px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-height: 60px;
+    }
+    .back-btn {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,.5);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: #d8dde4;
+      display: flex; align-items: center; justify-content: center;
+      color: #6b7280;
+      font-size: 18px;
+    }
+    .topbar-title { font-weight: 600; font-size: 15px; }
+    .topbar-sep { color: rgba(255,255,255,.5); }
+    .logout {
+      margin-left: 16px;
+      display: flex; align-items: center; gap: 6px;
+      cursor: pointer; font-size: 14px;
+    }
+    .topbar-actions {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .icon-btn {
+      position: relative;
+      width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      opacity: .9;
+    }
+    .icon-btn .dot {
+      position: absolute;
+      top: -4px; right: -4px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 999px;
+    }
+
+    .content { padding: 22px; flex: 1; }
+
+    /* APPS GRID */
+    .apps-card {
+      background: #fff;
+      border-radius: 6px;
+      padding: 24px 22px;
+      border: 1px solid #eaedf0;
+    }
+    .apps-grid {
+      display: grid;
+      grid-template-columns: repeat(11, 1fr);
+      gap: 16px;
+    }
+    .app-tile {
+      text-align: center;
+      padding: 8px 4px;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background .15s;
+    }
+    .app-tile:hover { background: #f6f7f9; }
+    .app-tile-icon {
+      width: 60px; height: 60px;
+      margin: 0 auto 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px;
+      color: #2563eb;
+    }
+    .app-tile-label {
+      font-size: 12px;
+      color: #2a2f36;
+      font-weight: 500;
+    }
+
+    /* PROMO BANNERS */
+    .banners {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 18px;
+    }
+    .banner {
+      background: linear-gradient(135deg, #0f1830, #1a2547);
+      border-radius: 8px;
+      padding: 16px 18px;
+      color: #fff;
+      position: relative;
+      cursor: pointer;
+    }
+    .banner-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #16a34a;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+    }
+    .banner-tag.feature { background: #7c3aed; }
+    .banner-title { font-size: 15px; font-weight: 700; margin-top: 12px; }
+    .banner-desc { font-size: 13px; color: rgba(255,255,255,.7); margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+    .banner-close {
+      position: absolute;
+      top: 12px; right: 12px;
+      display: flex; gap: 8px;
+      color: rgba(255,255,255,.5);
+      font-size: 14px;
+    }
+
+    /* SETUP SECTION */
+    .setup-title {
+      text-align: center;
+      font-size: 18px;
+      color: #2a2f36;
+      margin: 28px 0 18px;
+      font-weight: 500;
+    }
+    .setup-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+    }
+    .setup-card {
+      background: #fff;
+      border-top: 1px solid #e6e9ec;
+      padding: 16px 18px 14px;
+      border-radius: 4px;
+    }
+    .setup-card-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .6px;
+      color: #4b5563;
+      margin-bottom: 14px;
+    }
+    .setup-card-bar {
+      height: 8px;
+      background: #e4e6e9;
+      border-radius: 4px;
+      margin-bottom: 28px;
+    }
+    .setup-card-btn {
+      width: auto;
+      padding: 7px 14px;
+      background: #4b5563;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      float: right;
+    }
+    .setup-card-btn.disabled { background: #9ca3af; cursor: not-allowed; }
+
+    /* ANNOUNCEMENTS */
+    .announcements {
+      background: #1a2547;
+      border-radius: 6px 6px 0 0;
+      padding: 14px 20px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 36px;
+    }
+    .announcements-title { font-weight: 700; font-size: 15px; }
+    .announcements-count {
+      margin-left: auto;
+      background: #0f1830;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 2px 9px;
+      border-radius: 999px;
+    }
+    .announcement-list {
+      background: #fff;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+      padding: 22px;
+      border-radius: 0 0 6px 6px;
+    }
+    .announcement {
+      display: flex;
+      gap: 14px;
+    }
+    .announcement-icon {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: #eaf2ff;
+      display: flex; align-items: center; justify-content: center;
+      color: #2563eb;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .announcement-body { flex: 1; }
+    .announcement-tag {
+      display: inline-block;
+      background: #2563eb;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 3px;
+      letter-spacing: .3px;
+      text-transform: uppercase;
+    }
+    .announcement-tag.teal { background: #0d9488; }
+    .announcement-date {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-left: 8px;
+    }
+    .announcement-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+    .announcement-desc {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    .announcement-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .ann-btn {
+      flex: 1;
+      padding: 5px 10px;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #2563eb;
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+    }
+    .ann-btn.gray { color: #6b7280; }
+
+    /* ───────────────────────────────────────────────
+       CHATBOT WIDGET
+       ─────────────────────────────────────────────── */
+    .chat-fab {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #2563eb, #1e40af);
+      box-shadow: 0 8px 20px rgba(37, 99, 235, .35), 0 2px 6px rgba(0,0,0,.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      cursor: pointer;
+      z-index: 9000;
+      transition: transform .2s, box-shadow .2s;
+      border: none;
+    }
+    .chat-fab:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(37, 99, 235, .45);
+    }
+    .chat-fab.hidden { display: none; }
+    .chat-fab svg { width: 28px; height: 28px; }
+
+    .chat-window {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 380px;
+      height: 540px;
+      min-width: 320px;
+      min-height: 360px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 18px 50px rgba(0,0,0,.22), 0 4px 12px rgba(0,0,0,.08);
+      display: flex;
+      flex-direction: column;
+      z-index: 9000;
+      overflow: hidden;
+      border: 1px solid #e6e9ec;
+    }
+    .chat-window.hidden { display: none; }
+
+    .chat-header {
+      background: linear-gradient(135deg, #2563eb, #1e40af);
+      color: #fff;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: move;
+      user-select: none;
+    }
+    .chat-avatar {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.18);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .chat-avatar svg { width: 22px; height: 22px; }
+    .chat-title { font-size: 14px; font-weight: 700; }
+    .chat-status {
+      font-size: 11px;
+      color: rgba(255,255,255,.75);
+      display: flex; align-items: center; gap: 5px;
+      margin-top: 2px;
+    }
+    .chat-status::before {
+      content: '';
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, .3);
+    }
+    .chat-header-actions {
+      margin-left: auto;
+      display: flex; gap: 4px;
+    }
+    .chat-header-btn {
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      border-radius: 4px;
+      opacity: .8;
+      transition: opacity .15s, background .15s;
+    }
+    .chat-header-btn:hover { opacity: 1; background: rgba(255,255,255,.15); }
+
+    .chat-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      background: #f7f9fc;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .chat-msg {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      animation: msgFadeIn .3s ease-out;
+    }
+    @keyframes msgFadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .chat-msg.bot .msg-bubble {
+      background: #fff;
+      color: #2a2f36;
+      border-bottom-left-radius: 4px;
+    }
+    .chat-msg.user { flex-direction: row-reverse; }
+    .chat-msg.user .msg-bubble {
+      background: #2563eb;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .msg-bubble {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 13px;
+      line-height: 1.45;
+      box-shadow: 0 1px 2px rgba(0,0,0,.05);
+    }
+    .msg-avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #2563eb, #1e40af);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .msg-avatar svg { width: 16px; height: 16px; }
+
+    /* Thinking indicator */
+    .typing-bubble {
+      background: #fff;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border-bottom-left-radius: 4px;
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+      box-shadow: 0 1px 2px rgba(0,0,0,.05);
+    }
+    .typing-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #9ca3af;
+      animation: typing 1.2s infinite ease-in-out;
+    }
+    .typing-dot:nth-child(2) { animation-delay: .15s; }
+    .typing-dot:nth-child(3) { animation-delay: .3s; }
+    @keyframes typing {
+      0%, 60%, 100% { transform: translateY(0); opacity: .4; }
+      30% { transform: translateY(-4px); opacity: 1; }
+    }
+
+    .chat-input-wrap {
+      border-top: 1px solid #e6e9ec;
+      padding: 12px;
+      background: #fff;
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    .chat-input {
+      flex: 1;
+      border: 1px solid #d1d5db;
+      border-radius: 18px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-family: inherit;
+      resize: none;
+      max-height: 100px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .chat-input:focus { border-color: #2563eb; }
+    .chat-send {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      border: none;
+      background: #2563eb;
+      color: #fff;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+      flex-shrink: 0;
+    }
+    .chat-send:hover { background: #1e40af; }
+    .chat-send:disabled { background: #c7ccd1; cursor: not-allowed; }
+    .chat-send svg { width: 16px; height: 16px; }
+
+    /* Resize handle (bottom-left corner so it doesn't clash with right anchor) */
+    .chat-resize {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 16px; height: 16px;
+      cursor: nesw-resize;
+      background:
+        linear-gradient(135deg, transparent 50%, #c7ccd1 50%, #c7ccd1 60%, transparent 60%, transparent 70%, #c7ccd1 70%, #c7ccd1 80%, transparent 80%);
+      opacity: .8;
+    }
+
+    /* When the chat is being dragged */
+    .chat-window.dragging { transition: none; user-select: none; }
+    .chat-window.resizing { transition: none; user-select: none; }
+
+    /* ───────────────────────────────────────────────
+       VARIANT PICKER
+       ─────────────────────────────────────────────── */
+    .variant-picker {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      background: #0f1830;
+      color: #fff;
+      border-radius: 999px;
+      padding: 6px 8px 6px 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 6px 20px rgba(0,0,0,.22);
+      z-index: 9100;
+    }
+    .variant-picker-label {
+      color: rgba(255,255,255,.55);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      margin-right: 4px;
+    }
+    .variant-btn {
+      background: transparent;
+      color: rgba(255,255,255,.7);
+      border: none;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: background .15s, color .15s;
+      white-space: nowrap;
+    }
+    .variant-btn:hover { color: #fff; background: rgba(255,255,255,.08); }
+    .variant-btn.active { background: #2563eb; color: #fff; }
+
+    /* ───────────────────────────────────────────────
+       V2: SIDE PANEL
+       ─────────────────────────────────────────────── */
+    .chat-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 420px;
+      background: #fff;
+      box-shadow: -10px 0 40px rgba(0,0,0,.18);
+      display: flex;
+      flex-direction: column;
+      z-index: 9000;
+      transform: translateX(0);
+      transition: transform .28s ease;
+      border-left: 1px solid #e6e9ec;
+    }
+    .chat-panel.hidden { transform: translateX(100%); pointer-events: none; }
+    .chat-panel .chat-header {
+      cursor: default;
+      border-radius: 0;
+      background: linear-gradient(135deg, #1a2547, #0f1830);
+      padding: 18px 20px;
+    }
+    .chat-panel .chat-avatar { background: rgba(255,255,255,.14); }
+
+    /* ───────────────────────────────────────────────
+       V3: BOTTOM DRAWER
+       ─────────────────────────────────────────────── */
+    .chat-drawer {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 460px;
+      background: #fff;
+      box-shadow: 0 -10px 40px rgba(0,0,0,.18);
+      display: flex;
+      flex-direction: column;
+      z-index: 9000;
+      transform: translateY(0);
+      transition: transform .28s ease;
+      border-top: 1px solid #e6e9ec;
+    }
+    .chat-drawer.hidden { transform: translateY(100%); pointer-events: none; }
+    .chat-drawer .chat-header {
+      cursor: default;
+      border-radius: 0;
+      background: #fff;
+      color: #2a2f36;
+      border-bottom: 1px solid #e6e9ec;
+      padding: 12px 22px;
+    }
+    .chat-drawer .chat-avatar {
+      background: linear-gradient(135deg, #2563eb, #1e40af);
+      color: #fff;
+    }
+    .chat-drawer .chat-status { color: #6b7280; }
+    .chat-drawer .chat-status::before { box-shadow: 0 0 0 2px rgba(34,197,94,.25); }
+    .chat-drawer .chat-header-btn { color: #6b7280; }
+    .chat-drawer .chat-header-btn:hover { background: #f1f3f5; color: #2a2f36; }
+    .chat-drawer .chat-body {
+      max-width: 820px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .chat-drawer .chat-input-wrap {
+      max-width: 820px;
+      width: 100%;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ────── SIDEBAR ────── -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">◐</div>
+      <div class="brand-name">Ownerville</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active"><span>🏠</span> Welcome</div>
+      <div class="nav-item"><span>👥</span> Sales Reps</div>
+      <div class="nav-item"><span>📄</span> Digital Docs <span class="nav-arrow">›</span></div>
+      <div class="nav-item"><span>🚀</span> Onboard <span class="nav-arrow">›</span></div>
+      <div class="nav-item"><span>🎓</span> Client Training <span class="nav-arrow">›</span></div>
+      <div class="nav-item"><span>⏱</span> TeleMapper <span class="nav-arrow">›</span></div>
+      <div class="nav-item"><span>🏢</span> Teams <span class="nav-badge">B</span></div>
+      <div class="nav-item"><span>📍</span> TeleMapper Leads <span class="nav-badge red">1</span></div>
+      <div class="nav-item"><span>💲</span> Sales &amp; Payments <span class="nav-badge">B</span></div>
+      <div class="nav-item"><span>📊</span> Tableau <span class="nav-arrow">›</span></div>
+      <div class="nav-item"><span>💬</span> Resources <span class="nav-arrow">›</span></div>
+      <div class="nav-item"><span>▶</span> Training Videos</div>
+      <div class="nav-item"><span>⚙️</span> Settings</div>
+    </nav>
+    <div class="profile-completion">
+      <div class="pc-ring"></div>
+      <div>Profile Completion</div>
+      <div style="margin-left:auto;font-weight:700;color:#2a2f36">0%</div>
+    </div>
+  </aside>
+
+  <!-- ────── MAIN ────── -->
+  <main class="main">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="back-btn">←</div>
+      <div class="avatar">👤</div>
+      <div>
+        <span class="topbar-title">Aptel Demo</span>
+        <span class="topbar-sep"> — Owner • </span>
+        <span class="topbar-title">Aptel Demo (23628)</span>
+      </div>
+      <div class="logout">⏻ Logout</div>
+      <div class="topbar-actions">
+        <div class="icon-btn">✉<span class="dot">3</span></div>
+        <div class="icon-btn">⋮⋮⋮</div>
+        <div class="icon-btn">⚙</div>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- APPS GRID -->
+      <div class="apps-card">
+        <div class="apps-grid">
+          <div class="app-tile"><div class="app-tile-icon">🅢</div><div class="app-tile-label">ApplicantStream</div></div>
+          <div class="app-tile"><div class="app-tile-icon">🖥</div><div class="app-tile-label">Client Training</div></div>
+          <div class="app-tile"><div class="app-tile-icon">📑</div><div class="app-tile-label">Digital Documents</div></div>
+          <div class="app-tile"><div class="app-tile-icon">🧾</div><div class="app-tile-label">Invoice</div></div>
+          <div class="app-tile"><div class="app-tile-icon">💬</div><div class="app-tile-label">Jobs2Me</div></div>
+          <div class="app-tile"><div class="app-tile-icon">📍</div><div class="app-tile-label">Onboard</div></div>
+          <div class="app-tile"><div class="app-tile-icon">💲</div><div class="app-tile-label">Sales &amp; Payroll</div></div>
+          <div class="app-tile"><div class="app-tile-icon">⊕</div><div class="app-tile-label">Sales Reps</div></div>
+          <div class="app-tile"><div class="app-tile-icon">✦</div><div class="app-tile-label">Tableau Enroll</div></div>
+          <div class="app-tile"><div class="app-tile-icon">✦</div><div class="app-tile-label">Tableau Login</div></div>
+          <div class="app-tile"><div class="app-tile-icon">👥</div><div class="app-tile-label">Teams &amp; IQ</div></div>
+          <div class="app-tile"><div class="app-tile-icon">📍</div><div class="app-tile-label">TeleMapper</div></div>
+          <div class="app-tile"><div class="app-tile-icon">📍</div><div class="app-tile-label">TeleMapper Leads</div></div>
+        </div>
+      </div>
+
+      <!-- PROMO BANNERS -->
+      <div class="banners">
+        <div class="banner">
+          <div class="banner-close">👁 ✕</div>
+          <div class="banner-tag">? How To</div>
+          <div class="banner-title">Lead Management</div>
+          <div class="banner-desc">How to manage leads <span>→</span></div>
+        </div>
+        <div class="banner">
+          <div class="banner-close">✕</div>
+          <div class="banner-tag feature">★ Feature</div>
+          <div class="banner-title">Customize Site for Company Page</div>
+          <div class="banner-desc">Apply business logo and business friendly banner <span>→</span></div>
+        </div>
+      </div>
+
+      <!-- SETUP -->
+      <div class="setup-title">Let's set up your office</div>
+      <div class="setup-cards">
+        <div class="setup-card">
+          <div class="setup-card-title">COMPANY PROFILE</div>
+          <div class="setup-card-bar"></div>
+          <button class="setup-card-btn">Set Up Company</button>
+          <div style="clear:both"></div>
+        </div>
+        <div class="setup-card">
+          <div class="setup-card-title">TEAMS</div>
+          <div class="setup-card-bar"></div>
+          <button class="setup-card-btn disabled">Set Up Teams</button>
+          <div style="clear:both"></div>
+        </div>
+        <div class="setup-card">
+          <div class="setup-card-title">ADMINS</div>
+          <div class="setup-card-bar"></div>
+          <button class="setup-card-btn disabled">Set Up Admins</button>
+          <div style="clear:both"></div>
+        </div>
+      </div>
+
+      <!-- ANNOUNCEMENTS -->
+      <div class="announcements">
+        <span>🔔</span>
+        <span class="announcements-title">Announcements</span>
+        <span class="announcements-count">3</span>
+      </div>
+      <div class="announcement-list">
+
+        <div class="announcement">
+          <div class="announcement-icon">🅢</div>
+          <div class="announcement-body">
+            <span class="announcement-tag">ApplicantStream</span>
+            <span class="announcement-date">05/14/2026</span>
+            <div class="announcement-title">New Feature: Updated Timeslot Counts</div>
+            <div class="announcement-desc">What's New: You can now quickly view all interviews scheduled compared to total slots available in one…</div>
+            <div class="announcement-actions">
+              <button class="ann-btn">↗ View Details</button>
+              <button class="ann-btn gray">✓ Dismiss</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="announcement">
+          <div class="announcement-icon">🅢</div>
+          <div class="announcement-body">
+            <span class="announcement-tag">ApplicantStream</span>
+            <span class="announcement-date">05/14/2026</span>
+            <div class="announcement-title">New Feature: New Button to switch into V2</div>
+            <div class="announcement-desc">Whats New: We've added a new button that allows you to quickly switch out of Version 1 and into the…</div>
+            <div class="announcement-actions">
+              <button class="ann-btn">↗ View Details</button>
+              <button class="ann-btn gray">✓ Dismiss</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="announcement">
+          <div class="announcement-icon" style="background:#e0f2fe">📍</div>
+          <div class="announcement-body">
+            <span class="announcement-tag teal">TeleMapper Leads</span>
+            <span class="announcement-date">05/13/2026</span>
+            <div class="announcement-title">New Feature: Showing Gated Property</div>
+            <div class="announcement-desc">What's New: You can now see which properties are gated while cutting leads for sales reps, making it…</div>
+            <div class="announcement-actions">
+              <button class="ann-btn">↗ View Details</button>
+              <button class="ann-btn gray">✓ Dismiss</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- ────────────────────────────────────────────
+     CHATBOT VARIANTS
+     ──────────────────────────────────────────── -->
+
+<!-- VARIANT PICKER -->
+<div class="variant-picker">
+  <span class="variant-picker-label">Variant</span>
+  <button class="variant-btn active" data-variant="v1">V1 · Floating</button>
+  <button class="variant-btn" data-variant="v2">V2 · Side Panel</button>
+  <button class="variant-btn" data-variant="v3">V3 · Bottom Drawer</button>
+</div>
+
+<!-- ── V1: FLOATING WIDGET (draggable + resizable) ── -->
+<button id="chat-v1-fab" class="chat-fab variant-el" data-variant="v1" aria-label="Open chat">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+</button>
+
+<div id="chat-v1-window" class="chat-window hidden variant-el" data-variant="v1">
+  <div class="chat-header" id="chat-v1-header">
+    <div class="chat-avatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="10" rx="2"/>
+        <circle cx="12" cy="5" r="2"/>
+        <path d="M12 7v4"/>
+        <line x1="8" y1="16" x2="8" y2="16"/>
+        <line x1="16" y1="16" x2="16" y2="16"/>
+      </svg>
+    </div>
+    <div>
+      <div class="chat-title">Omni Assistant</div>
+      <div class="chat-status">Online</div>
+    </div>
+    <div class="chat-header-actions">
+      <button class="chat-header-btn" id="chat-v1-minimize" title="Minimize">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <button class="chat-header-btn" id="chat-v1-close" title="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="chat-body" id="chat-v1-body"></div>
+
+  <div class="chat-input-wrap">
+    <textarea id="chat-v1-input" class="chat-input" rows="1" placeholder="Type your message…"></textarea>
+    <button id="chat-v1-send" class="chat-send" aria-label="Send">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="chat-resize" id="chat-v1-resize"></div>
+</div>
+
+<!-- ── V2: SIDE PANEL (slides in from right, full height) ── -->
+<button id="chat-v2-fab" class="chat-fab variant-el" data-variant="v2" aria-label="Open chat" style="display:none">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+</button>
+
+<div id="chat-v2-window" class="chat-panel hidden variant-el" data-variant="v2" style="display:none">
+  <div class="chat-header">
+    <div class="chat-avatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="10" rx="2"/>
+        <circle cx="12" cy="5" r="2"/>
+        <path d="M12 7v4"/>
+      </svg>
+    </div>
+    <div>
+      <div class="chat-title">Omni Assistant</div>
+      <div class="chat-status">Online</div>
+    </div>
+    <div class="chat-header-actions">
+      <button class="chat-header-btn" id="chat-v2-close" title="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="chat-body" id="chat-v2-body"></div>
+
+  <div class="chat-input-wrap">
+    <textarea id="chat-v2-input" class="chat-input" rows="1" placeholder="Type your message…"></textarea>
+    <button id="chat-v2-send" class="chat-send" aria-label="Send">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<!-- ── V3: BOTTOM DRAWER (slides up, full width) ── -->
+<button id="chat-v3-fab" class="chat-fab variant-el" data-variant="v3" aria-label="Open chat" style="display:none">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+</button>
+
+<div id="chat-v3-window" class="chat-drawer hidden variant-el" data-variant="v3" style="display:none">
+  <div class="chat-header">
+    <div class="chat-avatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="10" rx="2"/>
+        <circle cx="12" cy="5" r="2"/>
+        <path d="M12 7v4"/>
+      </svg>
+    </div>
+    <div>
+      <div class="chat-title">Omni Assistant</div>
+      <div class="chat-status">Online</div>
+    </div>
+    <div class="chat-header-actions">
+      <button class="chat-header-btn" id="chat-v3-close" title="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="chat-body" id="chat-v3-body"></div>
+
+  <div class="chat-input-wrap">
+    <textarea id="chat-v3-input" class="chat-input" rows="1" placeholder="Type your message…"></textarea>
+    <button id="chat-v3-send" class="chat-send" aria-label="Send">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function () {
+
+  /* ───── Variant configs ───── */
+  const VARIANTS = {
+    v1: { fab:'chat-v1-fab', win:'chat-v1-window', body:'chat-v1-body',
+          input:'chat-v1-input', send:'chat-v1-send', close:'chat-v1-close',
+          min:'chat-v1-minimize', header:'chat-v1-header', resizer:'chat-v1-resize',
+          draggable:true, resizable:true },
+    v2: { fab:'chat-v2-fab', win:'chat-v2-window', body:'chat-v2-body',
+          input:'chat-v2-input', send:'chat-v2-send', close:'chat-v2-close' },
+    v3: { fab:'chat-v3-fab', win:'chat-v3-window', body:'chat-v3-body',
+          input:'chat-v3-input', send:'chat-v3-send', close:'chat-v3-close' },
+  };
+
+  /* ───── Set up each variant ───── */
+  Object.keys(VARIANTS).forEach(setupVariant);
+
+  /* ───── Variant picker ───── */
+  document.querySelectorAll('.variant-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setActive(btn.dataset.variant));
+  });
+  setActive('v1');
+
+  function setActive(id) {
+    document.querySelectorAll('.variant-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.variant === id);
+    });
+    document.querySelectorAll('.variant-el').forEach((el) => {
+      const isActive = el.dataset.variant === id;
+      el.style.display = isActive ? '' : 'none';
+      // Always start in closed state when switching
+      if (el.classList.contains('chat-window') || el.classList.contains('chat-panel') || el.classList.contains('chat-drawer')) {
+        el.classList.add('hidden');
+      }
+      if (el.classList.contains('chat-fab')) {
+        el.classList.remove('hidden');
+      }
+    });
+  }
+
+  /* ───── Per-variant setup ───── */
+  function setupVariant(id) {
+    const cfg     = VARIANTS[id];
+    const fab     = document.getElementById(cfg.fab);
+    const win     = document.getElementById(cfg.win);
+    const body    = document.getElementById(cfg.body);
+    const input   = document.getElementById(cfg.input);
+    const sendBtn = document.getElementById(cfg.send);
+    const closeBtn= document.getElementById(cfg.close);
+    const minBtn  = cfg.min     ? document.getElementById(cfg.min)     : null;
+    const header  = cfg.header  ? document.getElementById(cfg.header)  : null;
+    const resizer = cfg.resizer ? document.getElementById(cfg.resizer) : null;
+
+    let hasGreeted = false;
+
+    fab.addEventListener('click', openChat);
+    closeBtn.addEventListener('click', closeChat);
+    if (minBtn) minBtn.addEventListener('click', closeChat);
+
+    function openChat() {
+      win.classList.remove('hidden');
+      fab.classList.add('hidden');
+      if (!hasGreeted) {
+        hasGreeted = true;
+        runGreeting();
+      }
+      setTimeout(() => input.focus(), 200);
+    }
+    function closeChat() {
+      win.classList.add('hidden');
+      fab.classList.remove('hidden');
+    }
+
+    function runGreeting() {
+      const typing = addTyping(body);
+      setTimeout(() => {
+        typing.remove();
+        addMessage(body, 'bot', "Hi! 👋 I'm the Omni Assistant. What can I help you with today?");
+      }, 1600);
+    }
+
+    function send() {
+      const text = input.value.trim();
+      if (!text) return;
+      addMessage(body, 'user', text);
+      input.value = '';
+      input.style.height = 'auto';
+      const typing = addTyping(body);
+      setTimeout(() => {
+        typing.remove();
+        addMessage(body, 'bot', "Thanks — this is a prototype, so I can't actually respond yet. Once I'm wired up I'll help you with that!");
+      }, 1200 + Math.random() * 600);
+    }
+
+    sendBtn.addEventListener('click', send);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+    input.addEventListener('input', () => {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+    });
+
+    if (cfg.draggable && header) setupDrag(win, header);
+    if (cfg.resizable && resizer) setupResize(win, resizer);
+  }
+
+  /* ───── Shared message helpers ───── */
+  function addMessage(body, role, text) {
+    const msg = document.createElement('div');
+    msg.className = 'chat-msg ' + role;
+    if (role === 'bot') {
+      msg.innerHTML =
+        '<div class="msg-avatar">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<rect x="3" y="11" width="18" height="10" rx="2"/>' +
+            '<circle cx="12" cy="5" r="2"/>' +
+            '<path d="M12 7v4"/>' +
+          '</svg>' +
+        '</div>' +
+        '<div class="msg-bubble"></div>';
+      msg.querySelector('.msg-bubble').textContent = text;
+    } else {
+      const bubble = document.createElement('div');
+      bubble.className = 'msg-bubble';
+      bubble.textContent = text;
+      msg.appendChild(bubble);
+    }
+    body.appendChild(msg);
+    body.scrollTop = body.scrollHeight;
+    return msg;
+  }
+
+  function addTyping(body) {
+    const msg = document.createElement('div');
+    msg.className = 'chat-msg bot';
+    msg.innerHTML =
+      '<div class="msg-avatar">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<rect x="3" y="11" width="18" height="10" rx="2"/>' +
+          '<circle cx="12" cy="5" r="2"/>' +
+          '<path d="M12 7v4"/>' +
+        '</svg>' +
+      '</div>' +
+      '<div class="typing-bubble">' +
+        '<span class="typing-dot"></span>' +
+        '<span class="typing-dot"></span>' +
+        '<span class="typing-dot"></span>' +
+      '</div>';
+    body.appendChild(msg);
+    body.scrollTop = body.scrollHeight;
+    return msg;
+  }
+
+  /* ───── Drag (V1 only) ───── */
+  function setupDrag(win, header) {
+    let drag = null;
+    header.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.chat-header-btn')) return;
+      const rect = win.getBoundingClientRect();
+      win.style.left   = rect.left + 'px';
+      win.style.top    = rect.top  + 'px';
+      win.style.right  = 'auto';
+      win.style.bottom = 'auto';
+      drag = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+      win.classList.add('dragging');
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!drag) return;
+      const maxX = window.innerWidth  - win.offsetWidth;
+      const maxY = window.innerHeight - win.offsetHeight;
+      let x = Math.max(0, Math.min(e.clientX - drag.dx, maxX));
+      let y = Math.max(0, Math.min(e.clientY - drag.dy, maxY));
+      win.style.left = x + 'px';
+      win.style.top  = y + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (drag) { drag = null; win.classList.remove('dragging'); }
+    });
+  }
+
+  /* ───── Resize (V1 only, bottom-left handle) ───── */
+  function setupResize(win, resizer) {
+    let rez = null;
+    resizer.addEventListener('mousedown', (e) => {
+      const rect = win.getBoundingClientRect();
+      win.style.left   = rect.left + 'px';
+      win.style.top    = rect.top  + 'px';
+      win.style.right  = 'auto';
+      win.style.bottom = 'auto';
+      rez = { startX:e.clientX, startY:e.clientY, startW:rect.width, startH:rect.height, startLeft:rect.left };
+      win.classList.add('resizing');
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!rez) return;
+      const dx = e.clientX - rez.startX;
+      const dy = e.clientY - rez.startY;
+      let newW = Math.max(320, rez.startW - dx);
+      let newH = Math.max(360, rez.startH + dy);
+      let newLeft = rez.startLeft + (rez.startW - newW);
+      if (newLeft < 0) { newW += newLeft; newLeft = 0; }
+      if (newH + parseFloat(win.style.top || 0) > window.innerHeight) {
+        newH = window.innerHeight - parseFloat(win.style.top || 0);
+      }
+      win.style.width  = newW + 'px';
+      win.style.height = newH + 'px';
+      win.style.left   = newLeft + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (rez) { rez = null; win.classList.remove('resizing'); }
+    });
+  }
+
+})();
+</script>
+
+</body>
+</html>
