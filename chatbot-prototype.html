@@ -600,22 +600,28 @@
       left: 24px;
       background: #0f1830;
       color: #fff;
-      border-radius: 999px;
-      padding: 6px 8px 6px 16px;
+      border-radius: 14px;
+      padding: 10px 12px;
       display: flex;
-      align-items: center;
+      flex-direction: column;
+      align-items: stretch;
       gap: 6px;
       font-size: 12px;
       font-weight: 600;
       box-shadow: 0 6px 20px rgba(0,0,0,.22);
       z-index: 9100;
     }
+    .variant-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
     .variant-picker-label {
       color: rgba(255,255,255,.55);
       font-size: 10px;
       text-transform: uppercase;
       letter-spacing: .8px;
-      margin-right: 4px;
+      min-width: 84px;
     }
     .variant-btn {
       background: transparent;
@@ -660,49 +666,70 @@
     .chat-panel .chat-avatar { background: rgba(255,255,255,.14); }
 
     /* ───────────────────────────────────────────────
-       V3: BOTTOM DRAWER
+       LOGO BUBBLE — shared FAB shape + avatar (V3, V4)
        ─────────────────────────────────────────────── */
-    .chat-drawer {
+    .logo-fab {
       position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 460px;
+      bottom: 30px;
+      right: 30px;
+      width: 78px;
+      height: 70px;
       background: #fff;
-      box-shadow: 0 -10px 40px rgba(0,0,0,.18);
-      display: flex;
-      flex-direction: column;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
       z-index: 9000;
-      transform: translateY(0);
-      transition: transform .28s ease;
-      border-top: 1px solid #e6e9ec;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      filter: drop-shadow(0 10px 22px rgba(0,0,0,.18)) drop-shadow(0 2px 4px rgba(0,0,0,.08));
+      transition: transform .2s, filter .2s;
     }
-    .chat-drawer.hidden { transform: translateY(100%); pointer-events: none; }
-    .chat-drawer .chat-header {
-      cursor: default;
-      border-radius: 0;
+    .logo-fab:hover {
+      transform: translateY(-2px);
+      filter: drop-shadow(0 14px 26px rgba(0,0,0,.22)) drop-shadow(0 2px 6px rgba(0,0,0,.1));
+    }
+    .logo-fab.hidden { display: none; }
+    .logo-fab .fab-tail {
+      position: absolute;
+      bottom: -9px;
+      left: 16px;
+      width: 0;
+      height: 0;
+      border-style: solid;
+      border-width: 16px 14px 0 0;
+      border-color: #fff transparent transparent transparent;
+      transform: rotate(-18deg);
+    }
+    .logo-fab .fab-logo {
+      position: absolute;
+      width: 52px;
+      height: 52px;
+      object-fit: contain;
+      transition: opacity .65s ease;
+      pointer-events: none;
+    }
+
+    /* Avatar-sized rotating logo (for chat headers in logo variants) */
+    .logo-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
       background: #fff;
-      color: #2a2f36;
-      border-bottom: 1px solid #e6e9ec;
-      padding: 12px 22px;
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
     }
-    .chat-drawer .chat-avatar {
-      background: linear-gradient(135deg, #2563eb, #1e40af);
-      color: #fff;
-    }
-    .chat-drawer .chat-status { color: #6b7280; }
-    .chat-drawer .chat-status::before { box-shadow: 0 0 0 2px rgba(34,197,94,.25); }
-    .chat-drawer .chat-header-btn { color: #6b7280; }
-    .chat-drawer .chat-header-btn:hover { background: #f1f3f5; color: #2a2f36; }
-    .chat-drawer .chat-body {
-      max-width: 820px;
+    .logo-avatar .avatar-logo {
+      position: absolute;
+      inset: 0;
       width: 100%;
-      margin: 0 auto;
-    }
-    .chat-drawer .chat-input-wrap {
-      max-width: 820px;
-      width: 100%;
-      margin: 0 auto;
+      height: 100%;
+      object-fit: contain;
+      padding: 4px;
+      transition: opacity .65s ease;
     }
   </style>
 </head>
@@ -881,10 +908,16 @@
 
 <!-- VARIANT PICKER -->
 <div class="variant-picker">
-  <span class="variant-picker-label">Variant</span>
-  <button class="variant-btn active" data-variant="v1">V1 · Floating</button>
-  <button class="variant-btn" data-variant="v2">V2 · Side Panel</button>
-  <button class="variant-btn" data-variant="v3">V3 · Bottom Drawer</button>
+  <div class="variant-group">
+    <span class="variant-picker-label">Chat Icon</span>
+    <button class="variant-btn active" data-variant="v1">V1 · Floating</button>
+    <button class="variant-btn" data-variant="v2">V2 · Side Panel</button>
+  </div>
+  <div class="variant-group">
+    <span class="variant-picker-label">Logo Bubble</span>
+    <button class="variant-btn" data-variant="v3">V3 · Floating</button>
+    <button class="variant-btn" data-variant="v4">V4 · Side Panel</button>
+  </div>
 </div>
 
 <!-- ── V1: FLOATING WIDGET (draggable + resizable) ── -->
@@ -974,27 +1007,27 @@
   </div>
 </div>
 
-<!-- ── V3: BOTTOM DRAWER (slides up, full width) ── -->
-<button id="chat-v3-fab" class="chat-fab variant-el" data-variant="v3" aria-label="Open chat" style="display:none">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-  </svg>
+<!-- ── V3: LOGO BUBBLE + FLOATING (draggable + resizable) ── -->
+<button id="chat-v3-fab" class="logo-fab variant-el" data-variant="v3" aria-label="Open chat" style="display:none">
+  <span class="fab-tail"></span>
+  <img class="fab-logo fab-logo-a" alt="">
+  <img class="fab-logo fab-logo-b" alt="" style="opacity:0">
 </button>
 
-<div id="chat-v3-window" class="chat-drawer hidden variant-el" data-variant="v3" style="display:none">
-  <div class="chat-header">
-    <div class="chat-avatar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="11" width="18" height="10" rx="2"/>
-        <circle cx="12" cy="5" r="2"/>
-        <path d="M12 7v4"/>
-      </svg>
+<div id="chat-v3-window" class="chat-window hidden variant-el" data-variant="v3" style="display:none">
+  <div class="chat-header" id="chat-v3-header">
+    <div class="logo-avatar">
+      <img class="avatar-logo avatar-logo-a" alt="">
+      <img class="avatar-logo avatar-logo-b" alt="" style="opacity:0">
     </div>
     <div>
       <div class="chat-title">Omni Assistant</div>
       <div class="chat-status">Online</div>
     </div>
     <div class="chat-header-actions">
+      <button class="chat-header-btn" id="chat-v3-minimize" title="Minimize">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
       <button class="chat-header-btn" id="chat-v3-close" title="Close">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
       </button>
@@ -1012,10 +1045,64 @@
       </svg>
     </button>
   </div>
+
+  <div class="chat-resize" id="chat-v3-resize"></div>
+</div>
+
+<!-- ── V4: LOGO BUBBLE + SIDE PANEL ── -->
+<button id="chat-v4-fab" class="logo-fab variant-el" data-variant="v4" aria-label="Open chat" style="display:none">
+  <span class="fab-tail"></span>
+  <img class="fab-logo fab-logo-a" alt="">
+  <img class="fab-logo fab-logo-b" alt="" style="opacity:0">
+</button>
+
+<div id="chat-v4-window" class="chat-panel hidden variant-el" data-variant="v4" style="display:none">
+  <div class="chat-header">
+    <div class="logo-avatar">
+      <img class="avatar-logo avatar-logo-a" alt="">
+      <img class="avatar-logo avatar-logo-b" alt="" style="opacity:0">
+    </div>
+    <div>
+      <div class="chat-title">Omni Assistant</div>
+      <div class="chat-status">Online</div>
+    </div>
+    <div class="chat-header-actions">
+      <button class="chat-header-btn" id="chat-v4-close" title="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="chat-body" id="chat-v4-body"></div>
+
+  <div class="chat-input-wrap">
+    <textarea id="chat-v4-input" class="chat-input" rows="1" placeholder="Type your message…"></textarea>
+    <button id="chat-v4-send" class="chat-send" aria-label="Send">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
 </div>
 
 <script>
 (function () {
+
+  /* ───── Logo rotation (shared across all logo-bubble variants) ───── */
+  const LOGOS = [
+    'references/logos/smartcircle-logo.png',
+    'references/logos/applicantstream-symbol.png',
+    'references/logos/aptel-symbol-black.png',
+  ];
+  const logoRotator = createLogoRotator(LOGOS, 3500);
+  // Subscribe every pair of <img class="fab-logo a/b"> and avatar slots
+  document.querySelectorAll('.logo-fab, .logo-avatar').forEach((host) => {
+    const a = host.querySelector('.fab-logo-a, .avatar-logo-a');
+    const b = host.querySelector('.fab-logo-b, .avatar-logo-b');
+    if (a && b) logoRotator.subscribe(a, b);
+  });
+  logoRotator.start();
 
   /* ───── Variant configs ───── */
   const VARIANTS = {
@@ -1026,7 +1113,11 @@
     v2: { fab:'chat-v2-fab', win:'chat-v2-window', body:'chat-v2-body',
           input:'chat-v2-input', send:'chat-v2-send', close:'chat-v2-close' },
     v3: { fab:'chat-v3-fab', win:'chat-v3-window', body:'chat-v3-body',
-          input:'chat-v3-input', send:'chat-v3-send', close:'chat-v3-close' },
+          input:'chat-v3-input', send:'chat-v3-send', close:'chat-v3-close',
+          min:'chat-v3-minimize', header:'chat-v3-header', resizer:'chat-v3-resize',
+          draggable:true, resizable:true },
+    v4: { fab:'chat-v4-fab', win:'chat-v4-window', body:'chat-v4-body',
+          input:'chat-v4-input', send:'chat-v4-send', close:'chat-v4-close' },
   };
 
   /* ───── Set up each variant ───── */
@@ -1046,10 +1137,10 @@
       const isActive = el.dataset.variant === id;
       el.style.display = isActive ? '' : 'none';
       // Always start in closed state when switching
-      if (el.classList.contains('chat-window') || el.classList.contains('chat-panel') || el.classList.contains('chat-drawer')) {
+      if (el.classList.contains('chat-window') || el.classList.contains('chat-panel')) {
         el.classList.add('hidden');
       }
-      if (el.classList.contains('chat-fab')) {
+      if (el.classList.contains('chat-fab') || el.classList.contains('logo-fab')) {
         el.classList.remove('hidden');
       }
     });
@@ -1195,6 +1286,49 @@
     document.addEventListener('mouseup', () => {
       if (drag) { drag = null; win.classList.remove('dragging'); }
     });
+  }
+
+  /* ───── Logo rotator (shared across all logo-bubble subscribers) ───── */
+  function createLogoRotator(logos, intervalMs) {
+    const subscribers = [];
+    let currentSrc = logos[Math.floor(Math.random() * logos.length)];
+
+    function subscribe(slotA, slotB) {
+      slotA.src = currentSrc;
+      slotA.style.opacity = '1';
+      slotB.style.opacity = '0';
+      subscribers.push({ slotA, slotB, active: 'A' });
+    }
+
+    function pickNext() {
+      if (logos.length < 2) return logos[0];
+      let next;
+      do { next = logos[Math.floor(Math.random() * logos.length)]; }
+      while (next === currentSrc);
+      return next;
+    }
+
+    function tick() {
+      currentSrc = pickNext();
+      subscribers.forEach((sub) => {
+        const inactive = sub.active === 'A' ? sub.slotB : sub.slotA;
+        const active   = sub.active === 'A' ? sub.slotA : sub.slotB;
+        const swap = () => {
+          inactive.style.opacity = '1';
+          active.style.opacity   = '0';
+          sub.active = sub.active === 'A' ? 'B' : 'A';
+        };
+        inactive.src = currentSrc;
+        if (inactive.complete && inactive.naturalWidth > 0) swap();
+        else inactive.onload = swap;
+      });
+    }
+
+    let timer = null;
+    return {
+      subscribe,
+      start() { if (!timer) timer = setInterval(tick, intervalMs); },
+    };
   }
 
   /* ───── Resize (V1 only, bottom-left handle) ───── */
