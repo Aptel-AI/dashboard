@@ -634,6 +634,8 @@
       font-weight: 600;
       transition: background .15s, color .15s;
       white-space: nowrap;
+      text-decoration: none;
+      display: inline-block;
     }
     .variant-btn:hover { color: #fff; background: rgba(255,255,255,.08); }
     .variant-btn.active { background: #2563eb; color: #fff; }
@@ -909,6 +911,11 @@
 <!-- VARIANT PICKER -->
 <div class="variant-picker">
   <div class="variant-group">
+    <span class="variant-picker-label">Surface</span>
+    <a class="variant-btn active" href="chatbot-prototype.html">Desktop</a>
+    <a class="variant-btn" href="chatbot-prototype-mobile.html">Mobile</a>
+  </div>
+  <div class="variant-group">
     <span class="variant-picker-label">Chat Icon</span>
     <button class="variant-btn active" data-variant="v1">V1 · Floating</button>
     <button class="variant-btn" data-variant="v2">V2 · Side Panel</button>
@@ -1124,13 +1131,13 @@
   Object.keys(VARIANTS).forEach(setupVariant);
 
   /* ───── Variant picker ───── */
-  document.querySelectorAll('.variant-btn').forEach((btn) => {
+  document.querySelectorAll('.variant-btn[data-variant]').forEach((btn) => {
     btn.addEventListener('click', () => setActive(btn.dataset.variant));
   });
   setActive('v1');
 
   function setActive(id) {
-    document.querySelectorAll('.variant-btn').forEach((btn) => {
+    document.querySelectorAll('.variant-btn[data-variant]').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.variant === id);
     });
     document.querySelectorAll('.variant-el').forEach((el) => {

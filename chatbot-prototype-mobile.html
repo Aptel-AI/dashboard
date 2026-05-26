@@ -45,18 +45,24 @@
       border-radius: 14px;
       padding: 10px 12px;
       display: flex;
-      align-items: center;
-      gap: 8px;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
       font-size: 12px;
       font-weight: 600;
       box-shadow: 0 6px 20px rgba(0,0,0,.18);
+    }
+    .variant-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
     .variant-picker-label {
       color: rgba(255,255,255,.55);
       font-size: 10px;
       text-transform: uppercase;
       letter-spacing: .8px;
-      margin-right: 4px;
+      min-width: 70px;
     }
     .variant-btn {
       background: transparent;
@@ -69,6 +75,8 @@
       font-weight: 600;
       white-space: nowrap;
       transition: background .15s, color .15s;
+      text-decoration: none;
+      display: inline-block;
     }
     .variant-btn:hover { color: #fff; background: rgba(255,255,255,.08); }
     .variant-btn.active { background: #2563eb; color: #fff; }
@@ -520,9 +528,16 @@
   <div class="page-title">TeleMapper Mobile — Chatbot Prototype</div>
 
   <div class="variant-picker">
-    <span class="variant-picker-label">Variant</span>
-    <button class="variant-btn active" data-variant="m1">V1 · Bottom Sheet</button>
-    <button class="variant-btn" data-variant="m2">V2 · Full Screen</button>
+    <div class="variant-group">
+      <span class="variant-picker-label">Surface</span>
+      <a class="variant-btn" href="chatbot-prototype.html">Desktop</a>
+      <a class="variant-btn active" href="chatbot-prototype-mobile.html">Mobile</a>
+    </div>
+    <div class="variant-group">
+      <span class="variant-picker-label">Variant</span>
+      <button class="variant-btn active" data-variant="m1">V1 · Bottom Sheet</button>
+      <button class="variant-btn" data-variant="m2">V2 · Full Screen</button>
+    </div>
   </div>
 
   <!-- ────── PHONE FRAME ────── -->
@@ -749,13 +764,13 @@
   let active = 'm1';
   const fab = document.getElementById('mobile-fab');
 
-  document.querySelectorAll('.variant-btn').forEach((btn) => {
+  document.querySelectorAll('.variant-btn[data-variant]').forEach((btn) => {
     btn.addEventListener('click', () => setActive(btn.dataset.variant));
   });
 
   function setActive(id) {
     active = id;
-    document.querySelectorAll('.variant-btn').forEach((b) => {
+    document.querySelectorAll('.variant-btn[data-variant]').forEach((b) => {
       b.classList.toggle('active', b.dataset.variant === id);
     });
     document.querySelectorAll('.variant-el').forEach((el) => {
