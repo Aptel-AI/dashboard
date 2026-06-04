@@ -1,3 +1,34 @@
+# Dashboard — Session Handoff (June 3, 2026)
+
+_Rep-facing dashboard work (sales posting + teams). Older owner/NLR session log follows below._
+
+## What Was Done This Session
+
+### 1. ✅ Stopped leaderboard inflation from duplicate sales
+**Problem:** Discord tightened webhook rate limits, so some sales stopped posting to the Discord channel despite being tracked. Reps used the Discord post as their confirmation and re-submitted the same sale over and over until it appeared — and `writeAddSale` appended a new row each time, inflating the leaderboard.
+
+**Fix (server-side dedup, both `Code.gs` and `NdsCode.gs`):**
+- New `_findDuplicateSale(sheet, email, campaign, body)` + `_saleDateKey(val)` helpers.
+- `writeAddSale` checks for a duplicate before `appendRow`. On a match it returns `{ ok:true, duplicate:true, ... }` WITHOUT adding a row, and re-fires the webhook (the likely reason they re-submitted).
+- Dedup key: **rep email + DSI** for AT&T B2B (keyed on rep so one rep's typo'd DSI can't block a different rep — explicit user requirement); **rep email + client name + date of sale** for Ooma.
+- Lookup wrapped in try/catch → any failure returns "not a duplicate" so a real sale is never blocked.
+- Client (`post-sale.js` / `nds-post-sale.js`): reads the `duplicate` flag and shows a distinct orange **"Already Logged"** ↺ success screen telling the rep their numbers weren't changed and not to re-submit.
+
+**Verified** via a Node dry-run of the dedup helpers (mocked sheet): 11/11 cases — same rep+DSI blocked, different rep same/typo DSI allowed, Ooma same-day blocked / different-day allowed, blanks and empty sheet never block.
+
+**Deliberately skipped:** an async webhook retry queue — user wanted minimal maintenance ("don't want to come back if it breaks").
+
+### 2. ✅ Rebuilt the team emoji picker
+**Problem:** Old picker showed 12 random emojis from an 80-emoji pool + a reroll button, so most emojis were unreachable ("not all emojis are there").
+**Fix (`app.js`):** Replaced with a text input that accepts any emoji from the OS emoji keyboard / paste, plus a scrollable grid of the full curated set. New `isSingleEmoji()` validates via `Intl.Segmenter` (exactly one grapheme + actual emoji via `Extended_Pictographic`/regional-indicator) — rejects letters, digits, symbols, spaces, multi-emoji. Used by both the team-customize and teams-CRUD modals.
+
+### 3. ✅ Pushed + deployed
+- `1332560` Block duplicate sales to stop leaderboard inflation
+- `6393c64` Replace random team-emoji picker with keyboard entry + full grid
+- Frontend live on GH Pages. **User redeployed `Code.gs` + `NdsCode.gs` in the Apps Script editor** (backend doesn't deploy via Pages).
+
+---
+
 # Owner Dev Dashboard — Session Handoff (March 20, 2026)
 
 ## What Was Done This Session
