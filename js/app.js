@@ -1782,33 +1782,67 @@ const App = {
   },
 
   // ── Emoji picker helpers ──
-  _pickRandomEmojis(count, mustInclude) {
-    const pool = [...OFFICE_CONFIG.teamEmojis];
-    const result = new Set();
-    if (mustInclude && pool.includes(mustInclude)) result.add(mustInclude);
-    while (result.size < Math.min(count, pool.length)) {
-      result.add(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  // True only for exactly one emoji grapheme (handles ZWJ sequences, skin
+  // tones, and flags). Rejects letters, digits, symbols, spaces, and any
+  // input that resolves to more than one visual character.
+  isSingleEmoji(str) {
+    if (!str) return false;
+    let graphemes;
+    try {
+      graphemes = [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(str)].map(s => s.segment);
+    } catch (_) {
+      // Intl.Segmenter unavailable — fall back to treating the whole string as one unit
+      graphemes = [str];
     }
-    return [...result];
+    if (graphemes.length !== 1) return false;
+    return /\p{Extended_Pictographic}/u.test(graphemes[0]) || /\p{Regional_Indicator}/u.test(graphemes[0]);
   },
 
   _renderEmojiPicker(pickerId, displayId, selectFn, highlightFn) {
     const picker = document.getElementById(pickerId);
     if (!picker) return;
     const selected = selectFn === 'App.selectEmoji' ? this._selectedEmoji : TeamsManager._selectedTeamEmoji;
-    const emojis = this._pickRandomEmojis(12, selected);
-    picker.innerHTML = emojis.map(e =>
-      `<span onclick="${selectFn}('${e}')" style="cursor:pointer;font-size:24px;padding:4px 6px;border-radius:8px;border:2px solid transparent;transition:all 0.1s" id="${pickerId === 'emoji-picker' ? 'emoji-opt-' : 'team-emoji-opt-'}${e.codePointAt(0)}">${e}</span>`
-    ).join('')
-    + `<span onclick="App._rerollEmojis('${pickerId}','${displayId}','${selectFn}')" style="cursor:pointer;font-size:18px;padding:4px 8px;border-radius:8px;background:rgba(0,0,0,0.06);border:1px solid rgba(0,0,0,0.2);color:var(--silver-dim);font-family:'Neue Haas Grotesk','Helvetica Neue','Inter',sans-serif;font-weight:700;letter-spacing:1px;display:inline-flex;align-items:center;gap:4px" title="Show more emojis">🔄</span>`;
+    const optPrefix = pickerId === 'emoji-picker' ? 'emoji-opt-' : 'team-emoji-opt-';
+    const inputId = pickerId + '-input';
+    const errId = pickerId + '-err';
+
+    const grid = OFFICE_CONFIG.teamEmojis.map(e =>
+      `<span onclick="${selectFn}('${e}');App._syncEmojiInput('${pickerId}','${e}')" style="cursor:pointer;font-size:24px;padding:4px 6px;border-radius:8px;border:2px solid transparent;transition:all 0.1s" id="${optPrefix}${e.codePointAt(0)}">${e}</span>`
+    ).join('');
+
+    picker.innerHTML =
+      `<div style="display:flex;align-items:center;gap:10px;width:100%;margin-bottom:4px">
+        <input id="${inputId}" type="text" value="${selected}" maxlength="20"
+          oninput="App._handleEmojiInput(this,'${selectFn}','${pickerId}')"
+          placeholder="🙂"
+          style="width:64px;box-sizing:border-box;background:#F5F2EE;border:1px solid rgba(0,0,0,0.3);border-radius:8px;padding:8px 0;font-size:22px;text-align:center;outline:none">
+        <span style="font-size:11px;color:var(--silver-dim);font-family:'Helvetica Neue','Inter',sans-serif;line-height:1.4">Type or paste any emoji (⌘⌃Space on Mac · Win&nbsp;+&nbsp;. on Windows) — or pick one below</span>
+      </div>
+      <div id="${errId}" style="width:100%;color:#E5564A;font-size:11px;font-family:'Cerebri Sans','DM Sans','Inter',sans-serif;min-height:14px;margin-bottom:6px"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;max-height:168px;overflow-y:auto;width:100%">${grid}</div>`;
     if (highlightFn) highlightFn();
   },
 
-  _rerollEmojis(pickerId, displayId, selectFn) {
-    const highlightFn = selectFn === 'App.selectEmoji'
-      ? () => this.highlightSelectedEmoji()
-      : () => TeamsManager.highlightTeamEmoji();
-    this._renderEmojiPicker(pickerId, displayId, selectFn, highlightFn);
+  // Validate keyboard/paste input; commit through the owning selectFn only when it's a single emoji
+  _handleEmojiInput(inputEl, selectFn, pickerId) {
+    const val = inputEl.value;
+    const errEl = document.getElementById(pickerId + '-err');
+    if (val === '') { if (errEl) errEl.textContent = ''; return; }
+    if (this.isSingleEmoji(val)) {
+      if (errEl) errEl.textContent = '';
+      if (selectFn === 'App.selectEmoji') this.selectEmoji(val);
+      else TeamsManager.selectTeamEmoji(val);
+    } else if (errEl) {
+      errEl.textContent = 'Enter a single emoji only — no letters, numbers, symbols, or spaces.';
+    }
+  },
+
+  // Mirror a quick-pick choice back into the text input and clear any error
+  _syncEmojiInput(pickerId, val) {
+    const input = document.getElementById(pickerId + '-input');
+    if (input) input.value = val;
+    const errEl = document.getElementById(pickerId + '-err');
+    if (errEl) errEl.textContent = '';
   },
 
   openTeamCustomize() {
