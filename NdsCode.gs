@@ -1657,6 +1657,27 @@ function writeAddSale(body, ss, officeId) {
     String(body.codesUsedBy || '').trim().toLowerCase()             // 25 Codes Used By
   ];
 
+  // ── Dedup guard ──
+  // Reps re-post a sale when its Discord notification doesn't show up; without
+  // this, each re-post appends another row and inflates the leaderboard. Block
+  // re-posts that match an existing sale by the SAME rep (rep + DSI for B2B,
+  // rep + client + date for Ooma). A different rep with the same or typo'd DSI
+  // is never blocked. On a match we still re-fire the webhook (the likely
+  // reason they re-submitted) but do NOT add a row.
+  var dupRow = _findDuplicateSale(sheet, email, String(body.campaign || 'attb2b').trim(), body);
+  if (dupRow > 0) {
+    var dupWebhook = '';
+    try { dupWebhook = _fireWebhook(body, units, teamEmoji); } catch (e) { dupWebhook = 'error: ' + e.message; }
+    return {
+      ok: true,
+      duplicate: true,
+      rowIndex: dupRow,
+      units: units,
+      yeses: yeses,
+      webhook: dupWebhook
+    };
+  }
+
   sheet.appendRow(newRow);
 
   // Bust the Tableau cache so fresh data loads
@@ -1679,6 +1700,59 @@ function writeAddSale(body, ss, officeId) {
     yeses: yeses,
     webhook: webhookResult
   };
+}
+
+
+// === DUPLICATE-SALE DETECTION ===
+
+// Returns the 1-based row index of an existing sale that duplicates this one
+// (same rep + same sale identity), or -1 if none. Keyed on rep + DSI for
+// AT&T B2B, and rep + client name + date of sale for Ooma. Never throws — any
+// lookup failure returns -1 so a legitimate sale is never blocked by accident.
+function _findDuplicateSale(sheet, email, campaign, body) {
+  try {
+    if (sheet.getLastRow() < 2) return -1;
+    var emailNorm = String(email || '').trim().toLowerCase();
+    if (!emailNorm) return -1;
+    var dsiNorm = String(body.dsi || '').trim().toUpperCase();
+    var clientNorm = String(body.clientName || '').trim().toLowerCase();
+    var dateNorm = _saleDateKey(body.dateOfSale);
+
+    // Without a sale identity we can't safely dedup — let it through.
+    if (campaign === 'attb2b' && !dsiNorm) return -1;
+    if (campaign === 'ooma' && !clientNorm) return -1;
+
+    var data = sheet.getDataRange().getValues();
+    for (var r = data.length - 1; r >= 1; r--) {
+      if (String(data[r][1] || '').trim().toLowerCase() !== emailNorm) continue;     // 1  Email
+      if (String(data[r][4] || '').trim() !== campaign) continue;                    // 4  Campaign
+      if (campaign === 'attb2b') {
+        if (String(data[r][5] || '').trim().toUpperCase() === dsiNorm) return r + 1;  // 5  DSI
+      } else if (campaign === 'ooma') {
+        if (String(data[r][7] || '').trim().toLowerCase() === clientNorm &&           // 7  Client Name
+            _saleDateKey(data[r][3]) === dateNorm) return r + 1;                       // 3  Date of Sale
+      }
+    }
+    return -1;
+  } catch (e) {
+    return -1;
+  }
+}
+
+// Normalize a date-of-sale value (a Date object from the sheet, or a
+// 'YYYY-MM-DD' string from the payload) to a 'YYYY-MM-DD' key for comparison.
+function _saleDateKey(val) {
+  try {
+    if (val instanceof Date) {
+      var y = val.getFullYear();
+      var m = ('0' + (val.getMonth() + 1)).slice(-2);
+      var d = ('0' + val.getDate()).slice(-2);
+      return y + '-' + m + '-' + d;
+    }
+    return String(val || '').trim().slice(0, 10);
+  } catch (e) {
+    return '';
+  }
 }
 
 

@@ -9,6 +9,7 @@ const PostSale = {
   _step: 1,
   _campaign: 'attb2b',   // 'attb2b' | 'ooma'
   _submitting: false,
+  _wasDuplicate: false,  // server matched an existing sale; no new row was logged
   _formData: {},
   _products: {
     air:      { on: false, icon: '📡', label: 'Internet Air' },
@@ -449,12 +450,20 @@ const PostSale = {
       summary = d.clientName + ' — ' + d.oomaPackage;
     }
 
+    const dup = this._wasDuplicate;
+    const dupNote = dup
+      ? `<div style="font-size:13px;color:var(--orange);margin-top:16px;line-height:1.5;max-width:340px;margin-left:auto;margin-right:auto">
+          This sale was <strong>already logged</strong> — your numbers were not changed. We re-sent the notification to Discord, so there's no need to submit it again.
+        </div>`
+      : '';
+
     return `<div class="wizard-step-content" style="text-align:center;padding-top:40px">
-      <div class="success-check">✓</div>
+      <div class="success-check"${dup ? ' style="color:var(--orange);border-color:var(--orange)"' : ''}>${dup ? '↺' : '✓'}</div>
       <div class="success-summary">
-        <div class="success-title">Sale Logged!</div>
+        <div class="success-title">${dup ? 'Already Logged' : 'Sale Logged!'}</div>
         <div class="success-subtitle">${this._formatDate(d.dateOfSale)}</div>
         <div style="font-size:14px;color:var(--white);font-weight:600;margin-top:12px">${this._esc(summary)}</div>
+        ${dupNote}
       </div>
       <div class="success-actions">
         <button class="wizard-btn wizard-btn-primary" onclick="PostSale._resetForAnother()">Log Another Sale</button>
@@ -647,7 +656,10 @@ const PostSale = {
       this._submitting = false;
       if (result.ok && result.data && result.data.ok) {
         this._clearDraft();
-        // Discord webhook now fires server-side in Code.gs
+        // Discord webhook now fires server-side in Code.gs.
+        // duplicate === true means the server matched an existing sale (same rep
+        // + DSI/client) and did NOT log a new row — it only re-sent to Discord.
+        this._wasDuplicate = !!result.data.duplicate;
         // Advance to success step
         const total = this._campaign === 'ooma' ? 3 : 4;
         this._step = total;
