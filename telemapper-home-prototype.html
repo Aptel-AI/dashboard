@@ -423,6 +423,248 @@
     .tab-center svg { width: 26px; height: 26px; stroke: #fff; fill: none; }
 
     .home-bottom-pad { height: 4px; }
+
+    /* ───────────────────────────────────────────────
+       CLIENT SNAPSHOT STAT BOARD  (home + detail)
+       ─────────────────────────────────────────────── */
+    .stat-board {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      cursor: pointer;
+    }
+    .stat-tile {
+      position: relative;
+      background: #fff;
+      border-radius: 14px;
+      padding: 13px 12px 12px;
+      border: 1px solid rgba(0,0,0,.05);
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
+      overflow: hidden;
+    }
+    .stat-tile::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: var(--accent, #1a2547);
+    }
+    .st-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: #8e8e93;
+    }
+    .st-num {
+      font-size: 25px;
+      font-weight: 800;
+      letter-spacing: -.5px;
+      color: #1c1c1e;
+      margin-top: 3px;
+    }
+    .st-num.accent { color: var(--accent); }
+    .st-tap { font-size: 11px; color: #9aa0a6; margin-top: 5px; }
+
+    /* ───────────────────────────────────────────────
+       BULLETIN BOARD
+       ─────────────────────────────────────────────── */
+    .bulletin { padding: 4px 0; }
+    .bull-item {
+      display: flex;
+      gap: 12px;
+      padding: 13px 16px;
+      align-items: flex-start;
+      cursor: pointer;
+      transition: background .12s;
+    }
+    .bull-item:active { background: #f5f6f8; }
+    .bull-item + .bull-item { border-top: 1px solid #f0f0f2; }
+    .bull-icon {
+      width: 38px; height: 38px;
+      border-radius: 11px;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .bull-main { flex: 1; min-width: 0; }
+    .bull-tagrow { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+    .bull-tag {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding: 2px 7px;
+      border-radius: 6px;
+    }
+    .tag-new    { background: #e7f0ff; color: #2563eb; }
+    .tag-promo  { background: #fdeede; color: #d9730d; }
+    .tag-update { background: #e9f9ee; color: #1f9d4d; }
+    .bull-time { font-size: 11px; color: #9aa0a6; margin-left: auto; }
+    .bull-title { font-size: 14px; font-weight: 700; color: #1c1c1e; }
+    .bull-desc { font-size: 12.5px; color: #6b7280; margin-top: 2px; line-height: 1.4; }
+
+    /* ───────────────────────────────────────────────
+       CLIENT DETAIL SCREEN
+       ─────────────────────────────────────────────── */
+    .client-topbar {
+      position: relative;
+      flex-shrink: 0;
+      height: 92px;
+      background: #fff;
+      box-shadow: 0 1px 0 rgba(0,0,0,.06);
+      z-index: 5;
+    }
+    .ct-title {
+      position: absolute;
+      bottom: 14px; left: 0; right: 0;
+      text-align: center;
+      font-size: 17px; font-weight: 800; color: #1c1c1e; letter-spacing: -.2px;
+    }
+    .ct-back, .ct-menu {
+      position: absolute;
+      top: 52px;
+      width: 34px; height: 34px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: #1a2547;
+    }
+    .ct-back { left: 12px; }
+    .ct-menu { right: 12px; }
+    .ct-back svg, .ct-menu svg { width: 22px; height: 22px; stroke: currentColor; fill: none; }
+
+    .client-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 18px 96px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .client-scroll::-webkit-scrollbar { display: none; }
+
+    .identity { display: flex; align-items: center; gap: 13px; padding: 14px; }
+    .id-avatar {
+      width: 48px; height: 48px;
+      border-radius: 13px;
+      background: #4f9d69;
+      color: #fff;
+      font-size: 17px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .id-main { flex: 1; min-width: 0; }
+    .id-name { font-size: 17px; font-weight: 800; letter-spacing: -.2px; }
+    .id-co {
+      font-size: 12.5px; color: #8e8e93; margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .id-rate {
+      display: flex; align-items: center; gap: 7px;
+      border: 1px solid #e2e5ea;
+      border-radius: 999px;
+      padding: 5px 10px;
+      flex-shrink: 0;
+      font-size: 13px;
+    }
+    .id-rate .sep { width: 1px; height: 16px; background: #e2e5ea; }
+    .id-rate .q { font-size: 12px; font-weight: 600; color: #6b7280; }
+    .id-rate .emoji { cursor: pointer; }
+
+    .refreshed-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: #eef1f4;
+      color: #5b6470;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 12px;
+      border-radius: 999px;
+      margin: 10px 0 16px;
+    }
+    .refreshed-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #34c759; }
+
+    .week-section-title {
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: #8e8e93;
+      margin: 22px 4px 12px;
+    }
+    .week-card { padding: 16px; margin-bottom: 12px; }
+    .week-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .week-range { font-size: 16px; font-weight: 800; letter-spacing: -.2px; display: flex; align-items: center; gap: 8px; }
+    .week-tag {
+      font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px;
+      background: #e9f9ee; color: #1f9d4d;
+      padding: 2px 8px; border-radius: 6px;
+    }
+    .week-units { font-size: 15px; font-weight: 800; color: #1c1c1e; }
+    .week-bars { display: grid; grid-template-columns: repeat(7,1fr); gap: 4px; }
+    .day { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .day.has-units { cursor: pointer; }
+    .d-label { font-size: 10px; font-weight: 700; color: #9aa0a6; letter-spacing: .3px; }
+    .bar-area { height: 56px; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+    .bar { width: 18px; border-radius: 5px; background: #1a2547; }
+    .bar.zero { height: 3px; width: 16px; background: #dfe3e8; border-radius: 2px; }
+    .bar.cur { background: #34c759; }
+    .d-val { font-size: 12px; font-weight: 800; color: #1c1c1e; }
+    .d-val.muted { color: #c4c9cf; font-weight: 600; }
+    .d-date { font-size: 10px; color: #9aa0a6; }
+    .day.sun .d-label, .day.sun .d-date { color: #34c759; }
+
+    /* ── Order detail bottom sheet ── */
+    .order-sheet { position: absolute; inset: 0; z-index: 60; }
+    .order-sheet.hidden { pointer-events: none; }
+    .sheet-scrim {
+      position: absolute; inset: 0;
+      background: rgba(20,28,46,.42);
+      opacity: 1; transition: opacity .28s ease;
+    }
+    .order-sheet.hidden .sheet-scrim { opacity: 0; }
+    .sheet-panel {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 72%;
+      background: #fff;
+      border-radius: 22px 22px 0 0;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(0);
+      transition: transform .3s cubic-bezier(.32,.72,.27,.99);
+      box-shadow: 0 -10px 30px rgba(0,0,0,.2);
+    }
+    .order-sheet.hidden .sheet-panel { transform: translateY(100%); }
+    .sheet-grab { width: 36px; height: 5px; background: #d3d7dd; border-radius: 3px; margin: 9px auto 0; }
+    .sheet-title { padding: 12px 20px 14px; border-bottom: 1px solid #f0f0f2; }
+    .sheet-title .d { font-size: 20px; font-weight: 800; letter-spacing: -.3px; }
+    .sheet-title .r { font-size: 13px; color: #8e8e93; margin-top: 2px; }
+    .sheet-list { flex: 1; overflow-y: auto; padding: 14px 16px 8px; display: flex; flex-direction: column; gap: 12px; }
+    .order-card { border: 1px solid #e8eaee; border-radius: 14px; padding: 14px; background: #fbfcfd; }
+    .oc-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+    .oc-spm { font-size: 13px; font-weight: 700; color: #5b6470; }
+    .oc-spe { font-size: 16px; font-weight: 800; color: #1a2547; letter-spacing: -.2px; display: block; margin-top: 1px; }
+    .oc-status {
+      font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px;
+      color: #1f9d4d; border: 1px solid #b7e6c6; border-radius: 999px; padding: 3px 10px;
+      flex-shrink: 0;
+    }
+    .oc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 10px; }
+    .oc-l { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: #9aa0a6; }
+    .oc-v { font-size: 13.5px; font-weight: 600; color: #2a2f36; margin-top: 2px; }
+    .sheet-foot { padding: 10px 16px 18px; display: flex; justify-content: flex-end; }
+    .sheet-close {
+      background: #eef1f4; color: #1a2547;
+      border: none; border-radius: 12px;
+      padding: 12px 22px; font-size: 15px; font-weight: 700;
+      font-family: inherit; cursor: pointer;
+    }
+    .sheet-close:active { background: #e2e6eb; }
   </style>
 </head>
 <body>
@@ -459,6 +701,53 @@
               <div class="home-title">Good morning, Alex</div>
             </div>
             <div class="home-avatar">AP</div>
+          </div>
+
+          <!-- Client Training snapshot → opens detail -->
+          <div class="section-head">
+            <div class="section-title">Client Training</div>
+            <div class="section-link" data-go="client">Open ›</div>
+          </div>
+          <div class="stat-board" data-go="client">
+            <div class="stat-tile" style="--accent:#1a2547"><div class="st-label">Units</div><div class="st-num">26</div></div>
+            <div class="stat-tile" style="--accent:#2f8f5b"><div class="st-label">Lines</div><div class="st-num">25</div></div>
+            <div class="stat-tile" style="--accent:#19b53a"><div class="st-label">Activated</div><div class="st-num">24</div></div>
+            <div class="stat-tile" style="--accent:#d99a00"><div class="st-label">Pending</div><div class="st-num">1</div><div class="st-tap">Tap to view</div></div>
+            <div class="stat-tile" style="--accent:#e0503a"><div class="st-label">Port Issues</div><div class="st-num">0</div><div class="st-tap">Tap to view</div></div>
+            <div class="stat-tile" style="--accent:#9fb0bd"><div class="st-label">Cancelled</div><div class="st-num">0</div><div class="st-tap">Tap to view</div></div>
+            <div class="stat-tile" style="--accent:#7c3aed"><div class="st-label">Disconnected</div><div class="st-num accent">0</div></div>
+          </div>
+
+          <!-- Bulletin board -->
+          <div class="section-head">
+            <div class="section-title">Bulletin Board</div>
+            <div class="section-link">See all</div>
+          </div>
+          <div class="card bulletin">
+            <div class="bull-item">
+              <div class="bull-icon" style="background:#fdeede">🎉</div>
+              <div class="bull-main">
+                <div class="bull-tagrow"><span class="bull-tag tag-promo">Promo</span><span class="bull-time">2h ago</span></div>
+                <div class="bull-title">2 Free Months on Premium 2.0</div>
+                <div class="bull-desc">Now approved to offer through June 30 — lead with it on every doorstep.</div>
+              </div>
+            </div>
+            <div class="bull-item">
+              <div class="bull-icon" style="background:#e7f0ff">✨</div>
+              <div class="bull-main">
+                <div class="bull-tagrow"><span class="bull-tag tag-new">New</span><span class="bull-time">Yesterday</span></div>
+                <div class="bull-title">Routes 2.0 is live</div>
+                <div class="bull-desc">Auto-optimized walking routes are on by default. Tap Continue Mapping to try it.</div>
+              </div>
+            </div>
+            <div class="bull-item">
+              <div class="bull-icon" style="background:#e9f9ee">🛠️</div>
+              <div class="bull-main">
+                <div class="bull-tagrow"><span class="bull-tag tag-update">Update</span><span class="bull-time">2d ago</span></div>
+                <div class="bull-title">Cleaner leaderboard</div>
+                <div class="bull-desc">Duplicate sales no longer inflate team rankings — standings are accurate again.</div>
+              </div>
+            </div>
           </div>
 
           <!-- Activity rings summary -->
@@ -651,6 +940,151 @@
         </div>
       </div>
 
+      <!-- ════════ CLIENT TRAINING DETAIL SCREEN ════════ -->
+      <div class="screen client-screen hidden" data-screen="client">
+        <div class="client-topbar">
+          <button class="ct-back" data-go="home" aria-label="Back">
+            <svg viewBox="0 0 24 24" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div class="ct-title">Client Training</div>
+          <button class="ct-menu" aria-label="Menu">
+            <svg viewBox="0 0 24 24" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+          </button>
+        </div>
+        <div class="client-scroll">
+
+          <div class="card identity">
+            <div class="id-avatar">DB</div>
+            <div class="id-main">
+              <div class="id-name">Dallas Bennett</div>
+              <div class="id-co">New Age Marketing, Inc. · Jared …</div>
+            </div>
+            <div class="id-rate">
+              <span class="emoji">👍</span><span class="sep"></span><span class="emoji">👎</span><span class="q">Issues?</span>
+            </div>
+          </div>
+
+          <div class="refreshed-pill"><span class="dot"></span>Data refreshed: Jun 3, 2026 · 12:00 AM CDT</div>
+
+          <div class="stat-board" style="cursor:default">
+            <div class="stat-tile" style="--accent:#1a2547"><div class="st-label">Units</div><div class="st-num">26</div></div>
+            <div class="stat-tile" style="--accent:#2f8f5b"><div class="st-label">Lines</div><div class="st-num">25</div></div>
+            <div class="stat-tile" style="--accent:#19b53a"><div class="st-label">Activated</div><div class="st-num">24</div></div>
+            <div class="stat-tile" style="--accent:#d99a00"><div class="st-label">Pending</div><div class="st-num">1</div><div class="st-tap">Tap to view</div></div>
+            <div class="stat-tile" style="--accent:#e0503a"><div class="st-label">Port Issues</div><div class="st-num">0</div><div class="st-tap">Tap to view</div></div>
+            <div class="stat-tile" style="--accent:#9fb0bd"><div class="st-label">Cancelled</div><div class="st-num">0</div><div class="st-tap">Tap to view</div></div>
+            <div class="stat-tile" style="--accent:#7c3aed"><div class="st-label">Disconnected</div><div class="st-num accent">0</div></div>
+          </div>
+
+          <div class="week-section-title">Weekly Activity</div>
+
+          <!-- Current week -->
+          <div class="card week-card">
+            <div class="week-head">
+              <div class="week-range">Jun 1 – Jun 7 <span class="week-tag">Current</span></div>
+              <div class="week-units">1 units</div>
+            </div>
+            <div class="week-bars">
+              <div class="day"><div class="d-label">MON</div><div class="bar-area"><div class="bar zero"></div></div><div class="d-val muted">—</div><div class="d-date">Jun 1</div></div>
+              <div class="day"><div class="d-label">TUE</div><div class="bar-area"><div class="bar zero"></div></div><div class="d-val muted">—</div><div class="d-date">Jun 2</div></div>
+              <div class="day has-units" data-sheet="Wed Jun 3|Jun 1 – Jun 7"><div class="d-label">WED</div><div class="bar-area"><div class="bar" style="height:14px"></div></div><div class="d-val">1</div><div class="d-date">Jun 3</div></div>
+              <div class="day"><div class="d-label">THU</div><div class="bar-area"><div class="bar zero"></div></div><div class="d-val muted">—</div><div class="d-date">Jun 4</div></div>
+              <div class="day"><div class="d-label">FRI</div><div class="bar-area"><div class="bar zero"></div></div><div class="d-val muted">—</div><div class="d-date">Jun 5</div></div>
+              <div class="day"><div class="d-label">SAT</div><div class="bar-area"><div class="bar zero"></div></div><div class="d-val muted">—</div><div class="d-date">Jun 6</div></div>
+              <div class="day sun"><div class="d-label">SUN</div><div class="bar-area"><div class="bar cur" style="height:6px"></div></div><div class="d-val muted">—</div><div class="d-date">Jun 7</div></div>
+            </div>
+          </div>
+
+          <!-- Prior week -->
+          <div class="card week-card">
+            <div class="week-head">
+              <div class="week-range">May 25 – May 31</div>
+              <div class="week-units">13 units</div>
+            </div>
+            <div class="week-bars">
+              <div class="day"><div class="d-label">MON</div><div class="bar-area"><div class="bar zero"></div></div><div class="d-val muted">—</div><div class="d-date">May 25</div></div>
+              <div class="day"><div class="d-label">TUE</div><div class="bar-area"><div class="bar zero"></div></div><div class="d-val muted">—</div><div class="d-date">May 26</div></div>
+              <div class="day"><div class="d-label">WED</div><div class="bar-area"><div class="bar zero"></div></div><div class="d-val muted">—</div><div class="d-date">May 27</div></div>
+              <div class="day"><div class="d-label">THU</div><div class="bar-area"><div class="bar zero"></div></div><div class="d-val muted">—</div><div class="d-date">May 28</div></div>
+              <div class="day has-units" data-sheet="Fri May 29|May 25 – May 31"><div class="d-label">FRI</div><div class="bar-area"><div class="bar" style="height:28px"></div></div><div class="d-val">3</div><div class="d-date">May 29</div></div>
+              <div class="day has-units" data-sheet="Sat May 30|May 25 – May 31"><div class="d-label">SAT</div><div class="bar-area"><div class="bar" style="height:36px"></div></div><div class="d-val">4</div><div class="d-date">May 30</div></div>
+              <div class="day has-units sun" data-sheet="Sun May 31|May 25 – May 31"><div class="d-label">SUN</div><div class="bar-area"><div class="bar" style="height:52px"></div></div><div class="d-val">6</div><div class="d-date">May 31</div></div>
+            </div>
+          </div>
+
+          <!-- Week before -->
+          <div class="card week-card">
+            <div class="week-head">
+              <div class="week-range">May 18 – May 24</div>
+              <div class="week-units">11 units</div>
+            </div>
+            <div class="week-bars">
+              <div class="day"><div class="d-label">MON</div><div class="bar-area"><div class="bar zero"></div></div><div class="d-val muted">—</div><div class="d-date">May 18</div></div>
+              <div class="day"><div class="d-label">TUE</div><div class="bar-area"><div class="bar zero"></div></div><div class="d-val muted">—</div><div class="d-date">May 19</div></div>
+              <div class="day"><div class="d-label">WED</div><div class="bar-area"><div class="bar zero"></div></div><div class="d-val muted">—</div><div class="d-date">May 20</div></div>
+              <div class="day has-units" data-sheet="Thu May 21|May 18 – May 24"><div class="d-label">THU</div><div class="bar-area"><div class="bar" style="height:14px"></div></div><div class="d-val">1</div><div class="d-date">May 21</div></div>
+              <div class="day has-units" data-sheet="Fri May 22|May 18 – May 24"><div class="d-label">FRI</div><div class="bar-area"><div class="bar" style="height:52px"></div></div><div class="d-val">6</div><div class="d-date">May 22</div></div>
+              <div class="day has-units" data-sheet="Sat May 23|May 18 – May 24"><div class="d-label">SAT</div><div class="bar-area"><div class="bar" style="height:36px"></div></div><div class="d-val">4</div><div class="d-date">May 23</div></div>
+              <div class="day sun"><div class="d-label">SUN</div><div class="bar-area"><div class="bar zero"></div></div><div class="d-val muted">—</div><div class="d-date">May 24</div></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ════════ ORDER DETAIL BOTTOM SHEET ════════ -->
+      <div class="order-sheet hidden" id="order-sheet">
+        <div class="sheet-scrim" data-close-sheet></div>
+        <div class="sheet-panel">
+          <div class="sheet-grab"></div>
+          <div class="sheet-title">
+            <div class="d" id="sheet-day">Sun May 31</div>
+            <div class="r" id="sheet-range">May 25 – May 31</div>
+          </div>
+          <div class="sheet-list">
+            <div class="order-card">
+              <div class="oc-top">
+                <div class="oc-spm">SPM248744969<span class="oc-spe">SPE-08382589</span></div>
+                <div class="oc-status">Active</div>
+              </div>
+              <div class="oc-grid">
+                <div><div class="oc-l">Plan</div><div class="oc-v">Premium 2.0 – 2 Lines</div></div>
+                <div><div class="oc-l">Order Date</div><div class="oc-v">5/31/2026</div></div>
+                <div><div class="oc-l">Phone</div><div class="oc-v">iPhone 14 Pro A</div></div>
+                <div><div class="oc-l">Location</div><div class="oc-v">Costco #1333</div></div>
+              </div>
+            </div>
+            <div class="order-card">
+              <div class="oc-top">
+                <div class="oc-spm">SPM248744969<span class="oc-spe">SPE-08382590</span></div>
+                <div class="oc-status">Active</div>
+              </div>
+              <div class="oc-grid">
+                <div><div class="oc-l">Plan</div><div class="oc-v">Premium 2.0 – 2 Lines</div></div>
+                <div><div class="oc-l">Order Date</div><div class="oc-v">5/31/2026</div></div>
+                <div><div class="oc-l">Phone</div><div class="oc-v">iPhone 16 Pro A</div></div>
+                <div><div class="oc-l">Location</div><div class="oc-v">Costco #1333</div></div>
+              </div>
+            </div>
+            <div class="order-card">
+              <div class="oc-top">
+                <div class="oc-spm">SPM248744969<span class="oc-spe">SPE-08382591</span></div>
+                <div class="oc-status">Active</div>
+              </div>
+              <div class="oc-grid">
+                <div><div class="oc-l">Plan</div><div class="oc-v">Premium 2.0 – 2 Lines</div></div>
+                <div><div class="oc-l">Order Date</div><div class="oc-v">5/31/2026</div></div>
+                <div><div class="oc-l">Phone</div><div class="oc-v">iPhone 16 Pro A</div></div>
+                <div><div class="oc-l">Location</div><div class="oc-v">Costco #1333</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="sheet-foot">
+            <button class="sheet-close" data-close-sheet>Close</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ════════ BOTTOM TAB BAR (shared) ════════ -->
       <div class="tab-bar">
         <div class="tab-item active" data-go="home">
@@ -687,12 +1121,28 @@
     screens.forEach(s => s.classList.toggle('hidden', s.dataset.screen !== name));
     // Home tab is the only labeled tab tied to a screen; highlight it on Home.
     tabs.forEach(t => t.classList.toggle('active', t.dataset.go === name && name === 'home'));
+    const sheet = document.getElementById('order-sheet');
+    if (sheet) sheet.classList.add('hidden');
     if (name === 'home') runRings();
   }
 
   // Anything with data-go navigates
   document.querySelectorAll('[data-go]').forEach(el => {
     el.addEventListener('click', () => show(el.dataset.go));
+  });
+
+  // Weekly-activity day → open the order detail sheet
+  const sheet = document.getElementById('order-sheet');
+  document.querySelectorAll('.day.has-units').forEach(day => {
+    day.addEventListener('click', () => {
+      const [label, range] = (day.dataset.sheet || '|').split('|');
+      document.getElementById('sheet-day').textContent = label || '';
+      document.getElementById('sheet-range').textContent = range || '';
+      sheet.classList.remove('hidden');
+    });
+  });
+  document.querySelectorAll('[data-close-sheet]').forEach(el => {
+    el.addEventListener('click', () => sheet.classList.add('hidden'));
   });
 
   // Animate the activity rings (fill from 0 to target each time Home shows)
