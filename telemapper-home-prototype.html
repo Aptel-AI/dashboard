@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TeleMapper — Home Redesign Prototype</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #eef0f3;
+      color: #1c1c1e;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ───────────────────────────────────────────────
+       PAGE LAYOUT
+       ─────────────────────────────────────────────── */
+    .page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 28px 16px 56px;
+      gap: 20px;
+    }
+    .page-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1a2547;
+      letter-spacing: -.2px;
+    }
+    .page-sub {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: -12px;
+      text-align: center;
+      max-width: 360px;
+      line-height: 1.4;
+    }
+
+    /* ───────────────────────────────────────────────
+       PHONE FRAME
+       ─────────────────────────────────────────────── */
+    .phone-frame {
+      width: 390px;
+      height: 844px;
+      background: #111;
+      border-radius: 56px;
+      padding: 11px;
+      position: relative;
+      box-shadow:
+        0 30px 70px rgba(0,0,0,.28),
+        0 8px 16px rgba(0,0,0,.15),
+        inset 0 0 0 2px #2a2a2a;
+    }
+    .phone-screen {
+      width: 100%;
+      height: 100%;
+      background: #f2f2f7;
+      border-radius: 46px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Status bar */
+    .status-bar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 56px;
+      padding: 18px 30px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 16px;
+      font-weight: 700;
+      color: #1a2547;
+      pointer-events: none;
+      z-index: 40;
+    }
+    .status-bar .status-right { display: flex; align-items: center; gap: 5px; }
+    .status-right svg { width: 18px; height: 14px; }
+
+    /* Dynamic Island */
+    .dynamic-island {
+      position: absolute;
+      top: 11px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 122px;
+      height: 36px;
+      background: #000;
+      border-radius: 20px;
+      z-index: 50;
+    }
+
+    /* ───────────────────────────────────────────────
+       SCREENS (stacked, fade/slide)
+       ─────────────────────────────────────────────── */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      opacity: 1;
+      transition: opacity .28s ease, transform .28s ease;
+    }
+    .screen.hidden {
+      opacity: 0;
+      transform: translateX(18px);
+      pointer-events: none;
+    }
+
+    /* ───────────────────────────────────────────────
+       HOME SCREEN  (Apple Fitness "Summary" style)
+       ─────────────────────────────────────────────── */
+    .home-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 64px 18px 96px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .home-scroll::-webkit-scrollbar { display: none; }
+
+    /* Big header row */
+    .home-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .home-date {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ff453a;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+    .home-title {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -.6px;
+      color: #1c1c1e;
+      margin-top: 2px;
+    }
+    .home-avatar {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1a2547, #2563eb);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,.12);
+      cursor: pointer;
+    }
+
+    /* Section heading */
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin: 22px 4px 12px;
+    }
+    .section-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -.3px;
+    }
+    .section-link {
+      font-size: 14px;
+      font-weight: 600;
+      color: #2563eb;
+      cursor: pointer;
+    }
+
+    /* Generic card */
+    .card {
+      background: #fff;
+      border-radius: 22px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 22px rgba(0,0,0,.05);
+    }
+
+    /* ── Activity rings summary card ── */
+    .rings-card {
+      padding: 18px 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .rings-wrap { flex-shrink: 0; }
+    .rings-svg { transform: rotate(-90deg); }
+    .ring-bg { fill: none; opacity: .18; }
+    .ring-fg {
+      fill: none;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1.1s cubic-bezier(.4,0,.2,1);
+    }
+    .rings-stats { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+    .ring-stat { line-height: 1.1; }
+    .ring-stat .label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+    .ring-stat .value {
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: -.4px;
+    }
+    .ring-stat .value span { font-size: 13px; font-weight: 600; color: #8e8e93; }
+
+    /* ── Big "Continue" card ── */
+    .continue-card {
+      margin-top: 14px;
+      padding: 0;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform .12s ease;
+    }
+    .continue-card:active { transform: scale(.985); }
+    .continue-map {
+      height: 132px;
+      position: relative;
+      background: #e9edf2;
+      overflow: hidden;
+    }
+    .continue-map svg { display: block; }
+    .continue-pin {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 16px; height: 16px;
+      background: #2563eb;
+      border: 3px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 0 6px rgba(37,99,235,.18);
+      transform: translate(-50%,-50%);
+    }
+    .continue-body {
+      padding: 14px 18px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .continue-text { flex: 1; }
+    .continue-text .t { font-size: 16px; font-weight: 800; letter-spacing: -.2px; }
+    .continue-text .s { font-size: 13px; color: #8e8e93; margin-top: 2px; }
+    .continue-go {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: #2563eb;
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .continue-go svg { width: 18px; height: 18px; }
+
+    /* ── Nav card grid ── */
+    .nav-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .nav-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 22px rgba(0,0,0,.05);
+      cursor: pointer;
+      transition: transform .12s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 116px;
+    }
+    .nav-card:active { transform: scale(.97); }
+    .nav-tile {
+      width: 42px; height: 42px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+    }
+    .nav-tile svg { width: 23px; height: 23px; stroke: #fff; fill: none; }
+    .nav-card .t { font-size: 16px; font-weight: 800; letter-spacing: -.2px; }
+    .nav-card .s { font-size: 13px; color: #8e8e93; margin-top: -8px; }
+    .nav-card .stat {
+      margin-top: auto;
+      font-size: 13px;
+      font-weight: 700;
+      color: #1c1c1e;
+    }
+    .nav-card .stat b { color: #2563eb; }
+
+    /* Tile colors */
+    .tile-leads   { background: linear-gradient(135deg,#0a84ff,#0066cc); }
+    .tile-reports { background: linear-gradient(135deg,#bf5af2,#8e44e0); }
+    .tile-terr    { background: linear-gradient(135deg,#34c759,#28a745); }
+    .tile-notif   { background: linear-gradient(135deg,#ff9f0a,#ff7a00); }
+    .tile-awards  { background: linear-gradient(135deg,#ff375f,#e0245e); }
+    .tile-team    { background: linear-gradient(135deg,#5e5ce6,#3f3dd1); }
+
+    /* Notif badge */
+    .nav-tile { position: relative; }
+    .tile-badge {
+      position: absolute;
+      top: -5px; right: -5px;
+      min-width: 18px; height: 18px;
+      padding: 0 4px;
+      background: #ff3b30;
+      color: #fff;
+      border-radius: 9px;
+      font-size: 11px;
+      font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid #fff;
+    }
+
+    /* ───────────────────────────────────────────────
+       MAP SCREEN
+       ─────────────────────────────────────────────── */
+    .map-screen { background: #f1f3f5; }
+    .map-fill { position: absolute; inset: 0; }
+    .map-back {
+      position: absolute;
+      top: 60px; left: 14px;
+      width: 40px; height: 40px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0,0,0,.14);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 20;
+      cursor: pointer;
+      border: none;
+    }
+    .map-back svg { width: 22px; height: 22px; stroke: #1a2547; fill: none; }
+    .map-controls {
+      position: absolute;
+      top: 60px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 10;
+    }
+    .map-ctrl-card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.08);
+      padding: 8px 12px;
+      min-width: 64px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #2a2f36;
+    }
+    .map-ctrl-card svg { width: 22px; height: 22px; stroke: #2a2f36; fill: none; }
+    .location-dot {
+      position: absolute;
+      top: 52%; left: 49%;
+      width: 18px; height: 18px;
+      background: #2563eb;
+      border: 3px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 0 6px rgba(37,99,235,.15), 0 2px 6px rgba(0,0,0,.2);
+      z-index: 5;
+    }
+
+    /* ───────────────────────────────────────────────
+       BOTTOM NAV  (shared, floating pill)
+       ─────────────────────────────────────────────── */
+    .tab-bar {
+      position: absolute;
+      left: 14px; right: 14px;
+      bottom: 24px;
+      height: 64px;
+      background: rgba(255,255,255,.86);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-radius: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      z-index: 30;
+      box-shadow: 0 8px 26px rgba(0,0,0,.12), inset 0 0 0 1px rgba(0,0,0,.04);
+    }
+    .tab-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #8e8e93;
+      cursor: pointer;
+      padding: 6px 10px;
+      flex: 1;
+      transition: color .15s;
+    }
+    .tab-item svg { width: 23px; height: 23px; stroke: #8e8e93; fill: none; transition: stroke .15s; }
+    .tab-item.active { color: #2563eb; }
+    .tab-item.active svg { stroke: #2563eb; }
+    .tab-center {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: linear-gradient(135deg,#2563eb,#1e40af);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 16px rgba(37,99,235,.4);
+      flex: 0 0 auto;
+      margin-top: -22px;
+      cursor: pointer;
+    }
+    .tab-center svg { width: 26px; height: 26px; stroke: #fff; fill: none; }
+
+    .home-bottom-pad { height: 4px; }
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="page-title">TeleMapper — Home Redesign</div>
+  <div class="page-sub">Apple Fitness–style landing: an activity-rings summary plus tappable cards that route into the app. Tap a card or the map button to navigate; use the back arrow to return Home.</div>
+
+  <!-- ────── PHONE FRAME ────── -->
+  <div class="phone-frame">
+    <div class="phone-screen">
+
+      <div class="dynamic-island"></div>
+
+      <!-- Status bar -->
+      <div class="status-bar">
+        <div class="status-time">9:41</div>
+        <div class="status-right">
+          <svg viewBox="0 0 20 14" fill="currentColor"><rect x="0" y="9" width="3" height="5"/><rect x="5" y="6" width="3" height="8"/><rect x="10" y="3" width="3" height="11"/><rect x="15" y="0" width="3" height="14"/></svg>
+          <svg viewBox="0 0 20 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6c4-4 12-4 16 0"/><path d="M5 9c3-2.5 7-2.5 10 0"/><circle cx="10" cy="12" r="1" fill="currentColor"/></svg>
+          <svg viewBox="0 0 26 14" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="1" y="2" width="22" height="10" rx="2"/><rect x="3" y="4" width="18" height="6" rx="1" fill="#22c55e" stroke="none"/><rect x="24" y="5" width="1.5" height="4" rx=".5" fill="currentColor"/></svg>
+        </div>
+      </div>
+
+      <!-- ════════ HOME SCREEN ════════ -->
+      <div class="screen home-screen" data-screen="home">
+        <div class="home-scroll">
+
+          <!-- Header -->
+          <div class="home-header">
+            <div>
+              <div class="home-date">Monday, June 8</div>
+              <div class="home-title">Good morning, Alex</div>
+            </div>
+            <div class="home-avatar">AP</div>
+          </div>
+
+          <!-- Activity rings summary -->
+          <div class="section-head">
+            <div class="section-title">Today</div>
+            <div class="section-link">Details</div>
+          </div>
+          <div class="card rings-card">
+            <div class="rings-wrap">
+              <svg class="rings-svg" width="124" height="124" viewBox="0 0 124 124">
+                <!-- Doors (outer) -->
+                <circle class="ring-bg" cx="62" cy="62" r="52" stroke="#ff453a" stroke-width="11"/>
+                <circle class="ring-fg" cx="62" cy="62" r="52" stroke="#ff453a" stroke-width="11"
+                        stroke-dasharray="326.7" stroke-dashoffset="326.7" data-pct=".70"/>
+                <!-- Convos (middle) -->
+                <circle class="ring-bg" cx="62" cy="62" r="39" stroke="#34c759" stroke-width="11"/>
+                <circle class="ring-fg" cx="62" cy="62" r="39" stroke="#34c759" stroke-width="11"
+                        stroke-dasharray="245.0" stroke-dashoffset="245.0" data-pct=".60"/>
+                <!-- Sales (inner) -->
+                <circle class="ring-bg" cx="62" cy="62" r="26" stroke="#0a84ff" stroke-width="11"/>
+                <circle class="ring-fg" cx="62" cy="62" r="26" stroke="#0a84ff" stroke-width="11"
+                        stroke-dasharray="163.4" stroke-dashoffset="163.4" data-pct=".60"/>
+              </svg>
+            </div>
+            <div class="rings-stats">
+              <div class="ring-stat">
+                <div class="label" style="color:#ff453a">Doors</div>
+                <div class="value">84<span> / 120</span></div>
+              </div>
+              <div class="ring-stat">
+                <div class="label" style="color:#34c759">Convos</div>
+                <div class="value">12<span> / 20</span></div>
+              </div>
+              <div class="ring-stat">
+                <div class="label" style="color:#0a84ff">Sales</div>
+                <div class="value">3<span> / 5</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Continue Mapping -->
+          <div class="card continue-card" data-go="map">
+            <div class="continue-map">
+              <svg width="100%" height="132" viewBox="0 0 354 132" preserveAspectRatio="xMidYMid slice">
+                <rect width="354" height="132" fill="#e9edf2"/>
+                <path d="M-20,10 Q120,80 80,150" stroke="#d4d8de" stroke-width="26" fill="none" stroke-linecap="round"/>
+                <path d="M360,20 Q240,70 360,160" stroke="#d4d8de" stroke-width="26" fill="none" stroke-linecap="round"/>
+                <path d="M-40,90 Q180,120 400,80" stroke="#d4d8de" stroke-width="24" fill="none" stroke-linecap="round"/>
+                <g fill="#dadde1">
+                  <rect x="120" y="30" width="30" height="24" rx="2"/>
+                  <rect x="158" y="40" width="30" height="22" rx="2"/>
+                  <rect x="200" y="28" width="28" height="26" rx="2"/>
+                  <rect x="130" y="74" width="32" height="22" rx="2"/>
+                  <rect x="176" y="78" width="26" height="20" rx="2"/>
+                </g>
+                <path d="M40,8 Q70,70 160,150" stroke="#74c785" stroke-width="2.5" fill="none" stroke-dasharray="6 5"/>
+              </svg>
+              <div class="continue-pin"></div>
+            </div>
+            <div class="continue-body">
+              <div class="continue-text">
+                <div class="t">Continue Mapping</div>
+                <div class="s">Resume your route on Barano St · 36 doors left</div>
+              </div>
+              <div class="continue-go">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick nav cards -->
+          <div class="section-head">
+            <div class="section-title">Go To</div>
+          </div>
+          <div class="nav-grid">
+
+            <div class="nav-card" data-go="map">
+              <div class="nav-tile tile-leads">
+                <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              </div>
+              <div class="t">Leads</div>
+              <div class="s">Open & assigned</div>
+              <div class="stat"><b>47</b> active</div>
+            </div>
+
+            <div class="nav-card">
+              <div class="nav-tile tile-reports">
+                <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              </div>
+              <div class="t">Reports</div>
+              <div class="s">Today vs. goal</div>
+              <div class="stat"><b>+18%</b> this week</div>
+            </div>
+
+            <div class="nav-card" data-go="map">
+              <div class="nav-tile tile-terr">
+                <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+              </div>
+              <div class="t">Territory</div>
+              <div class="s">Your assigned area</div>
+              <div class="stat"><b>62%</b> covered</div>
+            </div>
+
+            <div class="nav-card">
+              <div class="nav-tile tile-notif">
+                <span class="tile-badge">3</span>
+                <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+              </div>
+              <div class="t">Alerts</div>
+              <div class="s">New activity</div>
+              <div class="stat"><b>3</b> unread</div>
+            </div>
+
+            <div class="nav-card">
+              <div class="nav-tile tile-awards">
+                <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M8.2 13.9 7 22l5-3 5 3-1.2-8.1"/></svg>
+              </div>
+              <div class="t">Awards</div>
+              <div class="s">Streaks & badges</div>
+              <div class="stat"><b>5</b>-day streak</div>
+            </div>
+
+            <div class="nav-card">
+              <div class="nav-tile tile-team">
+                <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <div class="t">Team</div>
+              <div class="s">Leaderboard</div>
+              <div class="stat"><b>#2</b> on your team</div>
+            </div>
+
+          </div>
+
+          <div class="home-bottom-pad"></div>
+        </div>
+      </div>
+
+      <!-- ════════ MAP SCREEN ════════ -->
+      <div class="screen map-screen hidden" data-screen="map">
+        <div class="map-fill">
+          <svg width="100%" height="100%" viewBox="0 0 368 844" preserveAspectRatio="xMidYMid slice" style="display:block">
+            <rect width="368" height="844" fill="#f1f3f5"/>
+            <path d="M-20,40 Q120,260 80,830" stroke="#d4d8de" stroke-width="44" fill="none" stroke-linecap="round"/>
+            <path d="M380,140 Q260,360 360,840" stroke="#d4d8de" stroke-width="44" fill="none" stroke-linecap="round"/>
+            <path d="M-40,490 Q200,560 410,520" stroke="#d4d8de" stroke-width="42" fill="none" stroke-linecap="round"/>
+            <path d="M-30,700 Q170,750 410,720" stroke="#d4d8de" stroke-width="36" fill="none" stroke-linecap="round"/>
+            <path d="M44,40 Q72,360 200,840" stroke="#74c785" stroke-width="2.5" fill="none" stroke-dasharray="6 5"/>
+            <g fill="#e4e6e9">
+              <rect x="150" y="170" width="36" height="48" rx="2"/>
+              <rect x="194" y="200" width="40" height="34" rx="2"/>
+              <rect x="244" y="170" width="36" height="46" rx="2"/>
+              <rect x="160" y="244" width="46" height="34" rx="2"/>
+              <rect x="218" y="260" width="34" height="30" rx="2"/>
+              <rect x="266" y="244" width="40" height="38" rx="2"/>
+              <rect x="140" y="320" width="38" height="46" rx="2"/>
+              <rect x="188" y="318" width="36" height="44" rx="2"/>
+              <rect x="232" y="320" width="32" height="50" rx="2"/>
+              <rect x="274" y="320" width="38" height="48" rx="2"/>
+              <rect x="138" y="410" width="40" height="44" rx="2"/>
+              <rect x="186" y="406" width="38" height="40" rx="2"/>
+              <rect x="232" y="408" width="38" height="46" rx="2"/>
+              <rect x="280" y="402" width="42" height="48" rx="2"/>
+            </g>
+            <text x="80"  y="280" font-size="13" font-weight="700" fill="#9ca3af" font-family="Inter,sans-serif" transform="rotate(-72 80 280)">Bacalar</text>
+            <text x="290" y="290" font-size="13" font-weight="700" fill="#9ca3af" font-family="Inter,sans-serif" transform="rotate(72 290 290)">Calderas</text>
+            <text x="160" y="540" font-size="13" font-weight="700" fill="#9ca3af" font-family="Inter,sans-serif" transform="rotate(-4 160 540)">Calderas</text>
+            <text x="200" y="730" font-size="13" font-weight="700" fill="#9ca3af" font-family="Inter,sans-serif" transform="rotate(-4 200 730)">Barano</text>
+          </svg>
+
+          <div class="location-dot"></div>
+
+          <button class="map-back" data-go="home" aria-label="Back to Home">
+            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+
+          <div class="map-controls">
+            <div class="map-ctrl-card">
+              <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+              <span>Layers</span>
+            </div>
+            <div class="map-ctrl-card">
+              <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+              <span>Near Me</span>
+            </div>
+            <div class="map-ctrl-card" style="background:#0f1830;color:#fff">
+              <svg viewBox="0 0 24 24" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+              <span style="color:#fff">Refresh</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════ BOTTOM TAB BAR (shared) ════════ -->
+      <div class="tab-bar">
+        <div class="tab-item active" data-go="home">
+          <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/></svg>
+          <span>Home</span>
+        </div>
+        <div class="tab-item" data-go="map">
+          <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+          <span>Leads</span>
+        </div>
+        <div class="tab-center" data-go="map">
+          <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+        </div>
+        <div class="tab-item" data-go="map">
+          <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="7 14 11 10 15 14 19 10"/></svg>
+          <span>Reports</span>
+        </div>
+        <div class="tab-item">
+          <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>
+          <span>More</span>
+        </div>
+      </div>
+
+    </div><!-- /phone-screen -->
+  </div><!-- /phone-frame -->
+</div><!-- /page -->
+
+<script>
+(function () {
+  const screens = document.querySelectorAll('.screen');
+  const tabs = document.querySelectorAll('.tab-item');
+
+  function show(name) {
+    screens.forEach(s => s.classList.toggle('hidden', s.dataset.screen !== name));
+    // Home tab is the only labeled tab tied to a screen; highlight it on Home.
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.go === name && name === 'home'));
+    if (name === 'home') runRings();
+  }
+
+  // Anything with data-go navigates
+  document.querySelectorAll('[data-go]').forEach(el => {
+    el.addEventListener('click', () => show(el.dataset.go));
+  });
+
+  // Animate the activity rings (fill from 0 to target each time Home shows)
+  function runRings() {
+    document.querySelectorAll('.home-screen .ring-fg').forEach(ring => {
+      const len = parseFloat(ring.getAttribute('stroke-dasharray'));
+      const pct = parseFloat(ring.dataset.pct);
+      ring.style.strokeDashoffset = len; // reset
+      // next frame → animate to target
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        ring.style.strokeDashoffset = (len * (1 - pct)).toFixed(1);
+      }));
+    });
+  }
+
+  // Initial paint
+  runRings();
+})();
+</script>
+
+</body>
+</html>
