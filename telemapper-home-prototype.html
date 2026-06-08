@@ -306,6 +306,8 @@
     .tile-notif   { background: linear-gradient(135deg,#ff9f0a,#ff7a00); }
     .tile-awards  { background: linear-gradient(135deg,#ff375f,#e0245e); }
     .tile-team    { background: linear-gradient(135deg,#5e5ce6,#3f3dd1); }
+    .tile-sales   { background: linear-gradient(135deg,#f7b733,#e0890b); }
+    .tile-checkin { background: linear-gradient(135deg,#14b8a6,#0d9488); }
 
     /* Notif badge */
     .nav-tile { position: relative; }
@@ -750,6 +752,35 @@
       width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
     }
     .map-banner .mb-x svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+
+    /* ───────────────────────────────────────────────
+       SALES BOARD (office leaderboard) SHEET
+       ─────────────────────────────────────────────── */
+    .lb-row { display: flex; align-items: center; gap: 12px; padding: 11px 8px; border-radius: 12px; }
+    .lb-row + .lb-row { border-top: 1px solid #f2f2f4; }
+    .lb-row.you { background: #eef4ff; }
+    .lb-row.you + .lb-row { border-top-color: transparent; }
+    .lb-rank { width: 22px; text-align: center; font-size: 15px; font-weight: 800; color: #b8bec6; flex-shrink: 0; }
+    .lb-rank.g1 { color: #f7b733; }
+    .lb-rank.g2 { color: #9aa6b2; }
+    .lb-rank.g3 { color: #cd7f4d; }
+    .lb-avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: #e7ecf3; color: #1a2547;
+      font-size: 13px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .lb-row.you .lb-avatar { background: #2563eb; color: #fff; }
+    .lb-main { flex: 1; min-width: 0; }
+    .lb-name { font-size: 14px; font-weight: 700; color: #1c1c1e; }
+    .lb-sub { font-size: 12px; color: #8e8e93; margin-top: 1px; }
+    .lb-num { text-align: right; flex-shrink: 0; }
+    .lb-num .n { font-size: 17px; font-weight: 800; color: #1c1c1e; }
+    .lb-num .u { font-size: 11px; color: #8e8e93; }
+
+    /* Check-in confirmed state */
+    .nav-card.checked .tile-checkin { background: linear-gradient(135deg,#34c759,#1f9d4d); }
+    #checkin-stat.done { color: #1f9d4d; font-weight: 800; }
   </style>
 </head>
 <body>
@@ -897,13 +928,13 @@
               <div class="stat"><b>+18%</b> this week</div>
             </div>
 
-            <div class="nav-card" data-go="map">
-              <div class="nav-tile tile-terr">
-                <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+            <div class="nav-card" id="checkin-card">
+              <div class="nav-tile tile-checkin">
+                <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7.5 12 12 15.5 14"/></svg>
               </div>
-              <div class="t">Territory</div>
-              <div class="s">Your assigned area</div>
-              <div class="stat"><b>62%</b> covered</div>
+              <div class="t">Check In</div>
+              <div class="s">Log your arrival</div>
+              <div class="stat" id="checkin-stat">Tap to check in</div>
             </div>
 
             <div class="nav-card">
@@ -916,13 +947,13 @@
               <div class="stat"><b>3</b> unread</div>
             </div>
 
-            <div class="nav-card">
-              <div class="nav-tile tile-awards">
-                <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M8.2 13.9 7 22l5-3 5 3-1.2-8.1"/></svg>
+            <div class="nav-card" data-open="sales-sheet">
+              <div class="nav-tile tile-sales">
+                <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg>
               </div>
-              <div class="t">Awards</div>
-              <div class="s">Streaks & badges</div>
-              <div class="stat"><b>5</b>-day streak</div>
+              <div class="t">Sales Board</div>
+              <div class="s">Office leaderboard</div>
+              <div class="stat"><b>#2</b> of 14</div>
             </div>
 
             <div class="nav-card">
@@ -1321,6 +1352,71 @@
         </div>
       </div>
 
+      <!-- ════════ SALES BOARD (office leaderboard) SHEET ════════ -->
+      <div class="order-sheet hidden" id="sales-sheet">
+        <div class="sheet-scrim" data-close-sheet></div>
+        <div class="sheet-panel">
+          <div class="sheet-grab"></div>
+          <div class="sheet-title">
+            <div class="d">Sales Board</div>
+            <div class="r">This month · Riverside office</div>
+          </div>
+          <div class="sheet-list">
+            <div class="lb-row">
+              <div class="lb-rank g1">1</div>
+              <div class="lb-avatar">MB</div>
+              <div class="lb-main"><div class="lb-name">Marcus Bell</div><div class="lb-sub">Team Velocity</div></div>
+              <div class="lb-num"><div class="n">41</div><div class="u">sales</div></div>
+            </div>
+            <div class="lb-row you">
+              <div class="lb-rank g2">2</div>
+              <div class="lb-avatar">AP</div>
+              <div class="lb-main"><div class="lb-name">Alex Prindle (You)</div><div class="lb-sub">Team Velocity</div></div>
+              <div class="lb-num"><div class="n">34</div><div class="u">sales</div></div>
+            </div>
+            <div class="lb-row">
+              <div class="lb-rank g3">3</div>
+              <div class="lb-avatar">DC</div>
+              <div class="lb-main"><div class="lb-name">Dana Cho</div><div class="lb-sub">Team Apex</div></div>
+              <div class="lb-num"><div class="n">31</div><div class="u">sales</div></div>
+            </div>
+            <div class="lb-row">
+              <div class="lb-rank">4</div>
+              <div class="lb-avatar">PN</div>
+              <div class="lb-main"><div class="lb-name">Priya Nair</div><div class="lb-sub">Team Apex</div></div>
+              <div class="lb-num"><div class="n">28</div><div class="u">sales</div></div>
+            </div>
+            <div class="lb-row">
+              <div class="lb-rank">5</div>
+              <div class="lb-avatar">JL</div>
+              <div class="lb-main"><div class="lb-name">Jordan Lee</div><div class="lb-sub">Team Velocity</div></div>
+              <div class="lb-num"><div class="n">24</div><div class="u">sales</div></div>
+            </div>
+            <div class="lb-row">
+              <div class="lb-rank">6</div>
+              <div class="lb-avatar">SO</div>
+              <div class="lb-main"><div class="lb-name">Sam Ortiz</div><div class="lb-sub">Team Apex</div></div>
+              <div class="lb-num"><div class="n">22</div><div class="u">sales</div></div>
+            </div>
+            <div class="lb-row">
+              <div class="lb-rank">7</div>
+              <div class="lb-avatar">RP</div>
+              <div class="lb-main"><div class="lb-name">Riya Patel</div><div class="lb-sub">Team Velocity</div></div>
+              <div class="lb-num"><div class="n">19</div><div class="u">sales</div></div>
+            </div>
+            <div class="lb-row">
+              <div class="lb-rank">8</div>
+              <div class="lb-avatar">CV</div>
+              <div class="lb-main"><div class="lb-name">Chris Vaughn</div><div class="lb-sub">Team Apex</div></div>
+              <div class="lb-num"><div class="n">17</div><div class="u">sales</div></div>
+            </div>
+          </div>
+          <div class="sheet-foot">
+            <button class="sheet-close" data-close-sheet>Close</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ════════ BOTTOM TAB BAR (shared) ════════ -->
       <div class="tab-bar">
         <div class="tab-item active" data-go="home">
@@ -1405,6 +1501,20 @@
   });
   const mapBannerX = document.getElementById('map-banner-x');
   if (mapBannerX) mapBannerX.addEventListener('click', () => mapBanner.classList.add('hidden'));
+
+  // Check-in: log arrival using the phone's displayed time
+  const checkinCard = document.getElementById('checkin-card');
+  if (checkinCard) {
+    checkinCard.addEventListener('click', () => {
+      const time = (document.querySelector('.status-time')?.textContent || '').trim();
+      const stat = document.getElementById('checkin-stat');
+      checkinCard.classList.add('checked');
+      if (stat) {
+        stat.textContent = '✓ Checked in ' + time + ' AM';
+        stat.classList.add('done');
+      }
+    });
+  }
 
   // Animate the activity rings (fill from 0 to target) within the given screen
   function runRings(scope) {
