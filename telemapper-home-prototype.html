@@ -873,7 +873,7 @@
 
       <!-- Status bar -->
       <div class="status-bar">
-        <div class="status-time">5:15</div>
+        <div class="status-time">4:42</div>
         <div class="status-right">
           <svg viewBox="0 0 20 14" fill="currentColor"><rect x="0" y="9" width="3" height="5"/><rect x="5" y="6" width="3" height="8"/><rect x="10" y="3" width="3" height="11"/><rect x="15" y="0" width="3" height="14"/></svg>
           <svg viewBox="0 0 20 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6c4-4 12-4 16 0"/><path d="M5 9c3-2.5 7-2.5 10 0"/><circle cx="10" cy="12" r="1" fill="currentColor"/></svg>
@@ -1647,7 +1647,7 @@
   // ----- Goal pacing: are they keeping up to finish by 8 PM? -----
   const DAY_START = 9 * 60;        // 9:00 AM
   const DAY_END   = 20 * 60;       // 8:00 PM
-  const NOW_MIN   = 17 * 60 + 15;  // mock "now" = 5:15 PM
+  const NOW_MIN   = 16 * 60 + 42;  // mock "now" = 4:42 PM
   const dayFrac = Math.min(1, Math.max(0, (NOW_MIN - DAY_START) / (DAY_END - DAY_START)));
   const METRICS = [
     { label: 'Outreach',  actual: 84, goal: 120 },  // outer ring
@@ -1661,11 +1661,12 @@
   // Pace = progress vs. where you'd need to be by now to hit goal by 8 PM
   function paceOf(m) {
     const expected = m.goal * dayFrac;
+    const ratio = expected > 0 ? m.actual / expected : 1;
     let color, word;
-    if (m.actual >= expected * 1.02)               { color = '#34c759'; word = 'Ahead of pace'; }
-    else if (m.actual >= expected)                 { color = '#34c759'; word = 'On pace'; }
-    else if (expected > 0 && m.actual / expected >= 0.85) { color = '#ff9f0a'; word = 'Slightly behind'; }
-    else                                           { color = '#ff3b30'; word = 'Behind'; }
+    if (ratio >= 1.05)      { color = '#32ade6'; word = 'Ahead of pace'; }   // light blue
+    else if (ratio >= 0.95) { color = '#34c759'; word = 'On pace'; }          // green
+    else if (ratio >= 0.80) { color = '#ff9f0a'; word = 'Slightly behind'; }  // amber
+    else                    { color = '#ff3b30'; word = 'Behind'; }           // red
     return { expected, color, word };
   }
 
@@ -1700,6 +1701,7 @@
       const fillW = Math.min(100, Math.round(m.actual / m.goal * 100));
       let status = p.word;
       if (m.actual < p.expected) status += ' · ' + Math.ceil(p.expected - m.actual) + ' to catch up';
+      else if (m.actual > p.expected) status += ' · ' + Math.floor(m.actual - p.expected) + ' ahead';
       return '<div class="pace-row">' +
           '<div class="pace-top"><span class="pace-name">' + m.label + '</span><span class="pace-vals">' + m.actual + ' / ' + m.goal + '</span></div>' +
           '<div class="pace-track"><div class="pace-fill" style="width:' + fillW + '%;background:' + p.color + '"></div><div class="pace-marker" style="left:' + markL + '%"></div></div>' +
