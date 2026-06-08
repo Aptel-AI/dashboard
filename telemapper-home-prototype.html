@@ -835,6 +835,27 @@
     .cc-btn:active { transform: scale(.9); }
     .cc-minus { background: #eef0f3; color: #5b6470; }
     .cc-plus { color: #fff; }
+
+    /* ───────────────────────────────────────────────
+       DAY PACE (goal vs. time of day)
+       ─────────────────────────────────────────────── */
+    .pace-card { padding: 16px; }
+    .day-timeline { margin-bottom: 10px; }
+    .dt-labels { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: #8e8e93; margin-bottom: 8px; }
+    .dt-labels #dt-left { color: #2563eb; }
+    .dt-track { position: relative; height: 8px; background: #eef0f3; border-radius: 5px; }
+    .dt-fill { position: absolute; left: 0; top: 0; bottom: 0; background: #cdd7e6; border-radius: 5px; }
+    .dt-now { position: absolute; top: -4px; width: 3px; height: 16px; background: #1a2547; border-radius: 2px; transform: translateX(-50%); }
+    .pace-note { font-size: 11.5px; color: #9aa0a6; line-height: 1.4; margin-bottom: 4px; }
+    .pace-row { padding: 14px 0 4px; }
+    .pace-row + .pace-row { border-top: 1px solid #f2f2f4; }
+    .pace-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 9px; }
+    .pace-name { font-size: 14px; font-weight: 700; color: #1c1c1e; }
+    .pace-vals { font-size: 13px; font-weight: 700; color: #5b6470; }
+    .pace-track { position: relative; height: 12px; background: #eef0f3; border-radius: 6px; }
+    .pace-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; transition: width .8s ease; }
+    .pace-marker { position: absolute; top: -4px; width: 2.5px; height: 20px; background: #1a2547; border-radius: 2px; transform: translateX(-50%); }
+    .pace-status { font-size: 12px; font-weight: 700; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -852,7 +873,7 @@
 
       <!-- Status bar -->
       <div class="status-bar">
-        <div class="status-time">9:41</div>
+        <div class="status-time">5:15</div>
         <div class="status-right">
           <svg viewBox="0 0 20 14" fill="currentColor"><rect x="0" y="9" width="3" height="5"/><rect x="5" y="6" width="3" height="8"/><rect x="10" y="3" width="3" height="11"/><rect x="15" y="0" width="3" height="14"/></svg>
           <svg viewBox="0 0 20 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6c4-4 12-4 16 0"/><path d="M5 9c3-2.5 7-2.5 10 0"/><circle cx="10" cy="12" r="1" fill="currentColor"/></svg>
@@ -868,7 +889,7 @@
           <div class="home-header">
             <div>
               <div class="home-date">Monday, June 8</div>
-              <div class="home-title">Good morning, Alex</div>
+              <div class="home-title">Good afternoon, Alex</div>
             </div>
             <div class="home-avatar">AP</div>
           </div>
@@ -1319,6 +1340,17 @@
             </div>
           </div>
 
+          <!-- Day pace (goal vs. time of day) -->
+          <div class="week-section-title">Day Pace</div>
+          <div class="card pace-card">
+            <div class="day-timeline">
+              <div class="dt-labels"><span>9:00 AM</span><span id="dt-left">—</span><span>8:00 PM</span></div>
+              <div class="dt-track"><div class="dt-fill" id="dt-fill"></div><div class="dt-now" id="dt-now"></div></div>
+            </div>
+            <div class="pace-note" id="pace-note"></div>
+            <div id="pace-rows"></div>
+          </div>
+
           <!-- Funnel -->
           <div class="week-section-title">Today's Funnel</div>
           <div class="card funnel">
@@ -1612,6 +1644,70 @@
   const screens = document.querySelectorAll('.screen');
   const tabs = document.querySelectorAll('.tab-item');
 
+  // ----- Goal pacing: are they keeping up to finish by 8 PM? -----
+  const DAY_START = 9 * 60;        // 9:00 AM
+  const DAY_END   = 20 * 60;       // 8:00 PM
+  const NOW_MIN   = 17 * 60 + 15;  // mock "now" = 5:15 PM
+  const dayFrac = Math.min(1, Math.max(0, (NOW_MIN - DAY_START) / (DAY_END - DAY_START)));
+  const METRICS = [
+    { label: 'Outreach',  actual: 84, goal: 120 },  // outer ring
+    { label: "Talk To's", actual: 38, goal: 50 },   // middle ring
+    { label: 'Sales',     actual: 3,  goal: 5 },    // inner ring
+  ];
+  function fmtTime(min) {
+    const h = Math.floor(min / 60), m = String(min % 60).padStart(2, '0');
+    return (((h + 11) % 12) + 1) + ':' + m + ' ' + (h >= 12 ? 'PM' : 'AM');
+  }
+  // Pace = progress vs. where you'd need to be by now to hit goal by 8 PM
+  function paceOf(m) {
+    const expected = m.goal * dayFrac;
+    let color, word;
+    if (m.actual >= expected * 1.02)               { color = '#34c759'; word = 'Ahead of pace'; }
+    else if (m.actual >= expected)                 { color = '#34c759'; word = 'On pace'; }
+    else if (expected > 0 && m.actual / expected >= 0.85) { color = '#ff9f0a'; word = 'Slightly behind'; }
+    else                                           { color = '#ff3b30'; word = 'Behind'; }
+    return { expected, color, word };
+  }
+
+  // Color every rings instance (home + today) and its legend by pace status
+  document.querySelectorAll('.rings-svg').forEach(svg => {
+    const fg = svg.querySelectorAll('.ring-fg'), bg = svg.querySelectorAll('.ring-bg');
+    METRICS.forEach((m, i) => {
+      const col = paceOf(m).color;
+      if (fg[i]) fg[i].setAttribute('stroke', col);
+      if (bg[i]) bg[i].setAttribute('stroke', col);
+    });
+  });
+  document.querySelectorAll('.rings-stats').forEach(stats => {
+    const labels = stats.querySelectorAll('.label');
+    METRICS.forEach((m, i) => { if (labels[i]) labels[i].style.color = paceOf(m).color; });
+  });
+
+  // Build the Day Pace visual (timeline + per-metric pace bars) on the Today screen
+  (function buildPace() {
+    const left = Math.max(0, DAY_END - NOW_MIN);
+    const leftEl = document.getElementById('dt-left');
+    if (leftEl) leftEl.textContent = Math.floor(left / 60) + 'h ' + (left % 60) + 'm left';
+    const fill = document.getElementById('dt-fill'); if (fill) fill.style.width = (dayFrac * 100).toFixed(1) + '%';
+    const nowMk = document.getElementById('dt-now'); if (nowMk) nowMk.style.left = (dayFrac * 100).toFixed(1) + '%';
+    const note = document.getElementById('pace-note');
+    if (note) note.textContent = 'Bars show your progress; the line marks where you should be by now to hit goal by 8 PM.';
+    const wrap = document.getElementById('pace-rows');
+    if (!wrap) return;
+    const markL = (dayFrac * 100).toFixed(1);
+    wrap.innerHTML = METRICS.map(m => {
+      const p = paceOf(m);
+      const fillW = Math.min(100, Math.round(m.actual / m.goal * 100));
+      let status = p.word;
+      if (m.actual < p.expected) status += ' · ' + Math.ceil(p.expected - m.actual) + ' to catch up';
+      return '<div class="pace-row">' +
+          '<div class="pace-top"><span class="pace-name">' + m.label + '</span><span class="pace-vals">' + m.actual + ' / ' + m.goal + '</span></div>' +
+          '<div class="pace-track"><div class="pace-fill" style="width:' + fillW + '%;background:' + p.color + '"></div><div class="pace-marker" style="left:' + markL + '%"></div></div>' +
+          '<div class="pace-status" style="color:' + p.color + '">' + status + '</div>' +
+        '</div>';
+    }).join('');
+  })();
+
   function show(name) {
     screens.forEach(s => s.classList.toggle('hidden', s.dataset.screen !== name));
     // Home tab is the only labeled tab tied to a screen; highlight it on Home.
@@ -1669,11 +1765,10 @@
   const checkinCard = document.getElementById('checkin-card');
   if (checkinCard) {
     checkinCard.addEventListener('click', () => {
-      const time = (document.querySelector('.status-time')?.textContent || '').trim();
       const stat = document.getElementById('checkin-stat');
       checkinCard.classList.add('checked');
       if (stat) {
-        stat.textContent = '✓ Checked in ' + time + ' AM';
+        stat.textContent = '✓ Checked in ' + fmtTime(NOW_MIN);
         stat.classList.add('done');
       }
     });
