@@ -781,6 +781,32 @@
     /* Check-in confirmed state */
     .nav-card.checked .tile-checkin { background: linear-gradient(135deg,#34c759,#1f9d4d); }
     #checkin-stat.done { color: #1f9d4d; font-weight: 800; }
+
+    /* ───────────────────────────────────────────────
+       MY TEAM (manage reps) SHEET
+       ─────────────────────────────────────────────── */
+    .tm-row { display: flex; align-items: center; gap: 12px; padding: 12px 8px; border-radius: 12px; cursor: pointer; }
+    .tm-row + .tm-row { border-top: 1px solid #f2f2f4; }
+    .tm-row:active { background: #f5f6f8; }
+    .tm-main { flex: 1; min-width: 0; }
+    .tm-name { font-size: 14px; font-weight: 700; color: #1c1c1e; }
+    .tm-sub { font-size: 12px; color: #8e8e93; margin-top: 1px; }
+    .tm-pill {
+      font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px;
+      padding: 3px 8px; border-radius: 999px; flex-shrink: 0;
+    }
+    .pill-on    { background: #e9f9ee; color: #1f9d4d; }
+    .pill-train { background: #fdf2e0; color: #d9870d; }
+    .pill-off   { background: #eef0f3; color: #8e98a4; }
+    .tm-go { color: #c4c9cf; flex-shrink: 0; display: flex; }
+    .tm-go svg { width: 20px; height: 20px; stroke: currentColor; fill: none; }
+    .sheet-add {
+      background: #2563eb; color: #fff; border: none; border-radius: 12px;
+      padding: 12px 18px; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .sheet-add:active { background: #1e40af; }
+    .sheet-add svg { width: 18px; height: 18px; stroke: #fff; fill: none; }
   </style>
 </head>
 <body>
@@ -956,13 +982,13 @@
               <div class="stat"><b>#2</b> of 14</div>
             </div>
 
-            <div class="nav-card">
+            <div class="nav-card" data-open="team-sheet">
               <div class="nav-tile tile-team">
                 <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               </div>
               <div class="t">Team</div>
-              <div class="s">Leaderboard</div>
-              <div class="stat"><b>#2</b> on your team</div>
+              <div class="s">Manage your reps</div>
+              <div class="stat"><b>6</b> reps</div>
             </div>
 
           </div>
@@ -1412,6 +1438,60 @@
             </div>
           </div>
           <div class="sheet-foot">
+            <button class="sheet-close" data-close-sheet>Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════ MY TEAM (manage reps) SHEET ════════ -->
+      <div class="order-sheet hidden" id="team-sheet">
+        <div class="sheet-scrim" data-close-sheet></div>
+        <div class="sheet-panel">
+          <div class="sheet-grab"></div>
+          <div class="sheet-title">
+            <div class="d">My Team</div>
+            <div class="r">6 reps · Team Velocity</div>
+          </div>
+          <div class="sheet-list">
+            <div class="tm-row">
+              <div class="lb-avatar">MB</div>
+              <div class="tm-main"><div class="tm-name">Marcus Bell</div><div class="tm-sub">Senior Rep · checked in 8:32 AM</div></div>
+              <div class="tm-pill pill-on">On site</div>
+              <span class="tm-go"><svg viewBox="0 0 24 24" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+            </div>
+            <div class="tm-row">
+              <div class="lb-avatar">JL</div>
+              <div class="tm-main"><div class="tm-name">Jordan Lee</div><div class="tm-sub">Rep · checked in 8:47 AM</div></div>
+              <div class="tm-pill pill-on">On site</div>
+              <span class="tm-go"><svg viewBox="0 0 24 24" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+            </div>
+            <div class="tm-row">
+              <div class="lb-avatar">RP</div>
+              <div class="tm-main"><div class="tm-name">Riya Patel</div><div class="tm-sub">Rep · checked in 9:05 AM</div></div>
+              <div class="tm-pill pill-on">On site</div>
+              <span class="tm-go"><svg viewBox="0 0 24 24" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+            </div>
+            <div class="tm-row">
+              <div class="lb-avatar">CM</div>
+              <div class="tm-main"><div class="tm-name">Casey Mraz</div><div class="tm-sub">Rep · checked in 8:58 AM</div></div>
+              <div class="tm-pill pill-on">On site</div>
+              <span class="tm-go"><svg viewBox="0 0 24 24" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+            </div>
+            <div class="tm-row">
+              <div class="lb-avatar">TR</div>
+              <div class="tm-main"><div class="tm-name">Tyler Reese</div><div class="tm-sub">Trainee · shadowing Marcus</div></div>
+              <div class="tm-pill pill-train">Training</div>
+              <span class="tm-go"><svg viewBox="0 0 24 24" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+            </div>
+            <div class="tm-row">
+              <div class="lb-avatar">SP</div>
+              <div class="tm-main"><div class="tm-name">Sam Park</div><div class="tm-sub">Rep · off today</div></div>
+              <div class="tm-pill pill-off">Off</div>
+              <span class="tm-go"><svg viewBox="0 0 24 24" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+            </div>
+          </div>
+          <div class="sheet-foot" style="justify-content:space-between">
+            <button class="sheet-add"><svg viewBox="0 0 24 24" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Rep</button>
             <button class="sheet-close" data-close-sheet>Close</button>
           </div>
         </div>
