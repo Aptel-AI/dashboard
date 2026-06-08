@@ -308,6 +308,7 @@
     .tile-team    { background: linear-gradient(135deg,#5e5ce6,#3f3dd1); }
     .tile-sales   { background: linear-gradient(135deg,#f7b733,#e0890b); }
     .tile-checkin { background: linear-gradient(135deg,#14b8a6,#0d9488); }
+    .tile-counter { background: linear-gradient(135deg,#7c3aed,#5b21b6); }
 
     /* Notif badge */
     .nav-tile { position: relative; }
@@ -807,6 +808,33 @@
     }
     .sheet-add:active { background: #1e40af; }
     .sheet-add svg { width: 18px; height: 18px; stroke: #fff; fill: none; }
+
+    /* ───────────────────────────────────────────────
+       COUNTER  (tally clicker)
+       ─────────────────────────────────────────────── */
+    .counter-card { padding: 4px 16px 10px; }
+    .cc-row { padding: 15px 0; }
+    .cc-row + .cc-row { border-top: 1px solid #f2f2f4; }
+    .cc-head { display: flex; align-items: flex-start; justify-content: space-between; }
+    .cc-name { font-size: 15px; font-weight: 800; color: #1c1c1e; letter-spacing: -.2px; }
+    .cc-desc { font-size: 11px; font-weight: 500; color: #9aa0a6; margin-top: 2px; max-width: 215px; line-height: 1.35; }
+    .cc-count { font-size: 27px; font-weight: 800; letter-spacing: -.6px; flex-shrink: 0; margin-left: 10px; transition: transform .12s ease; }
+    .cc-count.bump { transform: scale(1.2); }
+    .cc-bar { height: 10px; border-radius: 6px; background: #eef0f3; overflow: hidden; margin-top: 11px; }
+    .cc-fill { height: 100%; border-radius: 6px; transition: width .25s ease; }
+    .cc-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; gap: 10px; min-height: 36px; }
+    .cc-conv { font-size: 11px; color: #9aa0a6; }
+    .cc-conv b { color: #5b6470; font-weight: 700; }
+    .cc-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
+    .cc-btn {
+      width: 36px; height: 36px; border-radius: 50%; border: none;
+      font-size: 22px; font-weight: 700; line-height: 1; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .1s ease;
+    }
+    .cc-btn:active { transform: scale(.9); }
+    .cc-minus { background: #eef0f3; color: #5b6470; }
+    .cc-plus { color: #fff; }
   </style>
 </head>
 <body>
@@ -945,13 +973,13 @@
               <div class="stat"><b>47</b> active</div>
             </div>
 
-            <div class="nav-card">
-              <div class="nav-tile tile-reports">
-                <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            <div class="nav-card" data-go="counter">
+              <div class="nav-tile tile-counter">
+                <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
               </div>
-              <div class="t">Reports</div>
-              <div class="s">Today vs. goal</div>
-              <div class="stat"><b>+18%</b> this week</div>
+              <div class="t">Counter</div>
+              <div class="s">Tally your day</div>
+              <div class="stat" id="home-counter-stat"><b>84</b> outreach</div>
             </div>
 
             <div class="nav-card" id="checkin-card">
@@ -1150,6 +1178,61 @@
             </div>
           </div>
 
+        </div>
+      </div>
+
+      <!-- ════════ COUNTER SCREEN ════════ -->
+      <div class="screen counter-screen hidden" data-screen="counter">
+        <div class="client-topbar">
+          <button class="ct-back" data-go="home" aria-label="Back">
+            <svg viewBox="0 0 24 24" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div class="ct-title">Counter</div>
+          <button class="ct-menu" id="counter-reset" aria-label="Reset counts">
+            <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          </button>
+        </div>
+        <div class="client-scroll">
+          <div class="today-date">Monday, June 8 · Tap to count</div>
+          <div class="card counter-card">
+
+            <div class="cc-row" data-cat="outreach">
+              <div class="cc-head"><div><div class="cc-name">Outreach</div><div class="cc-desc">Unique leads you attempted to contact</div></div><div class="cc-count" style="color:#2563eb">84</div></div>
+              <div class="cc-bar"><div class="cc-fill" style="background:#2563eb;width:100%"></div></div>
+              <div class="cc-foot"><div class="cc-conv"></div><div class="cc-controls"><button class="cc-btn cc-minus" data-cat="outreach">&minus;</button><button class="cc-btn cc-plus" data-cat="outreach" style="background:#2563eb">+</button></div></div>
+            </div>
+
+            <div class="cc-row" data-cat="talk">
+              <div class="cc-head"><div><div class="cc-name">Talk To's</div><div class="cc-desc">Leads you actually reached and spoke with</div></div><div class="cc-count" style="color:#0a84ff">38</div></div>
+              <div class="cc-bar"><div class="cc-fill" style="background:#0a84ff;width:45%"></div></div>
+              <div class="cc-foot"><div class="cc-conv"></div><div class="cc-controls"><button class="cc-btn cc-minus" data-cat="talk">&minus;</button><button class="cc-btn cc-plus" data-cat="talk" style="background:#0a84ff">+</button></div></div>
+            </div>
+
+            <div class="cc-row" data-cat="qual">
+              <div class="cc-head"><div><div class="cc-name">Qualifying Questions</div><div class="cc-desc">Times you got to ask about eligibility</div></div><div class="cc-count" style="color:#5e5ce6">26</div></div>
+              <div class="cc-bar"><div class="cc-fill" style="background:#5e5ce6;width:31%"></div></div>
+              <div class="cc-foot"><div class="cc-conv"></div><div class="cc-controls"><button class="cc-btn cc-minus" data-cat="qual">&minus;</button><button class="cc-btn cc-plus" data-cat="qual" style="background:#5e5ce6">+</button></div></div>
+            </div>
+
+            <div class="cc-row" data-cat="pres">
+              <div class="cc-head"><div><div class="cc-name">Presentations</div><div class="cc-desc">Times you explained the product</div></div><div class="cc-count" style="color:#bf5af2">19</div></div>
+              <div class="cc-bar"><div class="cc-fill" style="background:#bf5af2;width:23%"></div></div>
+              <div class="cc-foot"><div class="cc-conv"></div><div class="cc-controls"><button class="cc-btn cc-minus" data-cat="pres">&minus;</button><button class="cc-btn cc-plus" data-cat="pres" style="background:#bf5af2">+</button></div></div>
+            </div>
+
+            <div class="cc-row" data-cat="close">
+              <div class="cc-head"><div><div class="cc-name">Closes</div><div class="cc-desc">Times you attempted to close the deal</div></div><div class="cc-count" style="color:#ff9f0a">9</div></div>
+              <div class="cc-bar"><div class="cc-fill" style="background:#ff9f0a;width:11%"></div></div>
+              <div class="cc-foot"><div class="cc-conv"></div><div class="cc-controls"><button class="cc-btn cc-minus" data-cat="close">&minus;</button><button class="cc-btn cc-plus" data-cat="close" style="background:#ff9f0a">+</button></div></div>
+            </div>
+
+            <div class="cc-row" data-cat="sale">
+              <div class="cc-head"><div><div class="cc-name">Sales</div><div class="cc-desc">Closes that turned into signed deals</div></div><div class="cc-count" style="color:#34c759">3</div></div>
+              <div class="cc-bar"><div class="cc-fill" style="background:#34c759;width:6%"></div></div>
+              <div class="cc-foot"><div class="cc-conv"></div><div class="cc-controls"><button class="cc-btn cc-minus" data-cat="sale">&minus;</button><button class="cc-btn cc-plus" data-cat="sale" style="background:#34c759">+</button></div></div>
+            </div>
+
+          </div>
         </div>
       </div>
 
@@ -1595,6 +1678,53 @@
       }
     });
   }
+
+  // ----- Counter (tally clicker) -----
+  const counterDefs = [
+    { cat: 'outreach', prev: null,       prevName: '' },
+    { cat: 'talk',     prev: 'outreach', prevName: 'Outreach' },
+    { cat: 'qual',     prev: 'talk',     prevName: "Talk To's" },
+    { cat: 'pres',     prev: 'qual',     prevName: 'Qualifying' },
+    { cat: 'close',    prev: 'pres',     prevName: 'Presentations' },
+    { cat: 'sale',     prev: 'close',    prevName: 'Closes' },
+  ];
+  const counts = { outreach: 84, talk: 38, qual: 26, pres: 19, close: 9, sale: 3 };
+
+  function renderCounter() {
+    const base = counts.outreach || 0;
+    counterDefs.forEach(d => {
+      const row = document.querySelector('.cc-row[data-cat="' + d.cat + '"]');
+      if (!row) return;
+      const c = counts[d.cat];
+      row.querySelector('.cc-count').textContent = c;
+      const pct = base > 0 ? Math.min(100, Math.round(c / base * 100)) : 0;
+      row.querySelector('.cc-fill').style.width = pct + '%';
+      const conv = row.querySelector('.cc-conv');
+      if (d.prev) {
+        const pv = counts[d.prev];
+        conv.innerHTML = '<b>' + (pv > 0 ? Math.round(c / pv * 100) : 0) + '%</b> of ' + d.prevName;
+      }
+    });
+    const homeStat = document.getElementById('home-counter-stat');
+    if (homeStat) homeStat.innerHTML = '<b>' + counts.outreach + '</b> outreach';
+  }
+
+  function bumpCount(cat) {
+    const el = document.querySelector('.cc-row[data-cat="' + cat + '"] .cc-count');
+    if (el) { el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 140); }
+  }
+
+  document.querySelectorAll('.cc-plus').forEach(b => b.addEventListener('click', () => {
+    counts[b.dataset.cat]++; renderCounter(); bumpCount(b.dataset.cat);
+  }));
+  document.querySelectorAll('.cc-minus').forEach(b => b.addEventListener('click', () => {
+    counts[b.dataset.cat] = Math.max(0, counts[b.dataset.cat] - 1); renderCounter(); bumpCount(b.dataset.cat);
+  }));
+  const counterReset = document.getElementById('counter-reset');
+  if (counterReset) counterReset.addEventListener('click', () => {
+    Object.keys(counts).forEach(k => counts[k] = 0); renderCounter();
+  });
+  renderCounter();
 
   // Animate the activity rings (fill from 0 to target) within the given screen
   function runRings(scope) {
