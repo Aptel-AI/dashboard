@@ -1,3 +1,40 @@
+# TeleMapper Home Prototype — Session Handoff (June 8, 2026)
+
+_New mobile prototype: `telemapper-home-prototype.html` (Apple Fitness–style landing redesign). Self-contained, no backend. Verified each change in headless Chrome before pushing; live on GH Pages._
+
+## What Was Done This Session
+
+### 1. ✅ Created the prototype (Apple Fitness "Summary" style)
+Card-first landing reusing the chatbot mobile prototype's phone frame / status bar / map SVG. Header greeting, "Today" completion rings (Outreach / Talk To's / Sales), a "Continue Mapping" card, and a "Go To" card grid. Floating frosted tab bar; Home↔Map navigation.
+
+### 2. ✅ Client Training snapshot + Bulletin Board + detail screen
+- Added a 7-tile stat snapshot (Units/Lines/Activated/Pending/Port Issues/Cancelled/Disconnected) at the top of Home that opens a **Client Training detail screen** (identity card, stat grid, Weekly Activity bar charts).
+- Tapping a weekly bar opens an **order-detail bottom sheet**.
+- Added a **Bulletin Board** card for feature releases + promotions.
+
+### 3. ✅ Fixed back button
+Client Training back button didn't fire — the full-width `.ct-title` overlay was intercepting taps. Fixed with `pointer-events:none`. Found via headless-Chrome repro (inspection looked fine). See [[verify-prototypes-headless-chrome]].
+
+### 4. ✅ Reworked navigation + cards
+- Removed **Continue Mapping**; **Leads** (tab + card) now opens a **batch-picker sheet** → choosing a batch shows it on the map with a "Viewing: <batch>" banner.
+- **Today** rings now open a detail screen: activity **funnel** (Outreach→Talk To's→Qualifying→Presentations→Closes→Sales) + avg-attempts breakdown.
+- **Awards → Sales Board** (office leaderboard sheet). **Territory → Check In** (logs arrival time). **Reports → Counter** (interactive tally clicker for the six funnel categories). **Team** reframed as **manage your reps** (My Team sheet).
+
+### 5. ✅ Goal-pacing on the completion rings
+Rings + a new **Day Pace** visual (Today screen) are colored by pace toward an 8 PM goal over a 9 AM–8 PM workday: **light blue = ahead, green = on pace, amber = slightly behind, red = behind**. Day Pace shows a day timeline (now marker + time left) and per-metric bars with a "where you should be by now" line. Mock "now" = 4:42 PM to surface a spread of tiers.
+
+### 6. ✅ Commits (all pushed to main)
+`db81e19` create → `78e1a9b` client snapshot/bulletin/detail → `7b08016` back-button fix → `ef3e868` leads/today funnel → `df9b052` sales board/check-in → `c095934` team mgmt → `49474e6` counter → `28f080a` goal pacing → `d43f72d` light-blue ahead tier.
+
+## Open Threads / Next Steps
+- Counter and the Today funnel hold **separate** numbers — could wire the Counter to be the single source of truth so it updates the rings/funnel/Day Pace live.
+- Pacing assumes a fixed 9 AM–8 PM window — could tie the start to the rep's **Check In** time.
+- Goals are hardcoded (120/50/5) — per-rep or per-campaign later.
+- Map batch selection only shows a banner — could render pins for the chosen batch.
+- Rep rows in My Team / batch cards are static — could open individual detail/management views.
+
+---
+
 # Dashboard — Session Handoff (June 3, 2026)
 
 _Rep-facing dashboard work (sales posting + teams). Older owner/NLR session log follows below._
