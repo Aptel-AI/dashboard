@@ -11,7 +11,8 @@ const { useState, useEffect, useRef, useMemo } = React;
 const html = htm.bind(React.createElement);
 
 const STORE_KEY = 'soi.data.v1';
-const THEME = new URLSearchParams(location.search).get('theme') || 'chart';
+const THEME = new URLSearchParams(location.search).get('theme') || 'parchment';
+document.body.setAttribute('data-theme', THEME);
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function parseDataFile(text) {
@@ -79,7 +80,6 @@ function App({ data }) {
 
   // --- init globe once ---
   useEffect(() => {
-    document.body.setAttribute('data-theme', THEME);
     const cv = document.getElementById('globe-canvas');
     window.Globe.init({ canvas: cv, theme: THEME, ports }).then(() => {
       window.Globe.onHover((hit, x, y) => setHover(hit ? { ...hit, x, y } : null));
