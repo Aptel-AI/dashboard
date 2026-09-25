@@ -37,7 +37,9 @@
   let theme = 'chart';
   let idle = false, baseRotation = 0.0006;
   let dragging = false, dragMoved = 0, lastX = 0, lastY = 0, momentumX = 0, momentumY = 0;
-  let camDist = 3.7, camTarget = 3.7;
+  // Opening distance: the whole globe (with its halo) fills ~60% of the window height.
+  const CAM_START = 5.3;
+  let camDist = CAM_START, camTarget = CAM_START;
   const pointers = new Map();
   let pinchStart = 0, pinchCam = 0;
   let currentVoyage = null, currentPath = [], lastProgress = 1;
@@ -507,7 +509,8 @@
   }
 
   // Center on the voyage's track and zoom so all of it fits.
-  function focusVoyage(voyage) {
+  // zoom=false only rotates, keeping the current distance (used on first load).
+  function focusVoyage(voyage, zoom = true) {
     const pts = (voyage && voyage.track) || [];
     if (!pts.length) return;
     const vs = pts.map(p => latLonToVec3(p.lat, p.lon, 1));
@@ -518,7 +521,7 @@
     const lon = Math.atan2(c.z, -c.x) * 180 / Math.PI - 180;
     // camera distance that fits an angular radius `spread` in view
     const dist = THREE.MathUtils.clamp(1.6 + spread * 2.6, 2.4, 4.6);
-    focusLatLon(lat, lon, dist);
+    focusLatLon(lat, lon, zoom ? dist : null);
   }
 
   window.Globe = {

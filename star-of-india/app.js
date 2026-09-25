@@ -75,6 +75,7 @@ function App({ data }) {
   const idleTimer = useRef(null);
   const cycleTimer = useRef(null);
   const playRef = useRef({ raf: null, t0: 0 });
+  const firstFocus = useRef(true);
 
   const voyage = voyages[voyageIdx] || voyages[0];
 
@@ -97,7 +98,9 @@ function App({ data }) {
     setProgress(1);
     setSelected(null);
     window.Globe.setVoyage(voyage, 1);
-    window.Globe.focusVoyage(voyage);
+    // Open on the whole globe; zoom to fit only when a voyage is picked.
+    window.Globe.focusVoyage(voyage, !firstFocus.current);
+    firstFocus.current = false;
   }, [voyageIdx, ready]);
 
   // --- progress -> globe ---
