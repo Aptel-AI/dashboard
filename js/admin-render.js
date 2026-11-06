@@ -301,16 +301,22 @@ const AdminRender = {
     const chatPlatformSelect = document.getElementById('office-chat-platform');
     if (chatPlatformSelect) chatPlatformSelect.value = chatPlatform;
 
-    // Set webhook value into the correct field based on platform
-    const webhookUrl = office ? (office.discordWebhookUrl || '') : '';
+    // The saved webhook is write-only: the server never sends it back, it only says whether
+    // one is saved. Leaving the field blank on save keeps the saved webhook.
+    const saved = !!(office && office.chatConfigured);
     const discordInput = document.getElementById('office-chat-webhook');
     const groupmeInput = document.getElementById('office-chat-webhook-gm');
-    if (chatPlatform === 'groupme') {
-      if (groupmeInput) groupmeInput.value = webhookUrl;
-      if (discordInput) discordInput.value = '';
-    } else {
-      if (discordInput) discordInput.value = webhookUrl;
-      if (groupmeInput) groupmeInput.value = '';
+    if (discordInput) {
+      discordInput.value = '';
+      discordInput.placeholder = (saved && chatPlatform === 'discord')
+        ? 'Webhook saved (hidden) — paste a new URL only to replace it'
+        : 'https://discord.com/api/webhooks/...';
+    }
+    if (groupmeInput) {
+      groupmeInput.value = '';
+      groupmeInput.placeholder = (saved && chatPlatform === 'groupme')
+        ? 'Bot ID saved (hidden) — paste a new one only to replace it'
+        : 'e.g. abc123def456...';
     }
 
     // Leaderboard post settings

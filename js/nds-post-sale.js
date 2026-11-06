@@ -520,82 +520,6 @@ const PostSale = {
     }
   },
 
-  _fireDiscordWebhook(payload) {
-    try {
-      const platform = OFFICE_CONFIG.chatPlatform || 'discord';  // default discord for backward compat
-      const webhookId = OFFICE_CONFIG.discordWebhookUrl;  // stores URL (discord) or bot ID (groupme)
-
-      if (!webhookId || platform === 'none') {
-        console.warn('[PostSale] No chat webhook configured for this office (platform:', platform, ')');
-        return;
-      }
-
-      // Build message text
-      const traineeName = payload.trainee ? (payload.traineeName || '').trim() : '';
-      const who = traineeName ? (payload.repName + ' and ' + traineeName) : payload.repName;
-      let msg = '';
-      let units = 0;
-
-      if (platform === 'discord') {
-        // Discord markdown: **bold**
-        msg += '**' + who + '** made a sale with AT&T: NDS!\n';
-      } else {
-        // GroupMe: plain text, no markdown
-        msg += who + ' made a sale with AT&T: NDS!\n';
-      }
-      msg += 'Consumer Account\n';
-      msg += payload.dsi + '\n';
-
-      // Product bullet lines
-      if (payload.air) { msg += '• Internet Air\n'; units++; }
-      if (payload.newPhones || payload.byods) {
-        msg += '• ' + (payload.newPhones || 0) + ' New Phone(s)|' + (payload.byods || 0) + ' BYOD(s)\n';
-        units += (payload.newPhones || 0) + (payload.byods || 0);
-      }
-
-      // Hashtags (optional)
-      const tags = this._formData.hashtags?.trim();
-      if (tags) msg += tags + '\n';
-
-      // Team emoji x units
-      const emoji = this._getTeamEmoji();
-      if (emoji && units > 0) msg += emoji.repeat(Math.min(units, 20));
-
-      const finalMsg = msg.trim();
-
-      // Platform-specific POST
-      let url, opts;
-      if (platform === 'groupme') {
-        url = 'https://api.groupme.com/v3/bots/post';
-        opts = {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bot_id: webhookId, text: finalMsg })
-        };
-      } else {
-        // Discord (default)
-        url = webhookId;
-        opts = {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: finalMsg })
-        };
-      }
-
-      console.log('[PostSale] Firing', platform, 'webhook');
-      fetch(url, opts)
-        .then(r => { if (!r.ok) console.warn('[PostSale]', platform, 'webhook HTTP', r.status); })
-        .catch(err => {
-          console.warn('[PostSale]', platform, 'webhook failed, retrying…', err.message);
-          setTimeout(() => {
-            fetch(url, opts)
-              .then(r => { if (!r.ok) console.warn('[PostSale] Retry HTTP', r.status); })
-              .catch(e2 => console.warn('[PostSale] Retry failed:', e2.message));
-          }, 2000);
-        });
-    } catch (e) { console.warn('[PostSale] Webhook build error:', e.message); }
-  },
-
   _buildPayload() {
     const session = Auth.getSession();
     const d = this._formData;
@@ -622,10 +546,9 @@ const PostSale = {
       // Order channel & codes
       orderChannel: d.orderChannel || 'Sara',
       codesUsedBy: d.codesUsed ? (d.codesUsedBy || '') : '',
-      // Webhook config (for server-side Discord/GroupMe posting)
+      // Hashtags appended to the server-side Discord/GroupMe message
       hashtags: d.hashtags || '',
-      discordWebhookUrl: OFFICE_CONFIG.discordWebhookUrl || '',
-      chatPlatform: OFFICE_CONFIG.chatPlatform || 'discord'
+      // Chat webhook is looked up server-side by NdsCode.gs; never sent from the browser.
     };
   },
 

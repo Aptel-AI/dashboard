@@ -107,7 +107,6 @@ const Auth = {
         logoIconUrl: OFFICE_CONFIG.logoIconUrl || '',
         headerLogoStyle: OFFICE_CONFIG.headerLogoStyle || 'icon',
         payrollManagerEmail: OFFICE_CONFIG.payrollManagerEmail || '',
-        discordWebhookUrl: OFFICE_CONFIG.discordWebhookUrl || '',
         payrollMode: OFFICE_CONFIG.payrollMode || 'commission-split',
         ownerEmail: OFFICE_CONFIG.ownerEmail || '',
         ownerName: OFFICE_CONFIG.ownerName || ''
@@ -143,7 +142,6 @@ const Auth = {
         logoIconUrl: OFFICE_CONFIG.logoIconUrl || '',
         headerLogoStyle: OFFICE_CONFIG.headerLogoStyle || 'icon',
         payrollManagerEmail: OFFICE_CONFIG.payrollManagerEmail || '',
-        discordWebhookUrl: OFFICE_CONFIG.discordWebhookUrl || '',
         payrollMode: OFFICE_CONFIG.payrollMode || 'commission-split',
         ownerEmail: OFFICE_CONFIG.ownerEmail || '',
         ownerName: OFFICE_CONFIG.ownerName || ''

@@ -89,7 +89,6 @@ const App = {
         if (session.officeConfig.logoIconUrl) OFFICE_CONFIG.logoIconUrl = session.officeConfig.logoIconUrl;
         if (session.officeConfig.headerLogoStyle) OFFICE_CONFIG.headerLogoStyle = session.officeConfig.headerLogoStyle;
         if (session.officeConfig.payrollManagerEmail) OFFICE_CONFIG.payrollManagerEmail = session.officeConfig.payrollManagerEmail;
-        if (session.officeConfig.discordWebhookUrl) OFFICE_CONFIG.discordWebhookUrl = session.officeConfig.discordWebhookUrl;
         if (session.officeConfig.payrollMode) OFFICE_CONFIG.payrollMode = session.officeConfig.payrollMode;
         if (session.officeConfig.ownerEmail) OFFICE_CONFIG.ownerEmail = session.officeConfig.ownerEmail;
         if (session.officeConfig.ownerName) OFFICE_CONFIG.ownerName = session.officeConfig.ownerName;
@@ -97,8 +96,8 @@ const App = {
       }
       // Update loading screen logo with restored office branding
       this._applyLoginBranding();
-      // Resolve office config if key fields are missing (webhooks, payroll manager, etc.)
-      if (OFFICE_CONFIG.officeId && (!OFFICE_CONFIG.discordWebhookUrl || !OFFICE_CONFIG.payrollManagerEmail)) {
+      // Resolve office config if key fields are missing (payroll manager, etc.)
+      if (OFFICE_CONFIG.officeId && !OFFICE_CONFIG.payrollManagerEmail) {
         await this._resolveOfficeId(OFFICE_CONFIG.officeId);
       }
       this.state.currentRole = session.role;
@@ -116,8 +115,8 @@ const App = {
       if (OFFICE_CONFIG._pendingOfficeId) {
         await this._resolveOfficeId(OFFICE_CONFIG._pendingOfficeId);
       }
-      // Resolve office config if key fields are missing (webhooks, payroll manager, etc.)
-      if (OFFICE_CONFIG.officeId && (!OFFICE_CONFIG.discordWebhookUrl || !OFFICE_CONFIG.payrollManagerEmail)) {
+      // Resolve office config if key fields are missing (payroll manager, etc.)
+      if (OFFICE_CONFIG.officeId && !OFFICE_CONFIG.payrollManagerEmail) {
         await this._resolveOfficeId(OFFICE_CONFIG.officeId);
       }
 
@@ -156,7 +155,6 @@ const App = {
         if (oc.logoIconUrl) OFFICE_CONFIG.logoIconUrl = oc.logoIconUrl;
         if (oc.headerLogoStyle) OFFICE_CONFIG.headerLogoStyle = oc.headerLogoStyle;
         if (oc.payrollManagerEmail) OFFICE_CONFIG.payrollManagerEmail = oc.payrollManagerEmail;
-        if (oc.discordWebhookUrl) OFFICE_CONFIG.discordWebhookUrl = oc.discordWebhookUrl;
         if (oc.chatPlatform && oc.chatPlatform !== 'none') OFFICE_CONFIG.chatPlatform = oc.chatPlatform;
         if (oc.payrollMode) OFFICE_CONFIG.payrollMode = oc.payrollMode;
         if (oc.ownerEmail) OFFICE_CONFIG.ownerEmail = oc.ownerEmail;
@@ -2122,7 +2120,6 @@ const App = {
       officeName: office.name,
       logoUrl: office.logoUrl || '',
       logoIconUrl: office.logoIconUrl || '',
-      discordWebhookUrl: office.discordWebhookUrl || ''
     };
 
     const encoded = btoa(JSON.stringify(config));

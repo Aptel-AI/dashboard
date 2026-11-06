@@ -139,7 +139,6 @@ const WEEK_PERIODS = new Set([7, 8, 9, 10, 11]);
       if (cfg.headerLogoStyle) OFFICE_CONFIG.headerLogoStyle = cfg.headerLogoStyle;
       if (cfg.payrollManagerEmail) OFFICE_CONFIG.payrollManagerEmail = cfg.payrollManagerEmail;
       if (cfg.payrollMode) OFFICE_CONFIG.payrollMode = cfg.payrollMode;
-      if (cfg.discordWebhookUrl) OFFICE_CONFIG.discordWebhookUrl = cfg.discordWebhookUrl;
       if (cfg.chatPlatform && cfg.chatPlatform !== 'none') OFFICE_CONFIG.chatPlatform = cfg.chatPlatform;
       if (cfg.ownerEmail) OFFICE_CONFIG.ownerEmail = cfg.ownerEmail;
       if (cfg.ownerName) OFFICE_CONFIG.ownerName = cfg.ownerName;

@@ -713,8 +713,7 @@ const AdminApp = {
       payrollManagerEmail: office.payrollManagerEmail || '',
       payrollMode: office.payrollMode || 'commission-split',
       ownerEmail: office.ownerEmail || '',
-      ownerName: office.ownerName || '',
-      discordWebhookUrl: office.discordWebhookUrl || ''
+      ownerName: office.ownerName || ''
     };
 
     const encoded = btoa(JSON.stringify(config));

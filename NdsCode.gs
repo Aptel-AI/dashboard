@@ -5,6 +5,9 @@
 // Accepts officeId + sheetId params to route to correct tabs/sheets.
 // Deploy as Web App: Execute as ME, Anyone can access.
 // Set API_KEY in Script Properties (Project Settings > Script Properties).
+// Chat webhooks are looked up from AdminCode.gs, never taken from the browser. Also set:
+//   ADMIN_API_URL      = the AdminCode.gs web app /exec URL
+//   CHAT_LOOKUP_SECRET = same value as in the Admin script's Script Properties
 
 
 // === PER-OFFICE TAB BASES ===
@@ -1667,7 +1670,7 @@ function writeAddSale(body, ss, officeId) {
   var dupRow = _findDuplicateSale(sheet, email, String(body.campaign || 'attb2b').trim(), body);
   if (dupRow > 0) {
     var dupWebhook = '';
-    try { dupWebhook = _fireWebhook(body, units, teamEmoji); } catch (e) { dupWebhook = 'error: ' + e.message; }
+    try { dupWebhook = _fireWebhook(body, units, teamEmoji, officeId); } catch (e) { dupWebhook = 'error: ' + e.message; }
     return {
       ok: true,
       duplicate: true,
@@ -1688,7 +1691,7 @@ function writeAddSale(body, ss, officeId) {
   // Fire Discord/GroupMe webhook server-side
   var webhookResult = 'skipped';
   try {
-    webhookResult = _fireWebhook(body, units, teamEmoji);
+    webhookResult = _fireWebhook(body, units, teamEmoji, officeId);
   } catch (e) {
     webhookResult = 'error: ' + e.message;
   }
@@ -1758,9 +1761,37 @@ function _saleDateKey(val) {
 
 // === DISCORD / GROUPME WEBHOOK (server-side) ===
 
-function _fireWebhook(body, units, teamEmoji) {
-  var platform = String(body.chatPlatform || 'discord').toLowerCase();
-  var webhookUrl = String(body.discordWebhookUrl || '').trim();
+// The webhook URL lives only in the Admin sheet. Fetch it server-to-server and cache it
+// briefly. A URL sent by the browser is never used, so the URL never has to leave Google.
+function _getChatConfig(officeId) {
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'chatcfg_' + officeId;
+  var hit = cache.get(cacheKey);
+  if (hit) return JSON.parse(hit);
+
+  var props = PropertiesService.getScriptProperties();
+  var adminUrl = (props.getProperty('ADMIN_API_URL') || '').trim();
+  var secret = (props.getProperty('CHAT_LOOKUP_SECRET') || '').trim();
+  if (!adminUrl || !secret) return { error: 'not_configured' };
+
+  var resp = UrlFetchApp.fetch(adminUrl, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ action: 'getChatWebhook', officeId: officeId, secret: secret }),
+    muteHttpExceptions: true
+  });
+  var cfg;
+  try { cfg = JSON.parse(resp.getContentText()); } catch (e) { return { error: 'http_' + resp.getResponseCode() }; }
+  if (cfg.error) return cfg;
+  cache.put(cacheKey, JSON.stringify(cfg), 300);  // 5 min: a rotated webhook takes effect within 5 min
+  return cfg;
+}
+
+function _fireWebhook(body, units, teamEmoji, officeId) {
+  var chat = _getChatConfig(officeId);
+  if (chat.error) return 'lookup_' + chat.error;
+  var platform = String(chat.chatPlatform || 'discord').toLowerCase();
+  var webhookUrl = String(chat.webhookUrl || '').trim();
   if (!webhookUrl) return 'no_url';
   if (platform === 'none') return 'platform_none';
 
@@ -1869,13 +1900,11 @@ function replayWebhook(body, ss, officeId) {
         air: row[OL.AIR],
         newPhones: row[OL.NEW_PHONES],
         byods: row[OL.BYODS],
-        hashtags: '',
-        discordWebhookUrl: body.discordWebhookUrl || '',
-        chatPlatform: body.chatPlatform || 'discord'
+        hashtags: ''
       };
       var units = (Number(row[OL.AIR]) || 0) + (Number(row[OL.NEW_PHONES]) || 0) + (Number(row[OL.BYODS]) || 0);
       var teamEmoji = String(row[OL.TEAM_EMOJI] || '').trim();
-      var wh = _fireWebhook(saleBody, units, teamEmoji);
+      var wh = _fireWebhook(saleBody, units, teamEmoji, officeId);
       results.push({ dsi: dsi, webhook: wh });
     }
   }
@@ -2070,15 +2099,16 @@ function buildLeaderboardText(ss, officeId, officeName) {
 }
 
 /**
- * Manual test — posts leaderboard to the webhook configured in Script Properties.
+ * Manual test — posts the default office's leaderboard to its chat webhook (looked up from Admin).
  * For centralized scheduling, use AdminCode.gs checkLeaderboardPosts() instead.
  */
 function postLeaderboardToChat() {
   var props = PropertiesService.getScriptProperties();
-  var webhookUrl = (props.getProperty('CHAT_WEBHOOK_URL') || '').trim();
-  var platform   = (props.getProperty('CHAT_PLATFORM') || 'discord').trim().toLowerCase();
-  if (!webhookUrl || platform === 'none') {
-    Logger.log('[LeaderboardPost] No webhook configured — skipping');
+  var chat = _getChatConfig(DEFAULT_OFFICE_ID);
+  var webhookUrl = String(chat.webhookUrl || '').trim();
+  var platform   = String(chat.chatPlatform || 'discord').toLowerCase();
+  if (chat.error || !webhookUrl || platform === 'none') {
+    Logger.log('[LeaderboardPost] No webhook available (' + (chat.error || 'none set') + ') — skipping');
     return;
   }
 

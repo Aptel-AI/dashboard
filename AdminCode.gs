@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════
 // Deploy as Web App: Execute as ME, Anyone can access.
 // Set API_KEY in Script Properties (Project Settings > Script Properties).
+// Set CHAT_LOOKUP_SECRET too (same value as in NdsCode.gs) so campaign scripts can look up webhooks.
 // Paste this into a NEW Apps Script project attached to the Admin master sheet.
 
 // === CONFIG ===
@@ -208,7 +209,7 @@ function doGet(e) {
                 apiKey: o.apiKey,
                 logoUrl: o.logoUrl || '',
                 logoIconUrl: o.logoIconUrl || '',
-                discordWebhookUrl: o.discordWebhookUrl || '',
+                chatConfigured: o.chatConfigured,
                 chatPlatform: o.chatPlatform || 'discord',
                 headerLogoStyle: o.headerLogoStyle || 'icon',
                 payrollManagerEmail: o.payrollManagerEmail || '',
@@ -243,6 +244,12 @@ function doPost(e) {
     body = JSON.parse(e.postData.contents);
   } catch (_) {
     return jsonResponse({ error: 'Invalid JSON' });
+  }
+
+  // Server-to-server only (called by NdsCode.gs). It is checked before API_KEY because
+  // API_KEY ships to browsers; this action is gated by CHAT_LOOKUP_SECRET instead.
+  if ((body.action || '').trim() === 'getChatWebhook') {
+    return jsonResponse(getChatWebhook(body));
   }
 
   const key = (body.key || '').trim();
@@ -380,7 +387,10 @@ function doPost(e) {
         if (body.logoUrl !== undefined) sheet.getRange(row, 11).setValue(body.logoUrl);
         if (body.logoIconUrl !== undefined) sheet.getRange(row, 12).setValue(body.logoIconUrl);
         if (body.brandColors !== undefined) sheet.getRange(row, 13).setValue(body.brandColors);
-        if (body.discordWebhookUrl !== undefined) sheet.getRange(row, 15).setValue(body.discordWebhookUrl);
+        // The webhook is write-only: the portal never receives the saved value, so an empty
+        // field means "keep the current one". Choosing platform "none" clears it.
+        if (body.discordWebhookUrl) sheet.getRange(row, 15).setValue(String(body.discordWebhookUrl).trim());
+        else if (body.chatPlatform === 'none') sheet.getRange(row, 15).setValue('');
         if (body.headerLogoStyle !== undefined) sheet.getRange(row, 16).setValue(body.headerLogoStyle);
         if (body.payrollManagerEmail !== undefined) sheet.getRange(row, 17).setValue(body.payrollManagerEmail);
         if (body.payrollMode !== undefined) sheet.getRange(row, 18).setValue(body.payrollMode);
@@ -573,7 +583,7 @@ function readOffices() {
       logoIconUrl: (data[i][11] || '').toString().trim(),
       brandColors: (data[i][12] || '').toString().trim(),
       createdDate: (data[i][13] || '').toString(),
-      discordWebhookUrl: (data[i][14] || '').toString().trim(),
+      chatConfigured: (data[i][14] || '').toString().trim() !== '',  // URL itself: readOfficeWebhook()
       headerLogoStyle: (data[i][15] || '').toString().trim() || 'icon',
       payrollManagerEmail: (data[i][16] || '').toString().trim().toLowerCase(),
       payrollMode: (data[i][17] || 'commission-split').toString().trim(),
@@ -603,13 +613,35 @@ function readOfficesBasic() {
       apiKey: (data[i][5] || '').toString().trim(),
       logoUrl: (data[i][10] || '').toString().trim(),
       logoIconUrl: (data[i][11] || '').toString().trim(),
-      discordWebhookUrl: (data[i][14] || '').toString().trim(),
+      chatConfigured: (data[i][14] || '').toString().trim() !== '',
       chatPlatform: (data[i][18] || 'discord').toString().trim(),
       leaderboardEnabled: (data[i][19] || 'false').toString().trim(),
       leaderboardHour: (data[i][20] || '22').toString().trim()
     });
   }
   return offices;
+}
+
+// ── Chat webhooks are secrets ──
+// Anyone holding the webhook URL can post to the office's channel, and API_KEY is
+// embedded in public browser code. So no client-facing read returns the URL;
+// readOffices() exposes only chatConfigured. These two helpers are the only readers.
+function readOfficeWebhook(officeId) {
+  const data = getOrCreateSheet(OFFICES_TAB).getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if ((data[i][0] || '').toString().trim() === officeId) return (data[i][14] || '').toString().trim();
+  }
+  return '';
+}
+
+// Server-to-server lookup for campaign scripts. Fails closed if CHAT_LOOKUP_SECRET is unset.
+function getChatWebhook(body) {
+  const expected = PropertiesService.getScriptProperties().getProperty('CHAT_LOOKUP_SECRET') || '';
+  if (!expected || String(body.secret || '') !== expected) return { error: 'unauthorized' };
+  const officeId = String(body.officeId || '').trim();
+  const office = readOffices().filter(function(o) { return o.officeId === officeId; })[0];
+  if (!office || office.status !== 'active') return { error: 'office not active' };
+  return { webhookUrl: readOfficeWebhook(officeId), chatPlatform: office.chatPlatform || 'discord' };
 }
 
 // ── Universal login: find which office a rep email belongs to ──
@@ -999,8 +1031,8 @@ function checkLeaderboardPosts() {
 
     // Must have a webhook configured
     var platform = (office.chatPlatform || 'discord').toLowerCase();
-    var webhookUrl = (office.discordWebhookUrl || '').trim();
-    if (!webhookUrl || platform === 'none') continue;
+    if (!office.chatConfigured || platform === 'none') continue;
+    var webhookUrl = readOfficeWebhook(office.officeId);
 
     // Must have an Apps Script URL to call
     var appsScriptUrl = (office.appsScriptUrl || '').trim();
